@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($php = \\(Get-Command php -ErrorAction SilentlyContinue\\); $composer = \\(Get-Command composer -ErrorAction SilentlyContinue\\); $docker = \\(Get-Command docker -ErrorAction SilentlyContinue\\); \"PHP: $\\($php.Source\\)\"; if \\($php\\) { php -v }; \"---\"; \"Composer: $\\($composer.Source\\)\"; if \\($composer\\) { composer --version }; \"---\"; \"Docker: $\\($docker.Source\\)\"; if \\($docker\\) { docker --version })",
+      "PowerShell(\"Removed backend/ to let composer create it fresh.\")",
+      "PowerShell(& \"C:\\\\xampp\\\\mysql\\\\bin\\\\mysql.exe\" -u root -e \"SELECT VERSION\\(\\) AS mysql_version; SHOW DATABASES;\" 2>&1)",
+      "PowerShell(\"=== Try connecting to MySQL as root with empty password \\(XAMPP default\\) ===\")",
+      "PowerShell(& \"C:\\\\xampp\\\\mysql\\\\bin\\\\mysql.exe\" -u meatplus_app -pPass@456 -e \"SELECT DATABASE\\(\\) AS db, CURRENT_USER\\(\\) AS user, VERSION\\(\\) AS version; USE meatplus_hris; SHOW TABLES;\" meatplus_hris 2>&1)",
+      "PowerShell(& \"C:\\\\xampp\\\\mysql\\\\bin\\\\mysql.exe\" --default-auth=mysql_native_password -u meatplus_app -pPass@456 meatplus_hris -e \"SELECT CURRENT_USER\\(\\);\" 2>&1)",
+      "PowerShell(& \"C:\\\\xampp\\\\mysql\\\\bin\\\\mysql.exe\" --protocol=tcp -h 127.0.0.1 -u meatplus_app -pPass@456 meatplus_hris -e \"SELECT CURRENT_USER\\(\\);\" 2>&1)",
+      "PowerShell(& \"C:\\\\xampp\\\\mysql\\\\bin\\\\mysql.exe\" --protocol=pipe -u meatplus_app -pPass@456 meatplus_hris -e \"SELECT CURRENT_USER\\(\\);\" 2>&1)",
+      "PowerShell(& \"C:\\\\xampp\\\\mysql\\\\bin\\\\mysql.exe\" -u root -e \"SELECT VERSION\\(\\);\" 2>&1)",
+      "PowerShell(\"=== Force mysql_native_password plugin on client ===\")",
+      "PowerShell(\"=== Try with --protocol=tcp explicitly ===\")",
+      "PowerShell(\"=== Maybe it's matching @localhost via socket. Try via named pipe ===\")",
+      "PowerShell(\"=== Last resort: try as root with no password \\(XAMPP fresh default\\) to rule out server issue ===\")",
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "PowerShell(npx --version)",
+      "PowerShell(\"=== Verify Node/npm/npx ===\")",
+      "PowerShell(\"=== Start backend \\(artisan serve\\) ===\")",
+      "PowerShell(\"Removed dead middleware.\")",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(grep -E \"\\\\.env$|\\\\.env\\\\.local$\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\WIN11RESOLVEIT\\bin"
+    ]
+  }
+}

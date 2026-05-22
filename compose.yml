@@ -1,0 +1,78 @@
+# Local development infrastructure for Meatplus HRIS.
+#
+# Runs the supporting services (Postgres, Redis, MinIO, Mailpit) in Docker.
+# Backend (Laravel) and frontend (Next.js) run on the host for fast iteration.
+# In production, the backend will run containerized via Laravel Forge.
+#
+# Usage:
+#   docker compose up -d          # start
+#   docker compose ps             # status
+#   docker compose down           # stop
+#   docker compose down -v        # stop + wipe data (destructive)
+
+name: meatplus-hris
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: meatplus-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: meatplus_hris
+      POSTGRES_USER: meatplus
+      POSTGRES_PASSWORD: meatplus_dev_only
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meatplus -d meatplus_hris"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: meatplus-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: meatplus-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: meatplus
+      MINIO_ROOT_PASSWORD: meatplus_dev_only
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: meatplus-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI — view dev emails at http://localhost:8025
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
