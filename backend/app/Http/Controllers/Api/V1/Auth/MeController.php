@@ -10,7 +10,20 @@ class MeController extends Controller
 {
     public function __invoke(Request $request): JsonResponse
     {
-        $user = $request->user()->load(['activeCompany:id,code,legal_name', 'companies:id,code,legal_name']);
+        $user = $request->user();
+
+        if ($user->active_company_id) {
+            setPermissionsTeamId($user->active_company_id);
+        }
+
+        // Avoid stale empty relations from earlier eager loads in the same request.
+        $user->unsetRelation('roles');
+        $user->unsetRelation('permissions');
+
+        $user->load([
+            'activeCompany:id,code,legal_name',
+            'companies:id,code,legal_name',
+        ]);
 
         return response()->json([
             'user' => [
@@ -21,8 +34,8 @@ class MeController extends Controller
                 'last_login_at' => $user->last_login_at,
                 'active_company' => $user->activeCompany,
                 'companies' => $user->companies,
-                'roles' => $user->getRoleNames(),
-                'permissions' => $user->getAllPermissions()->pluck('name'),
+                'roles' => $user->getRoleNames()->values()->all(),
+                'permissions' => $user->getAllPermissions()->pluck('name')->unique()->values()->all(),
             ],
         ]);
     }

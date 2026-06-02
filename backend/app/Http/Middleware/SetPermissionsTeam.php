@@ -14,7 +14,7 @@ class SetPermissionsTeam
         $companyId = $request->user()?->active_company_id;
 
         if ($companyId) {
-            app(PermissionRegistrar::class)->setPermissionsTeamId($companyId);
+            setPermissionsTeamId($companyId);
         }
 
         return $next($request);

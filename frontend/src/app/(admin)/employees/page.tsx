@@ -2,22 +2,31 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getMe } from "@/lib/auth";
 import { listEmployees } from "@/lib/employees";
 import { AppButton, AppInput, PageHeader, StatusBadge, TableShell } from "@/components/ui";
 
 export default function EmployeesPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
-  
-  // Track the currently selected employee for the preview drawer
   const [previewEmployee, setPreviewEmployee] = useState<any | null>(null);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["employees", { search, page }],
-    queryFn: () => listEmployees({ q: search, page, perPage: 25 }),
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["employees", { search: debouncedSearch, page }],
+    queryFn: () => listEmployees({ q: debouncedSearch, page, perPage: 25 }),
+    enabled: !!me,
+    staleTime: 30_000,
   });
 
   return (
@@ -74,7 +83,14 @@ export default function EmployeesPage() {
                 ))}
               </>
             )}
-            {data?.data.length === 0 && (
+            {isError && (
+              <tr>
+                <td colSpan={7} className="px-4 py-6 text-center text-red-600">
+                  Could not load employees (check you are signed in and have employee.view permission). Refresh the page.
+                </td>
+              </tr>
+            )}
+            {!isLoading && !isError && data?.data.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
                   No employees yet.{" "}

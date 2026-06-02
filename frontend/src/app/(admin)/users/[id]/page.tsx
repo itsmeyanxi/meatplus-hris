@@ -21,16 +21,28 @@ export default function UserDetailPage() {
 
   const [form, setForm] = useState<UpdateUserInput>({});
   const [tempPw, setTempPw] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (user) {
-      setForm({ name: user.name, email: user.email, role: user.roles[0], is_active: user.is_active });
+      setForm({ name: user.name, email: user.email, role: user.roles[0] ?? "employee", is_active: user.is_active });
     }
   }, [user]);
 
   const update = useMutation({
     mutationFn: () => usersApi.update(userId, form),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["user", userId] }),
+    onSuccess: () => {
+      setError(null);
+      setSaved(true);
+      qc.invalidateQueries({ queryKey: ["user", userId] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (e: unknown) => {
+      const err = e as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
+      const msgs = err?.response?.data?.errors;
+      setError(msgs ? Object.values(msgs).flat().join(" ") : err?.response?.data?.message ?? "Failed to save");
+    },
   });
   const reset = useMutation({
     mutationFn: () => usersApi.resetPassword(userId),
@@ -62,7 +74,7 @@ export default function UserDetailPage() {
       )}
 
       <form
-        onSubmit={(e) => { e.preventDefault(); update.mutate(); }}
+        onSubmit={(e) => { e.preventDefault(); setError(null); setSaved(false); update.mutate(); }}
         className="rounded-xl border border-slate-200 bg-white p-5 space-y-4"
       >
         <h3 className="text-sm font-semibold">Profile</h3>
@@ -86,6 +98,8 @@ export default function UserDetailPage() {
             Active
           </label>
         </div>
+        {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        {saved && !error && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">Saved.</p>}
         <div className="flex justify-end">
           <button type="submit" disabled={update.isPending} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
             {update.isPending ? "Saving…" : "Save changes"}

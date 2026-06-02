@@ -70,23 +70,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     if (isError) router.replace("/login");
   }, [isError, router]);
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">
-        Loading…
-      </div>
-    );
-  }
-
-  if (!data) return null;
-
   const handleLogout = async () => {
     await logout();
     router.replace("/login");
     router.refresh();
   };
 
-  const companyName = data.user.active_company?.legal_name ?? "No active company";
+  const companyName = data?.user.active_company?.legal_name ?? "Meatplus HRIS";
 
   return (
     <div 
@@ -159,7 +149,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           ) : (
             <div className="min-w-0">
               <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Signed in</p>
-              <p className="mt-0.5 break-all text-xs font-medium text-slate-900 line-clamp-2">{data.user.email}</p>
+              <p className="mt-0.5 break-all text-xs font-medium text-slate-900 line-clamp-2">
+                {isLoading ? "Loading…" : data?.user.email}
+              </p>
               <AppButton onClick={handleLogout} variant="secondary" className="mt-3 w-full text-xs py-1.5 h-auto">
                 Log out
               </AppButton>
@@ -203,7 +195,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               })}
             </nav>
 
-            <p className="text-xs text-slate-500 break-words">{data.user.email}</p>
+            <p className="text-xs text-slate-500 break-words">{isLoading ? "Loading…" : data?.user.email}</p>
           </div>
         </header>
 

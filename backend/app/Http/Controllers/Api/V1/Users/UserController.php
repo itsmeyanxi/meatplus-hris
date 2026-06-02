@@ -13,8 +13,6 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Spatie\Permission\PermissionRegistrar;
-
 class UserController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
@@ -59,7 +57,7 @@ class UserController extends Controller
             $companyId => ['is_default' => true],
         ]);
 
-        app(PermissionRegistrar::class)->setPermissionsTeamId($companyId);
+        setPermissionsTeamId($companyId);
         $user->assignRole($data['role']);
 
         if (! empty($data['employee_id'])) {
@@ -92,7 +90,7 @@ class UserController extends Controller
 
         if ($role) {
             $companyId = $request->user()->active_company_id;
-            app(PermissionRegistrar::class)->setPermissionsTeamId($companyId);
+            setPermissionsTeamId($companyId);
             $user->syncRoles([$role]);
         }
 
@@ -170,7 +168,7 @@ class UserController extends Controller
             $employee->company_id => ['is_default' => true],
         ]);
 
-        app(PermissionRegistrar::class)->setPermissionsTeamId($employee->company_id);
+        setPermissionsTeamId($employee->company_id);
         $user->assignRole('employee');
 
         $employee->forceFill(['user_id' => $user->id])->save();

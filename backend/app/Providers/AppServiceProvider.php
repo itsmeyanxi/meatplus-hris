@@ -12,7 +12,9 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Spatie registers this in boot(); binding early guarantees one instance so
+        // setPermissionsTeamId() in middleware applies to role/permission queries.
+        $this->app->singleton(PermissionRegistrar::class);
     }
 
     public function boot(): void
@@ -36,7 +38,7 @@ class AppServiceProvider extends ServiceProvider
             }
 
             if ($companyId) {
-                app(PermissionRegistrar::class)->setPermissionsTeamId($companyId);
+                setPermissionsTeamId($companyId);
             }
         });
     }
