@@ -24,12 +24,13 @@ use App\Http\Controllers\Api\V1\Leave\LeaveBalanceController;
 use App\Http\Controllers\Api\V1\Leave\LeaveTypeController;
 use App\Http\Controllers\Api\V1\Lookups\LookupController;
 use App\Http\Controllers\Api\V1\Users\UserController;
+use App\Http\Middleware\SetPermissionsTeam;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::post('login', LoginController::class);
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', SetPermissionsTeam::class])->group(function () {
         Route::get('me', MeController::class);
         Route::post('logout', LogoutController::class);
         Route::post('companies/switch', SwitchCompanyController::class);

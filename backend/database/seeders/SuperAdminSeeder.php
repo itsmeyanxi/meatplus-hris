@@ -6,12 +6,15 @@ use App\Domain\Identity\Models\Company;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class SuperAdminSeeder extends Seeder
 {
     public function run(): void
     {
         $company = Company::where('code', 'MPP-MAIN')->firstOrFail();
+        app(PermissionRegistrar::class)->setPermissionsTeamId($company->id);
 
         $user = User::firstOrCreate(
             ['email' => 'itdevice@meatplus.ph'],
@@ -27,7 +30,10 @@ class SuperAdminSeeder extends Seeder
             $company->id => ['is_default' => true],
         ]);
 
-        setPermissionsTeamId($company->id);
-        $user->assignRole('super_admin');
+        $role = Role::findByName('super_admin', 'web');
+
+        $user->roles()->syncWithoutDetaching([
+            $role->id => ['company_id' => $company->id],
+        ]);
     }
 }

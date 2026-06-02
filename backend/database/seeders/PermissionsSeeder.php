@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Identity\Models\Company;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -12,6 +13,11 @@ class PermissionsSeeder extends Seeder
     public function run(): void
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $company = Company::where('code', 'MPP-MAIN')->first();
+        if ($company) {
+            app(PermissionRegistrar::class)->setPermissionsTeamId($company->id);
+        }
 
         $permissions = [
             'employee.view', 'employee.create', 'employee.update', 'employee.delete',

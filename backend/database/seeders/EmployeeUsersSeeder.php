@@ -3,9 +3,12 @@
 namespace Database\Seeders;
 
 use App\Domain\HRIS\Models\Employee;
+use App\Domain\Identity\Models\Company;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class EmployeeUsersSeeder extends Seeder
 {
@@ -19,6 +22,11 @@ class EmployeeUsersSeeder extends Seeder
         $juan = Employee::query()->where('employee_no', 'EMP-0001')->first();
         if (! $juan) {
             return;
+        }
+
+        $company = Company::find($juan->company_id);
+        if ($company) {
+            app(PermissionRegistrar::class)->setPermissionsTeamId($company->id);
         }
 
         $user = User::firstOrCreate(
@@ -40,9 +48,9 @@ class EmployeeUsersSeeder extends Seeder
             $juan->forceFill(['user_id' => $user->id])->save();
         }
 
-        setPermissionsTeamId($juan->company_id);
-        if (! $user->hasRole('employee')) {
-            $user->assignRole('employee');
-        }
+        $role = Role::findByName('employee', 'web');
+        $user->roles()->syncWithoutDetaching([
+            $role->id => ['company_id' => $juan->company_id],
+        ]);
     }
 }

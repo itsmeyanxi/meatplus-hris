@@ -3,8 +3,10 @@
 namespace App\Providers;
 
 use Illuminate\Auth\Events\Authenticated;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Spatie\Permission\PermissionRegistrar;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -15,6 +17,14 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Gate::before(function ($user, string $ability) {
+            if (method_exists($user, 'hasPermissionTo') && $user->hasPermissionTo($ability)) {
+                return true;
+            }
+
+            return null;
+        });
+
         Event::listen(Authenticated::class, function (Authenticated $event) {
             $user = $event->user;
 
@@ -26,7 +36,7 @@ class AppServiceProvider extends ServiceProvider
             }
 
             if ($companyId) {
-                setPermissionsTeamId($companyId);
+                app(PermissionRegistrar::class)->setPermissionsTeamId($companyId);
             }
         });
     }

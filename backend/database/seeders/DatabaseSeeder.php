@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             CompanySeeder::class,
             PermissionsSeeder::class,
             SuperAdminSeeder::class,
+            EmployeeUsersSeeder::class,
             OrgStructureSeeder::class,
             AttendanceSeeder::class,
         ]);
