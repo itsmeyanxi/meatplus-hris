@@ -7,9 +7,21 @@ import { useEffect, useState, type ReactNode } from "react";
 import { getMe, logout } from "@/lib/auth";
 import { AppButton } from "@/components/ui";
 
-const NAV = [
-  { 
-    href: "/dashboard", 
+type NavItem = {
+  href: string;
+  label: string;
+  icon: ReactNode;
+  // Item shows only if the user has one of these roles (if set)…
+  roles?: string[];
+  // …and one of these permissions (if set). No gate = visible to everyone.
+  permissions?: string[];
+  // …and only if the user is linked to an employee record (if true).
+  requiresEmployee?: boolean;
+};
+
+const NAV: NavItem[] = [
+  {
+    href: "/dashboard",
     label: "Dashboard", 
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -18,39 +30,73 @@ const NAV = [
       </svg>
     )
   },
-  { 
-    href: "/employees", 
-    label: "Employees", 
+  {
+    href: "/employees",
+    label: "Employees",
+    permissions: ["employee.view"],
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
       </svg>
     )
   },
-  { 
-    href: "/attendance", 
-    label: "Attendance", 
+  {
+    href: "/attendance",
+    label: "Attendance",
+    permissions: ["attendance.view"],
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
     )
   },
-  { 
-    href: "/leaves", 
-    label: "Leaves", 
+  {
+    href: "/leaves",
+    label: "Leaves",
+    permissions: ["leave.view", "leave.file"],
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.364l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" />
       </svg>
     )
   },
-  { 
-    href: "/users", 
-    label: "Users", 
+  {
+    href: "/users",
+    label: "Users",
+    permissions: ["user.manage"],
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    )
+  },
+  {
+    href: "/my-attendance",
+    label: "My Attendance",
+    requiresEmployee: true,
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 16l2 2 4-4" />
+      </svg>
+    )
+  },
+  {
+    href: "/request-access",
+    label: "Request Access",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    )
+  },
+  {
+    href: "/access-requests",
+    label: "Access Requests",
+    roles: ["super_admin"],
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     )
   },
@@ -77,6 +123,18 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   };
 
   const companyName = data?.user.active_company?.legal_name ?? "Meatplus HRIS";
+
+  const userRoles = data?.user.roles ?? [];
+  const userPermissions = data?.user.permissions ?? [];
+  const hasEmployee = Boolean(data?.user.employee);
+  const visibleNav = NAV.filter((item) => {
+    const roleOk = !item.roles || item.roles.some((r) => userRoles.includes(r));
+    const permOk =
+      !item.permissions ||
+      item.permissions.some((p) => userPermissions.includes(p));
+    const employeeOk = !item.requiresEmployee || hasEmployee;
+    return roleOk && permOk && employeeOk;
+  });
 
   return (
     <div 
@@ -109,7 +167,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
           {/* Navigation Links */}
           <nav className="space-y-1">
-            {NAV.map((item) => {
+            {visibleNav.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <Link
@@ -177,7 +235,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             </div>
 
             <nav className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-              {NAV.map((item) => {
+              {visibleNav.map((item) => {
                 const active = pathname === item.href || pathname.startsWith(item.href + "/");
                 return (
                   <Link

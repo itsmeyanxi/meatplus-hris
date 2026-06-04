@@ -28,6 +28,8 @@ class PermissionsSeeder extends Seeder
             'gov_report.view', 'gov_report.generate',
             'company.manage', 'user.manage', 'role.manage',
             'audit.view',
+            'access_request.view',
+            'access_request.approve.supervisor', 'access_request.approve.hr', 'access_request.approve.it',
         ];
 
         foreach ($permissions as $name) {
@@ -42,6 +44,7 @@ class PermissionsSeeder extends Seeder
                 'leave.view', 'leave.approve.any', 'leave.manage_types',
                 'compensation.view',
                 'user.manage', 'role.manage', 'audit.view',
+                'access_request.view', 'access_request.approve.hr',
             ],
             'hr_manager' => [
                 'employee.view',
@@ -57,6 +60,7 @@ class PermissionsSeeder extends Seeder
             'dept_head' => [
                 'employee.view', 'attendance.view', 'attendance.approve.self_dept',
                 'leave.view', 'leave.approve.self_dept',
+                'access_request.approve.supervisor',
             ],
             'employee' => [
                 'leave.file',

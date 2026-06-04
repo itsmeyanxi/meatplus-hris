@@ -52,6 +52,15 @@ export type TimeLogInput = {
   source?: TimeLog["source"];
 };
 
+export type DayStatus =
+  | "present"
+  | "late"
+  | "absent"
+  | "leave"
+  | "holiday"
+  | "rest_day"
+  | "no_record";
+
 export type DailyTimeRecord = {
   id: number;
   employee_id: number;
@@ -70,7 +79,17 @@ export type DailyTimeRecord = {
   is_absent: boolean;
   is_on_leave: boolean;
   status: "draft" | "posted" | "locked";
+  day_status?: DayStatus;
   remarks: string | null;
+};
+
+export type AttendanceSummary = {
+  present: number;
+  late: number;
+  absent: number;
+  leave: number;
+  holiday: number;
+  rest_day: number;
 };
 
 export type ScheduleAssignment = {
@@ -118,6 +137,20 @@ export const dtrApi = {
   compute: async (body: { employee_id: number; from: string; to: string }): Promise<DailyTimeRecord[]> => {
     const { data } = await api.post<Listed<DailyTimeRecord>>("/api/v1/daily-time-records/compute", body);
     return data.data;
+  },
+};
+
+export const myAttendanceApi = {
+  // Self-service: the logged-in user's own DTRs + summary for a date range.
+  list: async (
+    from: string,
+    to: string,
+  ): Promise<{ data: DailyTimeRecord[]; summary: AttendanceSummary }> => {
+    const { data } = await api.get<{
+      data: DailyTimeRecord[];
+      summary: AttendanceSummary;
+    }>("/api/v1/my/daily-time-records", { params: { from, to } });
+    return data;
   },
 };
 

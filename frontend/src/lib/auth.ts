@@ -11,6 +11,7 @@ export type Me = {
     companies: Array<{ id: number; code: string; legal_name: string }>;
     roles: string[];
     permissions: string[];
+    employee: { id: number; employee_no: string; full_name: string } | null;
   };
 };
 

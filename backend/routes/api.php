@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Attendance\OfficialBusinessRequestController;
 use App\Http\Controllers\Api\V1\Attendance\OvertimeRequestController;
 use App\Http\Controllers\Api\V1\Attendance\TimeLogController;
 use App\Http\Controllers\Api\V1\Attendance\UndertimeRequestController;
+use App\Http\Controllers\Api\V1\AccessControl\AccessRequestController;
 use App\Http\Controllers\Api\V1\Attendance\WorkScheduleController;
 use App\Http\Controllers\Api\V1\Auth\LoginController;
 use App\Http\Controllers\Api\V1\Auth\LogoutController;
@@ -60,6 +61,7 @@ Route::prefix('v1')->group(function () {
         Route::post('time-logs', [TimeLogController::class, 'store']);
 
         Route::get('daily-time-records', [DailyTimeRecordController::class, 'index']);
+        Route::get('my/daily-time-records', [DailyTimeRecordController::class, 'mine']);
         Route::post('daily-time-records/compute', [DailyTimeRecordController::class, 'compute']);
 
         Route::get('employees/{employee}/schedule-assignments', [EmployeeScheduleController::class, 'index']);
@@ -75,6 +77,14 @@ Route::prefix('v1')->group(function () {
         Route::post('leave-applications/{leaveApplication}/approve', [LeaveApplicationController::class, 'approve']);
         Route::post('leave-applications/{leaveApplication}/reject', [LeaveApplicationController::class, 'reject']);
         Route::post('leave-applications/{leaveApplication}/cancel', [LeaveApplicationController::class, 'cancel']);
+
+        // Access requests (system access request form + supervisor -> HR -> IT approval)
+        Route::get('access-requests', [AccessRequestController::class, 'index']);
+        Route::get('access-requests/stats', [AccessRequestController::class, 'stats']);
+        Route::post('access-requests', [AccessRequestController::class, 'store']);
+        Route::get('access-requests/{accessRequest}', [AccessRequestController::class, 'show']);
+        Route::post('access-requests/{accessRequest}/approve', [AccessRequestController::class, 'approve']);
+        Route::post('access-requests/{accessRequest}/reject', [AccessRequestController::class, 'reject']);
 
         // Approval workflows (Phase 2.1)
         // User management (Phase 2.3)

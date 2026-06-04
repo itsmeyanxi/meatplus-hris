@@ -33,6 +33,67 @@ class DailyTimeRecordController extends Controller
         return DailyTimeRecordResource::collection($q->limit(500)->get());
     }
 
+    /**
+     * Self-service: the authenticated user's own daily time records for a date range.
+     * No attendance.view needed — scoped strictly to their linked employee record.
+     */
+    public function mine(Request $request): JsonResponse
+    {
+        $employee = $request->user()->employee;
+        abort_unless($employee, 403, 'Your account is not linked to an employee record.');
+
+        $q = DailyTimeRecord::query()
+            ->where('employee_id', $employee->id)
+            ->orderBy('work_date');
+
+        if ($from = $request->query('from')) {
+            $q->where('work_date', '>=', $from);
+        }
+        if ($to = $request->query('to')) {
+            $q->where('work_date', '<=', $to);
+        }
+
+        $records = $q->limit(400)->get();
+
+        $summary = ['present' => 0, 'late' => 0, 'absent' => 0, 'leave' => 0, 'holiday' => 0, 'rest_day' => 0];
+        foreach ($records as $r) {
+            $status = $this->classify($r);
+            if (array_key_exists($status, $summary)) {
+                $summary[$status]++;
+            }
+        }
+
+        return response()->json([
+            'data' => DailyTimeRecordResource::collection($records),
+            'summary' => $summary,
+        ]);
+    }
+
+    /** Mirrors DailyTimeRecordResource::dayStatus for summary counts. */
+    private function classify(DailyTimeRecord $r): string
+    {
+        if ($r->is_on_leave) {
+            return 'leave';
+        }
+        if ($r->is_absent) {
+            return 'absent';
+        }
+        if ($r->holiday_type && (float) $r->hours_worked === 0.0) {
+            return 'holiday';
+        }
+        if ($r->is_rest_day && (float) $r->hours_worked === 0.0) {
+            return 'rest_day';
+        }
+        if ($r->late_minutes > 0) {
+            return 'late';
+        }
+        if ((float) $r->hours_worked > 0 || $r->actual_in) {
+            return 'present';
+        }
+
+        return 'no_record';
+    }
+
     public function compute(ComputeDtrRequest $request, DtrComputer $computer): AnonymousResourceCollection
     {
         $employee = Employee::findOrFail($request->validated('employee_id'));

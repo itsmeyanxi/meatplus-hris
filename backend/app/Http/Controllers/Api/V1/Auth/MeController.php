@@ -23,6 +23,7 @@ class MeController extends Controller
         $user->load([
             'activeCompany:id,code,legal_name',
             'companies:id,code,legal_name',
+            'employee:id,user_id,employee_no,first_name,last_name',
         ]);
 
         return response()->json([
@@ -36,6 +37,11 @@ class MeController extends Controller
                 'companies' => $user->companies,
                 'roles' => $user->getRoleNames()->values()->all(),
                 'permissions' => $user->getAllPermissions()->pluck('name')->unique()->values()->all(),
+                'employee' => $user->employee ? [
+                    'id' => $user->employee->id,
+                    'employee_no' => $user->employee->employee_no,
+                    'full_name' => $user->employee->full_name,
+                ] : null,
             ],
         ]);
     }
