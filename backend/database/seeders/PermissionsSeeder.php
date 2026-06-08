@@ -37,7 +37,12 @@ class PermissionsSeeder extends Seeder
         }
 
         $rolePermissions = [
-            'super_admin' => $permissions,
+            // super_admin gets everything EXCEPT the supervisor/HR approval stages —
+            // those belong strictly to dept_head and hr_admin. super_admin only acts on the IT stage.
+            'super_admin' => array_values(array_diff($permissions, [
+                'access_request.approve.supervisor',
+                'access_request.approve.hr',
+            ])),
             'hr_admin' => [
                 'employee.view', 'employee.create', 'employee.update',
                 'attendance.view', 'attendance.manage', 'attendance.correct',
@@ -60,7 +65,7 @@ class PermissionsSeeder extends Seeder
             'dept_head' => [
                 'employee.view', 'attendance.view', 'attendance.approve.self_dept',
                 'leave.view', 'leave.approve.self_dept',
-                'access_request.approve.supervisor',
+                'access_request.view', 'access_request.approve.supervisor',
             ],
             'employee' => [
                 'leave.file',

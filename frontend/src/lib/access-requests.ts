@@ -47,7 +47,7 @@ export type AccessRequestStats = {
     approved: number;
     disapproved: number;
   };
-  queues: { supervisor: number; hr: number; it: number };
+  queues: Partial<Record<"supervisor" | "hr" | "it", number>>;
 };
 
 export type CreateAccessRequestInput = {
@@ -84,6 +84,13 @@ export async function getAccessRequests(params?: {
   const { data } = await api.get<{ data: AccessRequest[] }>(
     "/api/v1/access-requests",
     { params },
+  );
+  return data.data;
+}
+
+export async function getMyAccessRequests(): Promise<AccessRequest[]> {
+  const { data } = await api.get<{ data: AccessRequest[] }>(
+    "/api/v1/my/access-requests",
   );
   return data.data;
 }

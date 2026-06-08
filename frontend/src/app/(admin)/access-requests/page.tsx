@@ -11,7 +11,14 @@ import {
 } from "@/lib/access-requests";
 import { AppCard, PageHeader, TableShell } from "@/components/ui";
 
-const REQUIRED_ROLE = "super_admin";
+const VIEW_PERMISSION = "access_request.view";
+
+// Which permission lets a user act on each stage.
+const STAGE_PERMISSION: Record<string, string> = {
+  supervisor: "access_request.approve.supervisor",
+  hr: "access_request.approve.hr",
+  it: "access_request.approve.it",
+};
 
 function humanize(value: string): string {
   const s = value.replace(/_/g, " ");
@@ -41,18 +48,21 @@ export default function AccessRequestsPage() {
     queryFn: getMe,
   });
 
-  const isSuperAdmin = me?.user.roles.includes(REQUIRED_ROLE) ?? false;
+  const perms = me?.user.permissions ?? [];
+  const canView = perms.includes(VIEW_PERMISSION);
+  const canActOnStage = (stage: string) =>
+    Boolean(STAGE_PERMISSION[stage]) && perms.includes(STAGE_PERMISSION[stage]);
 
   const { data: stats } = useQuery({
     queryKey: ["access-requests", "stats"],
     queryFn: getAccessRequestStats,
-    enabled: isSuperAdmin,
+    enabled: canView,
   });
 
   const { data: requests = [], isLoading: listLoading } = useQuery({
     queryKey: ["access-requests", "list"],
     queryFn: () => getAccessRequests(),
-    enabled: isSuperAdmin,
+    enabled: canView,
   });
 
   const decide = useMutation({
@@ -72,7 +82,7 @@ export default function AccessRequestsPage() {
     return <p className="text-sm text-slate-500">Loading…</p>;
   }
 
-  if (!isSuperAdmin) {
+  if (!canView) {
     return (
       <AppCard className="mx-auto max-w-md text-center">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
@@ -93,8 +103,7 @@ export default function AccessRequestsPage() {
         </div>
         <h2 className="text-lg font-semibold text-slate-900">Access denied</h2>
         <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
-          You need the <span className="font-medium">super admin</span> role to
-          view access requests.
+          You don&apos;t have permission to view access requests.
         </p>
         <Link
           href="/dashboard"
@@ -112,7 +121,6 @@ export default function AccessRequestsPage() {
     approved: 0,
     disapproved: 0,
   };
-  const queues = stats?.queues ?? { supervisor: 0, hr: 0, it: 0 };
 
   const statCards = [
     { label: "Total", value: totals.total, dot: "bg-slate-400" },
@@ -120,11 +128,18 @@ export default function AccessRequestsPage() {
     { label: "Approved", value: totals.approved, dot: "bg-emerald-500" },
     { label: "Disapproved", value: totals.disapproved, dot: "bg-red-500" },
   ];
-  const queueCards = [
-    { label: "Supervisor Queue", pending: queues.supervisor },
-    { label: "HR Queue", pending: queues.hr },
-    { label: "IT Queue", pending: queues.it },
-  ];
+  // Only show the queue(s) connected to this user's stage(s).
+  const STAGE_QUEUE_LABEL: Record<string, string> = {
+    supervisor: "Supervisor Queue",
+    hr: "HR Queue",
+    it: "IT Queue",
+  };
+  const queueCards = (["supervisor", "hr", "it"] as const)
+    .filter((s) => canActOnStage(s))
+    .map((s) => ({
+      label: STAGE_QUEUE_LABEL[s],
+      pending: stats?.queues?.[s] ?? 0,
+    }));
 
   return (
     <div className="space-y-6">
@@ -241,7 +256,7 @@ export default function AccessRequestsPage() {
                       : "—"}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {r.status === "pending" ? (
+                    {r.status === "pending" && canActOnStage(r.current_stage) ? (
                       <div className="flex justify-end gap-2">
                         <button
                           type="button"
@@ -264,6 +279,10 @@ export default function AccessRequestsPage() {
                           Reject
                         </button>
                       </div>
+                    ) : r.status === "pending" ? (
+                      <span className="text-xs text-slate-400">
+                        Awaiting {humanize(r.current_stage)}
+                      </span>
                     ) : (
                       <span className="text-xs text-slate-400">—</span>
                     )}

@@ -80,6 +80,7 @@ Route::prefix('v1')->group(function () {
 
         // Access requests (system access request form + supervisor -> HR -> IT approval)
         Route::get('access-requests', [AccessRequestController::class, 'index']);
+        Route::get('my/access-requests', [AccessRequestController::class, 'mine']);
         Route::get('access-requests/stats', [AccessRequestController::class, 'stats']);
         Route::post('access-requests', [AccessRequestController::class, 'store']);
         Route::get('access-requests/{accessRequest}', [AccessRequestController::class, 'show']);

@@ -2,16 +2,28 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { getMe } from "@/lib/auth";
+import { getMyAccessRequests, type AccessRequest } from "@/lib/access-requests";
 import { useState } from "react";
 import { AppCard } from "@/components/ui";
 
+function humanize(value: string): string {
+  const s = value.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 export default function DashboardPage() {
   const { data } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const { data: myRequests } = useQuery({
+    queryKey: ["my-access-requests"],
+    queryFn: getMyAccessRequests,
+  });
   const [rolesOpen, setRolesOpen] = useState(false);
   const [permissionsOpen, setPermissionsOpen] = useState(false);
 
   if (!data) return null;
   const { user } = data;
+
+  const reqs = myRequests ?? [];
 
   return (
     <div className="space-y-6">
@@ -27,11 +39,26 @@ export default function DashboardPage() {
               </h2>
             </div>
 
-            <div className="space-y-5 lg:justify-self-end lg:text-right">
-              <p className="max-w-xl text-sm leading-6 text-slate-300 sm:text-base lg:max-w-md lg:text-right">
-                Phase 0 foundation is live. Use this view to check your identity, company,
-                role access, and permission coverage at a glance.
+            <div className="space-y-3 lg:justify-self-end">
+              <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-300 lg:text-right">
+                Access request status
               </p>
+              {reqs.length === 0 ? (
+                <p className="text-sm text-slate-300 lg:text-right">
+                  No access requests yet.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2 lg:items-end">
+                  {reqs.map((r) => (
+                    <div key={r.id} className="flex items-center gap-2">
+                      <span className="text-xs text-slate-300">
+                        {humanize(r.request_type)}
+                      </span>
+                      <AccessStatusPill status={r.status} stage={r.current_stage} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -160,6 +187,51 @@ export default function DashboardPage() {
         </AppCard>
       </div>
     </div>
+  );
+}
+
+function stageLabel(stage: AccessRequest["current_stage"]): string {
+  const map: Record<string, string> = {
+    supervisor: "Supervisor",
+    hr: "HR",
+    it: "IT",
+    done: "Completed",
+  };
+  return map[stage] ?? stage;
+}
+
+function AccessStatusPill({
+  status,
+  stage,
+}: {
+  status: AccessRequest["status"];
+  stage: AccessRequest["current_stage"];
+}) {
+  const styles: Record<string, { wrap: string; dot: string; label: string }> = {
+    pending: {
+      wrap: "bg-amber-50 text-amber-800 ring-amber-200",
+      dot: "bg-amber-500",
+      label: `Pending · ${stageLabel(stage)}`,
+    },
+    approved: {
+      wrap: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+      dot: "bg-emerald-500",
+      label: "Approved",
+    },
+    rejected: {
+      wrap: "bg-red-50 text-red-700 ring-red-200",
+      dot: "bg-red-500",
+      label: "Disapproved",
+    },
+  };
+  const s = styles[status] ?? styles.pending;
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ${s.wrap}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+      {s.label}
+    </span>
   );
 }
 

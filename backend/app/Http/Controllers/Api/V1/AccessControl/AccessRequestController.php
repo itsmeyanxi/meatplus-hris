@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\AccessControl;
 
 use App\Domain\AccessControl\Models\AccessRequest;
+use App\Domain\AccessControl\Models\AccessRequestApproval;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AccessControl\StoreAccessRequestRequest;
 use App\Http\Resources\AccessControl\AccessRequestResource;
@@ -24,51 +25,86 @@ class AccessRequestController extends Controller
         'it' => 'access_request.approve.it',
     ];
 
+    /** Stages the user is allowed to act on, derived from their permissions. */
+    private function userStages(\App\Models\User $user): array
+    {
+        $stages = [];
+        foreach (self::STAGE_PERMISSION as $stage => $permission) {
+            if ($user->can($permission)) {
+                $stages[] = $stage;
+            }
+        }
+
+        return $stages;
+    }
+
     public function index(Request $request): AnonymousResourceCollection
     {
-        abort_unless($request->user()->can('access_request.view'), 403);
+        $user = $request->user();
+        abort_unless($user->can('access_request.view'), 403);
+
+        // Each approver only sees the queue connected to them: requests
+        // currently pending at a stage they're allowed to act on.
+        $stages = $this->userStages($user) ?: ['__none__'];
 
         $q = AccessRequest::query()
             ->with('requester:id,name,email')
+            ->where('status', 'pending')
+            ->whereIn('current_stage', $stages)
             ->latest('id');
-
-        if ($status = $request->query('status')) {
-            $q->where('status', $status);
-        }
-        if ($stage = $request->query('stage')) {
-            $q->where('current_stage', $stage)->where('status', 'pending');
-        }
 
         return AccessRequestResource::collection($q->limit(500)->get());
     }
 
+    /** Self-service: the authenticated user's own submitted access requests. */
+    public function mine(Request $request): AnonymousResourceCollection
+    {
+        $q = AccessRequest::query()
+            ->where('requested_by_user_id', $request->user()->id)
+            ->with('approvals')
+            ->latest('id');
+
+        return AccessRequestResource::collection($q->limit(100)->get());
+    }
+
     public function stats(Request $request): JsonResponse
     {
-        abort_unless($request->user()->can('access_request.view'), 403);
+        $user = $request->user();
+        abort_unless($user->can('access_request.view'), 403);
 
-        $byStatus = AccessRequest::query()
-            ->selectRaw('status, COUNT(*) as c')
-            ->groupBy('status')
-            ->pluck('c', 'status');
+        $stages = $this->userStages($user) ?: ['__none__'];
 
-        $byStage = AccessRequest::query()
+        // Pending requests waiting at the user's stage(s) = their live queue.
+        $pendingByStage = AccessRequest::query()
             ->where('status', 'pending')
+            ->whereIn('current_stage', $stages)
             ->selectRaw('current_stage, COUNT(*) as c')
             ->groupBy('current_stage')
             ->pluck('c', 'current_stage');
 
+        // The user's own decision history at their stage(s).
+        $approved = AccessRequestApproval::query()
+            ->whereIn('stage', $stages)->where('status', 'approved')
+            ->whereHas('accessRequest')->count();
+        $disapproved = AccessRequestApproval::query()
+            ->whereIn('stage', $stages)->where('status', 'rejected')
+            ->whereHas('accessRequest')->count();
+
+        $pending = (int) $pendingByStage->sum();
+
+        $queues = [];
+        foreach ($this->userStages($user) as $s) {
+            $queues[$s] = (int) ($pendingByStage[$s] ?? 0);
+        }
+
         return response()->json([
             'totals' => [
-                'total' => (int) $byStatus->sum(),
-                'pending' => (int) ($byStatus['pending'] ?? 0),
-                'approved' => (int) ($byStatus['approved'] ?? 0),
-                'disapproved' => (int) ($byStatus['rejected'] ?? 0),
+                'total' => $pending + $approved + $disapproved,
+                'pending' => $pending,
+                'approved' => $approved,
+                'disapproved' => $disapproved,
             ],
-            'queues' => [
-                'supervisor' => (int) ($byStage['supervisor'] ?? 0),
-                'hr' => (int) ($byStage['hr'] ?? 0),
-                'it' => (int) ($byStage['it'] ?? 0),
-            ],
+            'queues' => $queues,
         ]);
     }
 
