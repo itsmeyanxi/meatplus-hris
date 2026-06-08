@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\V1\Attendance;
 use App\Domain\Attendance\Models\OvertimeRequest;
 use App\Http\Controllers\Concerns\HandlesApprovalWorkflow;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Attendance\DecisionRequest;
+use App\Http\Requests\Attendance\AttendanceDecisionRequest;
 use App\Http\Requests\Attendance\OvertimeRequestRequest;
 use App\Http\Resources\Attendance\OvertimeRequestResource;
 use Illuminate\Http\JsonResponse;
@@ -59,7 +59,7 @@ class OvertimeRequestController extends Controller
         );
     }
 
-    public function approve(DecisionRequest $request, OvertimeRequest $overtimeRequest): OvertimeRequestResource
+    public function approve(AttendanceDecisionRequest $request, OvertimeRequest $overtimeRequest): OvertimeRequestResource
     {
         $this->assertCanDecide($request, $overtimeRequest);
 
@@ -73,7 +73,7 @@ class OvertimeRequestController extends Controller
         return new OvertimeRequestResource($overtimeRequest->load(['employee', 'approver:id,name']));
     }
 
-    public function reject(DecisionRequest $request, OvertimeRequest $overtimeRequest): OvertimeRequestResource
+    public function reject(AttendanceDecisionRequest $request, OvertimeRequest $overtimeRequest): OvertimeRequestResource
     {
         $this->assertCanDecide($request, $overtimeRequest);
 

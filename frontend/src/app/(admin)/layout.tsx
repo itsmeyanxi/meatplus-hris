@@ -127,14 +127,22 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const userRoles = data?.user.roles ?? [];
   const userPermissions = data?.user.permissions ?? [];
   const hasEmployee = Boolean(data?.user.employee);
-  const visibleNav = NAV.filter((item) => {
+  const isAllowed = (item: NavItem) => {
     const roleOk = !item.roles || item.roles.some((r) => userRoles.includes(r));
     const permOk =
       !item.permissions ||
       item.permissions.some((p) => userPermissions.includes(p));
     const employeeOk = !item.requiresEmployee || hasEmployee;
     return roleOk && permOk && employeeOk;
-  });
+  };
+  const visibleNav = NAV.filter(isAllowed);
+
+  // Page-level guard: if the current route maps to a nav item the user can't
+  // access, block it here (defense-in-depth + clean UX). Backend still enforces.
+  const currentItem = NAV.find(
+    (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
+  );
+  const routeAllowed = !data || !currentItem || isAllowed(currentItem);
 
   return (
     <div 
@@ -257,8 +265,32 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          {routeAllowed ? children : <AccessDenied />}
+        </main>
       </div>
+    </div>
+  );
+}
+
+function AccessDenied() {
+  return (
+    <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white/90 p-8 text-center shadow-[0_1px_2px_rgba(15,23,42,0.04)] backdrop-blur">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-6 w-6" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m0-6a9 9 0 110 18 9 9 0 010-18zm0 0V9m-7.071 1.929a10 10 0 0114.142 0" />
+        </svg>
+      </div>
+      <h2 className="text-lg font-semibold text-slate-900">Access denied</h2>
+      <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+        You don&apos;t have permission to view this page.
+      </p>
+      <Link
+        href="/dashboard"
+        className="mt-6 inline-flex rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+      >
+        Back to dashboard
+      </Link>
     </div>
   );
 }

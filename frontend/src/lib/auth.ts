@@ -21,7 +21,14 @@ export async function login(email: string, password: string): Promise<void> {
 }
 
 export async function logout(): Promise<void> {
-  await api.post("/api/v1/logout");
+  // Refresh CSRF first (the token may have expired in a long-open tab),
+  // and never throw — we want to land on /login regardless of the result.
+  try {
+    await ensureCsrf();
+    await api.post("/api/v1/logout");
+  } catch {
+    // Session is being ended anyway; ignore server-side failures.
+  }
 }
 
 export async function getMe(): Promise<Me> {

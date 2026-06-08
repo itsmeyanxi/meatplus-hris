@@ -19,6 +19,9 @@ export function useAttendancePerms() {
     isLoading,
     canManageAttendance: perms.includes("attendance.manage"),
     canApproveOwnDept: perms.includes("attendance.approve.self_dept"),
-    canApprove: perms.includes("attendance.manage") || perms.includes("attendance.approve.self_dept"),
+    // Approval is dept_head's (attendance.approve.any), mirroring leaves.
+    canApprove:
+      perms.includes("attendance.approve.any") ||
+      perms.includes("attendance.approve.self_dept"),
   };
 }

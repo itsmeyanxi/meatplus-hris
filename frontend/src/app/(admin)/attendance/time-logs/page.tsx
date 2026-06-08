@@ -4,7 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { listEmployees } from "@/lib/employees";
 import { timeLogsApi, type TimeLog, type TimeLogInput } from "@/lib/attendance";
-import { inputCls } from "@/components/employees/ChildList";
+import { AppButton, AppCard, PageHeader, TableShell } from "@/components/ui";
+
+const inputCls =
+  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900/50";
+const labelCls = "mb-1.5 block text-sm font-medium text-slate-700";
 
 export default function TimeLogsPage() {
   const qc = useQueryClient();
@@ -27,7 +31,6 @@ export default function TimeLogsPage() {
         from: from || undefined,
         to: to || undefined,
       }),
-    enabled: true,
   });
 
   const [form, setForm] = useState<TimeLogInput>({
@@ -47,111 +50,88 @@ export default function TimeLogsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold">Time logs</h2>
-        <p className="text-sm text-slate-500">
-          Append-only raw punches. Use this to manually enter logs; biometric/web/mobile sources will populate automatically once integrated.
-        </p>
-      </div>
+      <PageHeader
+        title="Time logs"
+        description="Append-only raw punches. Enter logs manually here; biometric/web/mobile sources populate automatically once integrated."
+      />
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h3 className="mb-3 text-sm font-semibold">Filter</h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <select
-            className={inputCls}
-            value={employeeId}
-            onChange={(e) => setEmployeeId(e.target.value === "" ? "" : Number(e.target.value))}
-          >
-            <option value="">All employees</option>
-            {empPage?.data.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.employee_no} — {e.full_name}
-              </option>
-            ))}
-          </select>
-          <input type="date" className={inputCls} value={from} onChange={(e) => setFrom(e.target.value)} />
-          <input type="date" className={inputCls} value={to} onChange={(e) => setTo(e.target.value)} />
+      <AppCard title="Filter">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label className={labelCls}>Employee</label>
+            <select className={inputCls} value={employeeId} onChange={(e) => setEmployeeId(e.target.value === "" ? "" : Number(e.target.value))}>
+              <option value="">All employees</option>
+              {empPage?.data.map((e) => (<option key={e.id} value={e.id}>{e.employee_no} — {e.full_name}</option>))}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>From</label>
+            <input type="date" className={inputCls} value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>To</label>
+            <input type="date" className={inputCls} value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
         </div>
-      </section>
+      </AppCard>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h3 className="mb-3 text-sm font-semibold">Add manual log</h3>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            create.mutate();
-          }}
-          className="grid grid-cols-1 gap-3 sm:grid-cols-4"
-        >
-          <select
-            className={inputCls}
-            value={form.employee_id || ""}
-            onChange={(e) => setForm({ ...form, employee_id: Number(e.target.value) })}
-            required
-          >
-            <option value="">Employee *</option>
-            {empPage?.data.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.employee_no} — {e.full_name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="datetime-local"
-            className={inputCls}
-            value={form.logged_at}
-            onChange={(e) => setForm({ ...form, logged_at: e.target.value.replace("T", " ") + ":00" })}
-            required
-          />
-          <select
-            className={inputCls}
-            value={form.direction}
-            onChange={(e) => setForm({ ...form, direction: e.target.value as TimeLogInput["direction"] })}
-          >
-            <option value="in">In</option>
-            <option value="out">Out</option>
-            <option value="break_out">Break out</option>
-            <option value="break_in">Break in</option>
-          </select>
-          <button
-            type="submit"
-            disabled={create.isPending}
-            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-          >
-            {create.isPending ? "Saving…" : "Add log"}
-          </button>
+      <AppCard title="Add manual log">
+        <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+          <div>
+            <label className={labelCls}>Employee *</label>
+            <select className={inputCls} value={form.employee_id || ""} onChange={(e) => setForm({ ...form, employee_id: Number(e.target.value) })} required>
+              <option value="">Select…</option>
+              {empPage?.data.map((e) => (<option key={e.id} value={e.id}>{e.employee_no} — {e.full_name}</option>))}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Logged at *</label>
+            <input type="datetime-local" className={inputCls} value={form.logged_at} onChange={(e) => setForm({ ...form, logged_at: e.target.value.replace("T", " ") + ":00" })} required />
+          </div>
+          <div>
+            <label className={labelCls}>Direction</label>
+            <select className={inputCls} value={form.direction} onChange={(e) => setForm({ ...form, direction: e.target.value as TimeLogInput["direction"] })}>
+              <option value="in">In</option>
+              <option value="out">Out</option>
+              <option value="break_out">Break out</option>
+              <option value="break_in">Break in</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <AppButton type="submit" className="w-full" disabled={create.isPending}>{create.isPending ? "Saving…" : "Add log"}</AppButton>
+          </div>
         </form>
-      </section>
+      </AppCard>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500">
-            <tr>
-              <th className="px-4 py-2">Logged at</th>
-              <th className="px-4 py-2">Employee #</th>
-              <th className="px-4 py-2">Direction</th>
-              <th className="px-4 py-2">Source</th>
+      <TableShell>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-left text-slate-600">
+              {["Logged at", "Employee #", "Direction", "Source"].map((h) => (
+                <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">{h}</th>
+              ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody>
             {items.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-slate-500">
-                  No logs in this range.
+                <td colSpan={4} className="px-4 py-16 text-center">
+                  <p className="text-sm font-medium text-slate-700">No logs in this range</p>
+                  <p className="mt-1 text-sm text-slate-500">Adjust the filter or add a manual log above.</p>
                 </td>
               </tr>
             )}
             {items.map((l: TimeLog) => (
-              <tr key={l.id} className="hover:bg-slate-50">
-                <td className="px-4 py-2 font-mono">{l.logged_at}</td>
-                <td className="px-4 py-2">{l.employee_id}</td>
-                <td className="px-4 py-2">{l.direction}</td>
-                <td className="px-4 py-2 text-slate-500">{l.source}</td>
+              <tr key={l.id} className="border-t border-slate-100 transition hover:bg-slate-50/70">
+                <td className="px-4 py-3 font-mono text-xs text-slate-600">{l.logged_at}</td>
+                <td className="px-4 py-3 text-slate-600">{l.employee_id}</td>
+                <td className="px-4 py-3 capitalize text-slate-700">{l.direction.replace("_", " ")}</td>
+                <td className="px-4 py-3 text-slate-500">{l.source}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+      </TableShell>
     </div>
   );
 }

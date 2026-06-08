@@ -6,7 +6,7 @@ use App\Domain\Attendance\Models\CertificateOfAttendanceRequest;
 use App\Http\Controllers\Concerns\HandlesApprovalWorkflow;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendance\CertificateOfAttendanceRequestRequest;
-use App\Http\Requests\Attendance\DecisionRequest;
+use App\Http\Requests\Attendance\AttendanceDecisionRequest;
 use App\Http\Resources\Attendance\CertificateOfAttendanceRequestResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -59,7 +59,7 @@ class CertificateOfAttendanceRequestController extends Controller
         );
     }
 
-    public function approve(DecisionRequest $request, CertificateOfAttendanceRequest $certificateOfAttendanceRequest): CertificateOfAttendanceRequestResource
+    public function approve(AttendanceDecisionRequest $request, CertificateOfAttendanceRequest $certificateOfAttendanceRequest): CertificateOfAttendanceRequestResource
     {
         $this->assertCanDecide($request, $certificateOfAttendanceRequest);
 
@@ -73,7 +73,7 @@ class CertificateOfAttendanceRequestController extends Controller
         return new CertificateOfAttendanceRequestResource($certificateOfAttendanceRequest->load(['employee', 'approver:id,name']));
     }
 
-    public function reject(DecisionRequest $request, CertificateOfAttendanceRequest $certificateOfAttendanceRequest): CertificateOfAttendanceRequestResource
+    public function reject(AttendanceDecisionRequest $request, CertificateOfAttendanceRequest $certificateOfAttendanceRequest): CertificateOfAttendanceRequestResource
     {
         $this->assertCanDecide($request, $certificateOfAttendanceRequest);
 

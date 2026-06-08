@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\V1\Attendance;
 use App\Domain\Attendance\Models\OfficialBusinessRequest;
 use App\Http\Controllers\Concerns\HandlesApprovalWorkflow;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Attendance\DecisionRequest;
+use App\Http\Requests\Attendance\AttendanceDecisionRequest;
 use App\Http\Requests\Attendance\OfficialBusinessRequestRequest;
 use App\Http\Resources\Attendance\OfficialBusinessRequestResource;
 use Illuminate\Http\JsonResponse;
@@ -57,7 +57,7 @@ class OfficialBusinessRequestController extends Controller
         return new OfficialBusinessRequestResource($officialBusinessRequest->load(['employee', 'approver:id,name']));
     }
 
-    public function approve(DecisionRequest $request, OfficialBusinessRequest $officialBusinessRequest): OfficialBusinessRequestResource
+    public function approve(AttendanceDecisionRequest $request, OfficialBusinessRequest $officialBusinessRequest): OfficialBusinessRequestResource
     {
         $this->assertCanDecide($request, $officialBusinessRequest);
 
@@ -71,7 +71,7 @@ class OfficialBusinessRequestController extends Controller
         return new OfficialBusinessRequestResource($officialBusinessRequest->load(['employee', 'approver:id,name']));
     }
 
-    public function reject(DecisionRequest $request, OfficialBusinessRequest $officialBusinessRequest): OfficialBusinessRequestResource
+    public function reject(AttendanceDecisionRequest $request, OfficialBusinessRequest $officialBusinessRequest): OfficialBusinessRequestResource
     {
         $this->assertCanDecide($request, $officialBusinessRequest);
 

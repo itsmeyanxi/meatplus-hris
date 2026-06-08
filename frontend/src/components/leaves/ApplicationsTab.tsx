@@ -4,8 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { StatusPill } from "@/components/approvals/StatusPill";
 import { AppButton, AppCard, TableShell } from "@/components/ui";
+import { getMe } from "@/lib/auth";
 import { listEmployees } from "@/lib/employees";
-import { useAttendancePerms } from "@/lib/permissions";
 import { leaveAppsApi, leaveTypesApi, type LeaveAppInput, type LeaveStatus } from "@/lib/leaves";
 
 const inputCls =
@@ -22,13 +22,17 @@ const FILTERS: Array<{ value: LeaveStatus | ""; label: string }> = [
 
 export function ApplicationsTab() {
   const qc = useQueryClient();
-  const { canManageAttendance, canApprove } = useAttendancePerms();
+  // Only dept_head (leave.approve.any) sees all leaves, files for others, and approves.
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const canManage = me?.user.permissions.includes("leave.approve.any") ?? false;
+  const canApprove = canManage;
+  const showFile = Boolean(me?.user.employee) || canManage;
 
   const { data: types = [] } = useQuery({ queryKey: ["leave-types"], queryFn: leaveTypesApi.list });
   const { data: empPage } = useQuery({
     queryKey: ["employees", { all: true }],
     queryFn: () => listEmployees({ perPage: 100 }),
-    enabled: canManageAttendance,
+    enabled: canManage,
   });
 
   const [status, setStatus] = useState<LeaveStatus | "">("");
@@ -75,23 +79,25 @@ export function ApplicationsTab() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave-apps"] }); qc.invalidateQueries({ queryKey: ["leave-balances"] }); },
   });
 
-  const colSpan = canManageAttendance ? 7 : 6;
+  const colSpan = canManage ? 7 : 6;
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-500">
-          {items.length} shown{!canManageAttendance ? " — your own only" : ""}
+          {items.length} shown{!canManage ? " — your own only" : ""}
         </p>
-        <AppButton variant={isAdding ? "secondary" : "primary"} onClick={() => setIsAdding((v) => !v)}>
-          {isAdding ? "Cancel" : "+ File leave"}
-        </AppButton>
+        {showFile && (
+          <AppButton variant={isAdding ? "secondary" : "primary"} onClick={() => setIsAdding((v) => !v)}>
+            {isAdding ? "Cancel" : "+ File leave"}
+          </AppButton>
+        )}
       </div>
 
       {isAdding && (
         <AppCard title="File a leave request">
           <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {canManageAttendance && (
+            {canManage && (
               <div>
                 <label className={labelCls}>Employee *</label>
                 <select className={inputCls} value={form.employee_id ?? ""} onChange={(e) => setForm({ ...form, employee_id: e.target.value ? Number(e.target.value) : undefined })} required>
@@ -148,7 +154,7 @@ export function ApplicationsTab() {
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-slate-600">
               <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">Status</th>
-              {canManageAttendance && <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">Employee</th>}
+              {canManage && <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">Employee</th>}
               <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">Type</th>
               <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">Dates</th>
               <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">Days</th>
@@ -168,7 +174,7 @@ export function ApplicationsTab() {
             {items.map((r) => (
               <tr key={r.id} className="border-t border-slate-100 transition hover:bg-slate-50/70">
                 <td className="px-4 py-3"><StatusPill status={r.status} /></td>
-                {canManageAttendance && (
+                {canManage && (
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-800">{r.employee?.full_name}</div>
                     <div className="font-mono text-xs text-slate-400">{r.employee?.employee_no}</div>

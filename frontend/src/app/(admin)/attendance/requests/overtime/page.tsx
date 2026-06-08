@@ -204,10 +204,11 @@ export default function OvertimeRequestsPage() {
                 <td className="px-3 py-2 max-w-xs">{r.reason}</td>
                 <td className="px-3 py-2 text-xs">
                   {r.approved_by ? (
-                    <>
-                      <div>by {r.approved_by.name}</div>
-                      <div className="text-slate-500">{r.decision_remarks ?? "—"}</div>
-                    </>
+                    <div>
+                      <div className="text-slate-700">{r.approved_by.name}</div>
+                      {r.decided_at && <div className="text-xs text-slate-400">{new Date(r.decided_at).toLocaleDateString()}</div>}
+                      {r.decision_remarks && <div className="text-xs italic text-slate-500">&ldquo;{r.decision_remarks}&rdquo;</div>}
+                    </div>
                   ) : (
                     <span className="text-slate-400">—</span>
                   )}

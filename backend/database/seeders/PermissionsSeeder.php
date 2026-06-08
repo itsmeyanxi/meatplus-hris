@@ -21,7 +21,8 @@ class PermissionsSeeder extends Seeder
 
         $permissions = [
             'employee.view', 'employee.create', 'employee.update', 'employee.delete',
-            'attendance.view', 'attendance.manage', 'attendance.correct', 'attendance.approve.self_dept',
+            'attendance.view', 'attendance.manage', 'attendance.correct',
+            'attendance.approve.any', 'attendance.approve.self_dept',
             'leave.view', 'leave.file', 'leave.approve.self_dept', 'leave.approve.any', 'leave.manage_types',
             'payroll.view', 'payroll.run', 'payroll.approve', 'payroll.post',
             'compensation.view', 'compensation.manage',
@@ -37,23 +38,28 @@ class PermissionsSeeder extends Seeder
         }
 
         $rolePermissions = [
-            // super_admin gets everything EXCEPT the supervisor/HR approval stages —
-            // those belong strictly to dept_head and hr_admin. super_admin only acts on the IT stage.
+            // super_admin gets everything EXCEPT the stages reserved for other roles:
+            // supervisor/HR access-request stages, and leave approval (dept_head only).
             'super_admin' => array_values(array_diff($permissions, [
                 'access_request.approve.supervisor',
                 'access_request.approve.hr',
+                'leave.approve.any',
+                'leave.approve.self_dept',
+                // Approvals reserved for dept_head (consistent "immediate supervisor approves" model).
+                'attendance.approve.any',
+                'attendance.approve.self_dept',
             ])),
             'hr_admin' => [
                 'employee.view', 'employee.create', 'employee.update',
                 'attendance.view', 'attendance.manage', 'attendance.correct',
-                'leave.view', 'leave.approve.any', 'leave.manage_types',
+                'leave.view', 'leave.manage_types',
                 'compensation.view',
                 'user.manage', 'role.manage', 'audit.view',
                 'access_request.view', 'access_request.approve.hr',
             ],
             'hr_manager' => [
                 'employee.view',
-                'attendance.view', 'leave.view', 'leave.approve.any',
+                'attendance.view', 'leave.view',
                 'compensation.view', 'audit.view',
             ],
             'payroll_officer' => [
@@ -63,8 +69,10 @@ class PermissionsSeeder extends Seeder
                 'gov_report.view', 'gov_report.generate', 'audit.view',
             ],
             'dept_head' => [
-                'employee.view', 'attendance.view', 'attendance.approve.self_dept',
-                'leave.view', 'leave.approve.self_dept',
+                'employee.view', 'attendance.view',
+                // dept_head is the sole approver for attendance requests AND leaves (role-based).
+                'attendance.approve.any', 'attendance.approve.self_dept',
+                'leave.view', 'leave.approve.any',
                 'access_request.view', 'access_request.approve.supervisor',
             ],
             'employee' => [

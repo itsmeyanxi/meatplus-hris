@@ -55,11 +55,6 @@ trait HandlesApprovalWorkflow
         }
 
         $employee = $request->user()->employee;
-        \Illuminate\Support\Facades\Log::info('resolveEmployeeIdForStore', [
-            'user_id' => $request->user()->id,
-            'can_manage' => $request->user()->can('attendance.manage'),
-            'employee_via_relation' => $employee?->id,
-        ]);
         if (! $employee) {
             abort(403, 'You are not linked to an employee record. Ask HR to provision your access.');
         }
@@ -94,7 +89,8 @@ trait HandlesApprovalWorkflow
             abort(403, 'You cannot approve your own request.');
         }
 
-        if ($user->can('attendance.manage')) {
+        // dept_head approves attendance requests (role-based, any), mirroring leaves.
+        if ($user->can('attendance.approve.any')) {
             return;
         }
 

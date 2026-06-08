@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\V1\Attendance;
 use App\Domain\Attendance\Models\UndertimeRequest;
 use App\Http\Controllers\Concerns\HandlesApprovalWorkflow;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Attendance\DecisionRequest;
+use App\Http\Requests\Attendance\AttendanceDecisionRequest;
 use App\Http\Requests\Attendance\UndertimeRequestRequest;
 use App\Http\Resources\Attendance\UndertimeRequestResource;
 use Illuminate\Http\JsonResponse;
@@ -59,7 +59,7 @@ class UndertimeRequestController extends Controller
         );
     }
 
-    public function approve(DecisionRequest $request, UndertimeRequest $undertimeRequest): UndertimeRequestResource
+    public function approve(AttendanceDecisionRequest $request, UndertimeRequest $undertimeRequest): UndertimeRequestResource
     {
         $this->assertCanDecide($request, $undertimeRequest);
 
@@ -73,7 +73,7 @@ class UndertimeRequestController extends Controller
         return new UndertimeRequestResource($undertimeRequest->load(['employee', 'approver:id,name']));
     }
 
-    public function reject(DecisionRequest $request, UndertimeRequest $undertimeRequest): UndertimeRequestResource
+    public function reject(AttendanceDecisionRequest $request, UndertimeRequest $undertimeRequest): UndertimeRequestResource
     {
         $this->assertCanDecide($request, $undertimeRequest);
 

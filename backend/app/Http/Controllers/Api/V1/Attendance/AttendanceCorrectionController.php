@@ -6,7 +6,7 @@ use App\Domain\Attendance\Models\AttendanceCorrection;
 use App\Http\Controllers\Concerns\HandlesApprovalWorkflow;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendance\AttendanceCorrectionRequest;
-use App\Http\Requests\Attendance\DecisionRequest;
+use App\Http\Requests\Attendance\AttendanceDecisionRequest;
 use App\Http\Resources\Attendance\AttendanceCorrectionResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -57,7 +57,7 @@ class AttendanceCorrectionController extends Controller
         return new AttendanceCorrectionResource($attendanceCorrection->load(['employee', 'approver:id,name']));
     }
 
-    public function approve(DecisionRequest $request, AttendanceCorrection $attendanceCorrection): AttendanceCorrectionResource
+    public function approve(AttendanceDecisionRequest $request, AttendanceCorrection $attendanceCorrection): AttendanceCorrectionResource
     {
         $this->assertCanDecide($request, $attendanceCorrection);
 
@@ -71,7 +71,7 @@ class AttendanceCorrectionController extends Controller
         return new AttendanceCorrectionResource($attendanceCorrection->load(['employee', 'approver:id,name']));
     }
 
-    public function reject(DecisionRequest $request, AttendanceCorrection $attendanceCorrection): AttendanceCorrectionResource
+    public function reject(AttendanceDecisionRequest $request, AttendanceCorrection $attendanceCorrection): AttendanceCorrectionResource
     {
         $this->assertCanDecide($request, $attendanceCorrection);
 

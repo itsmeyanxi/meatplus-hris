@@ -7,7 +7,7 @@ use App\Domain\Leave\Models\LeaveApplication;
 use App\Domain\Leave\Models\LeaveType;
 use App\Domain\Leave\Services\LeaveBalanceService;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Attendance\DecisionRequest;
+use App\Http\Requests\Leave\LeaveDecisionRequest;
 use App\Http\Requests\Leave\StoreLeaveApplicationRequest;
 use App\Http\Resources\Leave\LeaveApplicationResource;
 use Carbon\CarbonImmutable;
@@ -34,12 +34,15 @@ class LeaveApplicationController extends Controller
             ])
             ->orderByDesc('date_from');
 
-        // Self-service scope: non-viewers see only their own
-        if (! $user->can('leave.view')) {
-            if (! $user->employee) {
-                abort(403, 'You are not linked to an employee record.');
+        // Only the leave approver (dept_head) sees the whole company.
+        // Everyone else — employees, HR, super_admin — sees only their own.
+        if (! $user->can('leave.approve.any')) {
+            if ($user->employee) {
+                $q->where('employee_id', $user->employee->id);
+            } else {
+                // No employee record means no personal leaves to show.
+                $q->whereRaw('1 = 0');
             }
-            $q->where('employee_id', $user->employee->id);
         }
 
         foreach (['status', 'employee_id', 'leave_type_id'] as $f) {
@@ -138,7 +141,7 @@ class LeaveApplicationController extends Controller
         );
     }
 
-    public function approve(DecisionRequest $request, LeaveApplication $leaveApplication): LeaveApplicationResource
+    public function approve(LeaveDecisionRequest $request, LeaveApplication $leaveApplication): LeaveApplicationResource
     {
         $this->assertCanDecide($request, $leaveApplication);
 
@@ -165,7 +168,7 @@ class LeaveApplicationController extends Controller
         );
     }
 
-    public function reject(DecisionRequest $request, LeaveApplication $leaveApplication): LeaveApplicationResource
+    public function reject(LeaveDecisionRequest $request, LeaveApplication $leaveApplication): LeaveApplicationResource
     {
         $this->assertCanDecide($request, $leaveApplication);
 
@@ -220,7 +223,8 @@ class LeaveApplicationController extends Controller
     private function ensureCanView(Request $request, LeaveApplication $leave): void
     {
         $user = $request->user();
-        if ($user->can('leave.view')) {
+        // Only the approver (dept_head) may view others' leaves.
+        if ($user->can('leave.approve.any')) {
             return;
         }
         if ($user->employee && $leave->employee_id === $user->employee->id) {
@@ -248,6 +252,10 @@ class LeaveApplicationController extends Controller
 
         if ($user->can('leave.approve.self_dept')) {
             $approverEmp = $user->employee?->id;
+            // An approver with no employee record can't be anyone's manager/dept head.
+            if (! $approverEmp) {
+                abort(403, 'You do not have permission to act on this request.');
+            }
             $subj = $leave->employee()->first(['id', 'manager_employee_id', 'department_id']);
             if ($subj && $subj->manager_employee_id === $approverEmp) {
                 return;
