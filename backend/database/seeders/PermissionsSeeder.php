@@ -21,7 +21,7 @@ class PermissionsSeeder extends Seeder
 
         $permissions = [
             'employee.view', 'employee.create', 'employee.update', 'employee.delete',
-            'attendance.view', 'attendance.manage', 'attendance.correct',
+            'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',
             'attendance.approve.any', 'attendance.approve.self_dept',
             'leave.view', 'leave.file', 'leave.approve.self_dept', 'leave.approve.any', 'leave.manage_types',
             'payroll.view', 'payroll.run', 'payroll.approve', 'payroll.post',
@@ -51,7 +51,7 @@ class PermissionsSeeder extends Seeder
             ])),
             'hr_admin' => [
                 'employee.view', 'employee.create', 'employee.update',
-                'attendance.view', 'attendance.manage', 'attendance.correct',
+                'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',
                 'leave.view', 'leave.manage_types',
                 'compensation.view',
                 'user.manage', 'role.manage', 'audit.view',
@@ -59,8 +59,15 @@ class PermissionsSeeder extends Seeder
             ],
             'hr_manager' => [
                 'employee.view',
-                'attendance.view', 'leave.view',
+                'attendance.view', 'attendance.view.any', 'leave.view',
                 'compensation.view', 'audit.view',
+                'user.manage',
+            ],
+            // IT: manages user accounts and owns the IT stage of access requests.
+            'it_admin' => [
+                'user.manage',
+                'access_request.view', 'access_request.approve.it',
+                'audit.view',
             ],
             'payroll_officer' => [
                 'employee.view', 'attendance.view',

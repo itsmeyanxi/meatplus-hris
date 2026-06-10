@@ -72,6 +72,10 @@ export const leaveAppsApi = {
     const { data } = await api.get<Listed<LeaveApplication>>("/api/v1/leave-applications", { params });
     return data.data;
   },
+  get: async (id: number): Promise<LeaveApplication> => {
+    const { data } = await api.get<{ data: LeaveApplication }>(`/api/v1/leave-applications/${id}`);
+    return data.data;
+  },
   create: async (body: LeaveAppInput): Promise<LeaveApplication> => {
     const { data } = await api.post<{ data: LeaveApplication }>("/api/v1/leave-applications", body);
     return data.data;

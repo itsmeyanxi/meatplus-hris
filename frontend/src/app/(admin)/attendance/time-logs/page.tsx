@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { getMe } from "@/lib/auth";
 import { listEmployees } from "@/lib/employees";
 import { timeLogsApi, type TimeLog, type TimeLogInput } from "@/lib/attendance";
 import { AppButton, AppCard, PageHeader, TableShell } from "@/components/ui";
@@ -13,9 +14,16 @@ const labelCls = "mb-1.5 block text-sm font-medium text-slate-700";
 export default function TimeLogsPage() {
   const qc = useQueryClient();
 
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  // Only HR (attendance.view.any) may browse other employees; everyone else is self-only.
+  const canViewAny = me?.user.permissions.includes("attendance.view.any") ?? false;
+  // Creating manual logs is restricted to attendance.manage holders.
+  const canManage = me?.user.permissions.includes("attendance.manage") ?? false;
+
   const { data: empPage } = useQuery({
     queryKey: ["employees", { all: true }],
     queryFn: () => listEmployees({ perPage: 100 }),
+    enabled: canViewAny,
   });
 
   const [employeeId, setEmployeeId] = useState<number | "">("");
@@ -57,13 +65,15 @@ export default function TimeLogsPage() {
 
       <AppCard title="Filter">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div>
-            <label className={labelCls}>Employee</label>
-            <select className={inputCls} value={employeeId} onChange={(e) => setEmployeeId(e.target.value === "" ? "" : Number(e.target.value))}>
-              <option value="">All employees</option>
-              {empPage?.data.map((e) => (<option key={e.id} value={e.id}>{e.employee_no} — {e.full_name}</option>))}
-            </select>
-          </div>
+          {canViewAny && (
+            <div>
+              <label className={labelCls}>Employee</label>
+              <select className={inputCls} value={employeeId} onChange={(e) => setEmployeeId(e.target.value === "" ? "" : Number(e.target.value))}>
+                <option value="">All employees</option>
+                {empPage?.data.map((e) => (<option key={e.id} value={e.id}>{e.employee_no} — {e.full_name}</option>))}
+              </select>
+            </div>
+          )}
           <div>
             <label className={labelCls}>From</label>
             <input type="date" className={inputCls} value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -75,6 +85,7 @@ export default function TimeLogsPage() {
         </div>
       </AppCard>
 
+      {canManage && (
       <AppCard title="Add manual log">
         <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="grid grid-cols-1 gap-4 sm:grid-cols-4">
           <div>
@@ -102,6 +113,7 @@ export default function TimeLogsPage() {
           </div>
         </form>
       </AppCard>
+      )}
 
       <TableShell>
         <table className="w-full text-sm">

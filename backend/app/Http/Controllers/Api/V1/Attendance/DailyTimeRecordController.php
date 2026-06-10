@@ -16,13 +16,22 @@ class DailyTimeRecordController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        abort_unless($request->user()->can('attendance.view'), 403);
+        $user = $request->user();
+        abort_unless($user->can('attendance.view'), 403);
 
         $q = DailyTimeRecord::query()->orderBy('work_date');
 
-        if ($eid = $request->query('employee_id')) {
-            $q->where('employee_id', $eid);
+        // HR (attendance.view.any) sees everyone; everyone else is locked to their own record.
+        if ($user->can('attendance.view.any')) {
+            if ($eid = $request->query('employee_id')) {
+                $q->where('employee_id', $eid);
+            }
+        } else {
+            $employee = $user->employee;
+            abort_unless($employee, 403, 'Your account is not linked to an employee record.');
+            $q->where('employee_id', $employee->id);
         }
+
         if ($from = $request->query('from')) {
             $q->where('work_date', '>=', $from);
         }

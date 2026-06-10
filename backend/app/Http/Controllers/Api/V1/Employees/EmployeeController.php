@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Employees;
 
+use App\Domain\Attendance\Services\DtrComputer;
 use App\Domain\HRIS\Models\Employee;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employees\StoreEmployeeRequest;
@@ -50,9 +51,12 @@ class EmployeeController extends Controller
     /**
      * Store a newly created employee in storage.
      */
-    public function store(StoreEmployeeRequest $request): JsonResponse
+    public function store(StoreEmployeeRequest $request, DtrComputer $computer): JsonResponse
     {
         $employee = Employee::create($request->validated());
+
+        // Seed the new hire's calendar with existing holidays.
+        $computer->applyHolidaysToEmployee($employee);
 
         return (new EmployeeResource($employee->load([
             'branch', 'department', 'position', 'employmentType',

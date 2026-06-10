@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { getMe } from "@/lib/auth";
 import { listEmployees } from "@/lib/employees";
 import { dtrApi, type DailyTimeRecord } from "@/lib/attendance";
 import { AppButton, AppCard, PageHeader, TableShell } from "@/components/ui";
@@ -13,9 +14,16 @@ const labelCls = "mb-1.5 block text-sm font-medium text-slate-700";
 export default function DtrPage() {
   const qc = useQueryClient();
 
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  // Only HR (attendance.view.any) may browse other employees; everyone else is self-only.
+  const canViewAny = me?.user.permissions.includes("attendance.view.any") ?? false;
+  // Recomputing DTRs is restricted to attendance.manage holders.
+  const canManage = me?.user.permissions.includes("attendance.manage") ?? false;
+
   const { data: empPage } = useQuery({
     queryKey: ["employees", { all: true }],
     queryFn: () => listEmployees({ perPage: 100 }),
+    enabled: canViewAny,
   });
 
   const [employeeId, setEmployeeId] = useState<number | "">("");
@@ -67,13 +75,15 @@ export default function DtrPage() {
 
       <AppCard>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <label className={labelCls}>Employee</label>
-            <select className={inputCls} value={employeeId} onChange={(e) => setEmployeeId(e.target.value === "" ? "" : Number(e.target.value))}>
-              <option value="">All employees</option>
-              {empPage?.data.map((e) => (<option key={e.id} value={e.id}>{e.employee_no} — {e.full_name}</option>))}
-            </select>
-          </div>
+          {canViewAny && (
+            <div>
+              <label className={labelCls}>Employee</label>
+              <select className={inputCls} value={employeeId} onChange={(e) => setEmployeeId(e.target.value === "" ? "" : Number(e.target.value))}>
+                <option value="">All employees</option>
+                {empPage?.data.map((e) => (<option key={e.id} value={e.id}>{e.employee_no} — {e.full_name}</option>))}
+              </select>
+            </div>
+          )}
           <div>
             <label className={labelCls}>From</label>
             <input type="date" className={inputCls} value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -82,16 +92,18 @@ export default function DtrPage() {
             <label className={labelCls}>To</label>
             <input type="date" className={inputCls} value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
-          <div className="flex items-end">
-            <AppButton
-              className="w-full"
-              disabled={!canCompute || compute.isPending}
-              onClick={() => compute.mutate()}
-              title={canCompute ? "" : "Pick employee + from + to first"}
-            >
-              {compute.isPending ? "Computing…" : "Compute"}
-            </AppButton>
-          </div>
+          {canManage && (
+            <div className="flex items-end">
+              <AppButton
+                className="w-full"
+                disabled={!canCompute || compute.isPending}
+                onClick={() => compute.mutate()}
+                title={canCompute ? "" : "Pick employee + from + to first"}
+              >
+                {compute.isPending ? "Computing…" : "Compute"}
+              </AppButton>
+            </div>
+          )}
         </div>
       </AppCard>
 

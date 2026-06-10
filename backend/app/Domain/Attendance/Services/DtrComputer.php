@@ -82,6 +82,85 @@ class DtrComputer
         return $results;
     }
 
+    /**
+     * Stamp a holiday onto every applicable employee's calendar for its date by
+     * (re)computing that single day's DTR for each. Honours the holiday's company
+     * and branch scope, and skips locked rows. Returns the number of employees touched.
+     */
+    public function applyHolidayToEmployees(Holiday $holiday): int
+    {
+        $date = CarbonImmutable::parse($holiday->holiday_date);
+
+        $employees = Employee::query()
+            ->where('is_active', true)
+            ->when($holiday->company_id, fn ($q) => $q->where('company_id', $holiday->company_id))
+            ->when($holiday->applicable_branch_id, fn ($q) => $q->where('branch_id', $holiday->applicable_branch_id))
+            ->get();
+
+        foreach ($employees as $employee) {
+            $this->computeForEmployee($employee, $date, $date);
+        }
+
+        return $employees->count();
+    }
+
+    /**
+     * Stamp every applicable existing holiday onto a single employee's calendar —
+     * the mirror of applyHolidayToEmployees(), used when a new employee is added so
+     * they inherit holidays created before they existed. Only holiday dates are
+     * computed, so non-holiday days are left untouched (no spurious "absent" rows).
+     */
+    public function applyHolidaysToEmployee(Employee $employee): int
+    {
+        $holidays = Holiday::query()
+            ->where(function ($q) use ($employee) {
+                $q->whereNull('company_id')->orWhere('company_id', $employee->company_id);
+            })
+            ->where(function ($q) use ($employee) {
+                $q->whereNull('applicable_branch_id')->orWhere('applicable_branch_id', $employee->branch_id);
+            })
+            ->get();
+
+        foreach ($holidays as $holiday) {
+            $date = CarbonImmutable::parse($holiday->holiday_date);
+            $this->computeForEmployee($employee, $date, $date);
+        }
+
+        return $holidays->count();
+    }
+
+    /**
+     * Clear a now-removed/moved holiday from employee calendars on $date by
+     * recomputing only the employees that currently carry a holiday marker there.
+     * Bounded to those rows so we never fabricate fresh records for everyone.
+     */
+    public function clearHolidayOnDate(CarbonInterface $date, ?int $companyId, ?int $branchId): int
+    {
+        $date = CarbonImmutable::parse($date);
+
+        $employeeIds = DailyTimeRecord::query()
+            ->whereDate('work_date', $date->toDateString())
+            ->whereNotNull('holiday_type')
+            ->where('status', '!=', 'locked')
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->pluck('employee_id');
+
+        if ($employeeIds->isEmpty()) {
+            return 0;
+        }
+
+        $employees = Employee::query()
+            ->whereIn('id', $employeeIds)
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->get();
+
+        foreach ($employees as $employee) {
+            $this->computeForEmployee($employee, $date, $date);
+        }
+
+        return $employees->count();
+    }
+
     private function resolveScheduleDay(Collection $assignments, CarbonInterface $day): ?WorkScheduleDay
     {
         $dow = (int) $day->dayOfWeek; // 0=Sun..6=Sat

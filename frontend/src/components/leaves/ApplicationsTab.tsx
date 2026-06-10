@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useState } from "react";
 import { StatusPill } from "@/components/approvals/StatusPill";
 import { AppButton, AppCard, TableShell } from "@/components/ui";
@@ -185,19 +186,18 @@ export function ApplicationsTab() {
                 <td className="px-4 py-3 font-medium text-slate-800">{r.days_count}</td>
                 <td className="max-w-xs px-4 py-3 text-slate-600">{r.reason}</td>
                 <td className="px-4 py-3 text-right">
-                  {(r.status === "pending" || r.status === "approved") ? (
-                    <div className="flex justify-end gap-2">
-                      {r.status === "pending" && canApprove && (
-                        <>
-                          <button onClick={() => approve.mutate(r.id)} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100">Approve</button>
-                          <button onClick={() => reject.mutate(r.id)} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100">Reject</button>
-                        </>
-                      )}
+                  <div className="flex justify-end gap-2">
+                    <Link href={`/leaves/${r.id}`} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50">View</Link>
+                    {r.status === "pending" && canApprove && (
+                      <>
+                        <button onClick={() => approve.mutate(r.id)} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100">Approve</button>
+                        <button onClick={() => reject.mutate(r.id)} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100">Reject</button>
+                      </>
+                    )}
+                    {(r.status === "pending" || r.status === "approved") && (
                       <button onClick={() => cancel.mutate(r.id)} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50">Cancel</button>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-slate-400">—</span>
-                  )}
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
