@@ -23,6 +23,7 @@ class DailyTimeRecordResource extends JsonResource
             'overtime_minutes' => $this->overtime_minutes,
             'night_diff_minutes' => $this->night_diff_minutes,
             'holiday_type' => $this->holiday_type,
+            'holiday_name' => $this->holiday_name ?? null,
             'is_rest_day' => $this->is_rest_day,
             'is_absent' => $this->is_absent,
             'is_on_leave' => $this->is_on_leave,
@@ -30,30 +31,5 @@ class DailyTimeRecordResource extends JsonResource
             'day_status' => $this->dayStatus(),
             'remarks' => $this->remarks,
         ];
-    }
-
-    /** Single colour-friendly classification of the day. */
-    private function dayStatus(): string
-    {
-        if ($this->is_on_leave) {
-            return 'leave';
-        }
-        if ($this->is_absent) {
-            return 'absent';
-        }
-        if ($this->holiday_type && (float) $this->hours_worked === 0.0) {
-            return 'holiday';
-        }
-        if ($this->is_rest_day && (float) $this->hours_worked === 0.0) {
-            return 'rest_day';
-        }
-        if ($this->late_minutes > 0) {
-            return 'late';
-        }
-        if ((float) $this->hours_worked > 0 || $this->actual_in) {
-            return 'present';
-        }
-
-        return 'no_record';
     }
 }

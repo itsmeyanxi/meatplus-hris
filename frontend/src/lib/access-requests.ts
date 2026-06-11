@@ -1,6 +1,6 @@
 import { api, ensureCsrf } from "./api";
 
-export type AccessRequestStatus = "pending" | "approved" | "rejected";
+export type AccessRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
 export type ApprovalStage = "supervisor" | "hr" | "it" | "done";
 
 export type AccessRequestModuleSelection = {
@@ -91,6 +91,15 @@ export async function getAccessRequests(params?: {
 export async function getMyAccessRequests(): Promise<AccessRequest[]> {
   const { data } = await api.get<{ data: AccessRequest[] }>(
     "/api/v1/my/access-requests",
+  );
+  return data.data;
+}
+
+export async function cancelAccessRequest(id: number): Promise<AccessRequest> {
+  await ensureCsrf();
+  const { data } = await api.post<{ data: AccessRequest }>(
+    `/api/v1/access-requests/${id}/cancel`,
+    {},
   );
   return data.data;
 }

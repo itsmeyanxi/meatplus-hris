@@ -8,8 +8,8 @@ class StoreAccessRequestRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Any authenticated user may submit an access request.
-        return $this->user() !== null;
+        // Only department heads may submit access requests.
+        return $this->user()?->hasRole('dept_head') ?? false;
     }
 
     public function rules(): array

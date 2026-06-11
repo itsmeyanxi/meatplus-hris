@@ -1,8 +1,14 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
-import { createAccessRequest } from "@/lib/access-requests";
+import {
+  cancelAccessRequest,
+  createAccessRequest,
+  getMyAccessRequests,
+  type AccessRequest,
+} from "@/lib/access-requests";
 
 const inputClass =
   "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 outline-none focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900/50";
@@ -84,6 +90,7 @@ const MODULES = [
 const ACCESS_LEVELS = ["View", "User", "Approver", "Admin"];
 
 export default function RequestAccessPage() {
+  const qc = useQueryClient();
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -116,6 +123,7 @@ export default function RequestAccessPage() {
         justification: String(fd.get("justification") ?? ""),
         modules,
       });
+      qc.invalidateQueries({ queryKey: ["my-access-requests"] });
       setSubmitted(true);
     } catch (err: unknown) {
       const msg =
@@ -407,6 +415,73 @@ export default function RequestAccessPage() {
           </p>
         </form>
       )}
+
+      <MyRequests />
+    </div>
+  );
+}
+
+const STATUS_BADGE: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-800",
+  approved: "bg-emerald-100 text-emerald-800",
+  rejected: "bg-red-100 text-red-800",
+  cancelled: "bg-slate-200 text-slate-700",
+};
+
+function MyRequests() {
+  const qc = useQueryClient();
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ["my-access-requests"],
+    queryFn: getMyAccessRequests,
+  });
+
+  const cancel = useMutation({
+    mutationFn: (id: number) => cancelAccessRequest(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["my-access-requests"] }),
+  });
+
+  if (isLoading || items.length === 0) return null;
+
+  return (
+    <div className="mt-10">
+      <h2 className="text-sm font-semibold text-slate-800">My requests</h2>
+      <p className="mt-1 text-sm text-slate-500">Track and withdraw requests you have submitted.</p>
+
+      <div className="mt-4 space-y-2">
+        {items.map((r: AccessRequest) => (
+          <div
+            key={r.id}
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-slate-900">
+                {r.employee_name} <span className="font-normal text-slate-400">— {r.request_type}</span>
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Submitted {r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : "—"}
+                {r.status === "pending" && r.current_stage !== "done" && (
+                  <span className="ml-1">· awaiting {r.current_stage}</span>
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_BADGE[r.status] ?? "bg-slate-100 text-slate-600"}`}>
+                {r.status}
+              </span>
+              {r.status === "pending" && (
+                <button
+                  type="button"
+                  onClick={() => cancel.mutate(r.id)}
+                  disabled={cancel.isPending}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

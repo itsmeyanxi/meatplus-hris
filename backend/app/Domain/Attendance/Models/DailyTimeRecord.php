@@ -37,4 +37,29 @@ class DailyTimeRecord extends Model
     {
         return $this->belongsTo(Employee::class);
     }
+
+    /** Single colour-friendly classification of the day, shared by the API and summaries. */
+    public function dayStatus(): string
+    {
+        if ($this->is_on_leave) {
+            return 'leave';
+        }
+        if ($this->is_absent) {
+            return 'absent';
+        }
+        if ($this->holiday_type && (float) $this->hours_worked === 0.0) {
+            return 'holiday';
+        }
+        if ($this->is_rest_day && (float) $this->hours_worked === 0.0) {
+            return 'rest_day';
+        }
+        if ($this->late_minutes > 0) {
+            return 'late';
+        }
+        if ((float) $this->hours_worked > 0 || $this->actual_in) {
+            return 'present';
+        }
+
+        return 'no_record';
+    }
 }

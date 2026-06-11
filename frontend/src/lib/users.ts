@@ -1,6 +1,6 @@
 import { api } from "./api";
 
-export type Role = "super_admin" | "hr_admin" | "hr_manager" | "payroll_officer" | "dept_head" | "employee";
+export type Role = "super_admin" | "hr_admin" | "hr_manager" | "it_admin" | "payroll_officer" | "dept_head" | "employee";
 
 export type UserItem = {
   id: number;
@@ -65,6 +65,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   super_admin: "Super Admin",
   hr_admin: "HR Admin",
   hr_manager: "HR Manager",
+  it_admin: "IT Admin",
   payroll_officer: "Payroll Officer",
   dept_head: "Department Head",
   employee: "Employee",

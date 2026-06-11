@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Attendance;
 
 use App\Domain\Attendance\Models\DailyTimeRecord;
+use App\Domain\Attendance\Models\Holiday;
 use App\Domain\Attendance\Services\DtrComputer;
 use App\Domain\HRIS\Models\Employee;
 use App\Http\Controllers\Controller;
@@ -19,7 +20,7 @@ class DailyTimeRecordController extends Controller
         $user = $request->user();
         abort_unless($user->can('attendance.view'), 403);
 
-        $q = DailyTimeRecord::query()->orderBy('work_date');
+        $q = DailyTimeRecord::query();
 
         // HR (attendance.view.any) sees everyone; everyone else is locked to their own record.
         if ($user->can('attendance.view.any')) {
@@ -39,7 +40,12 @@ class DailyTimeRecordController extends Controller
             $q->where('work_date', '<=', $to);
         }
 
-        return DailyTimeRecordResource::collection($q->limit(500)->get());
+        // Cap on the most recent rows (DESC + limit), then present chronologically
+        // so a wide range never silently drops the latest days.
+        $records = $q->orderBy('work_date', 'desc')->limit(500)->get()
+            ->sortBy('work_date')->values();
+
+        return DailyTimeRecordResource::collection($records);
     }
 
     /**
@@ -51,22 +57,44 @@ class DailyTimeRecordController extends Controller
         $employee = $request->user()->employee;
         abort_unless($employee, 403, 'Your account is not linked to an employee record.');
 
+        $from = $request->query('from');
+        $to = $request->query('to');
+
+        // Order DESC so the row cap always keeps the most recent days (the calendar
+        // cares about current/upcoming dates); a wide range never drops them.
         $q = DailyTimeRecord::query()
             ->where('employee_id', $employee->id)
-            ->orderBy('work_date');
+            ->orderBy('work_date', 'desc');
 
-        if ($from = $request->query('from')) {
+        if ($from) {
             $q->where('work_date', '>=', $from);
         }
-        if ($to = $request->query('to')) {
+        if ($to) {
             $q->where('work_date', '<=', $to);
         }
 
-        $records = $q->limit(400)->get();
+        $records = $q->limit(800)->get();
+
+        // Attach the holiday name (e.g. "Labor Day") to holiday rows so the
+        // calendar can show which holiday it is, not just a generic label.
+        $holidays = Holiday::query()
+            ->where(function ($hq) use ($employee) {
+                $hq->whereNull('company_id')->orWhere('company_id', $employee->company_id);
+            })
+            ->where(function ($hq) use ($employee) {
+                $hq->whereNull('applicable_branch_id')->orWhere('applicable_branch_id', $employee->branch_id);
+            })
+            ->when($from, fn ($hq) => $hq->where('holiday_date', '>=', $from))
+            ->when($to, fn ($hq) => $hq->where('holiday_date', '<=', $to))
+            ->get()
+            ->keyBy(fn (Holiday $h) => $h->holiday_date->toDateString());
 
         $summary = ['present' => 0, 'late' => 0, 'absent' => 0, 'leave' => 0, 'holiday' => 0, 'rest_day' => 0];
         foreach ($records as $r) {
-            $status = $this->classify($r);
+            if ($r->holiday_type) {
+                $r->holiday_name = $holidays->get($r->work_date->toDateString())?->name;
+            }
+            $status = $r->dayStatus();
             if (array_key_exists($status, $summary)) {
                 $summary[$status]++;
             }
@@ -76,31 +104,6 @@ class DailyTimeRecordController extends Controller
             'data' => DailyTimeRecordResource::collection($records),
             'summary' => $summary,
         ]);
-    }
-
-    /** Mirrors DailyTimeRecordResource::dayStatus for summary counts. */
-    private function classify(DailyTimeRecord $r): string
-    {
-        if ($r->is_on_leave) {
-            return 'leave';
-        }
-        if ($r->is_absent) {
-            return 'absent';
-        }
-        if ($r->holiday_type && (float) $r->hours_worked === 0.0) {
-            return 'holiday';
-        }
-        if ($r->is_rest_day && (float) $r->hours_worked === 0.0) {
-            return 'rest_day';
-        }
-        if ($r->late_minutes > 0) {
-            return 'late';
-        }
-        if ((float) $r->hours_worked > 0 || $r->actual_in) {
-            return 'present';
-        }
-
-        return 'no_record';
     }
 
     public function compute(ComputeDtrRequest $request, DtrComputer $computer): AnonymousResourceCollection

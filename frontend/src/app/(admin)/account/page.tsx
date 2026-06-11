@@ -12,7 +12,6 @@ export default function AccountPage() {
   });
 
   const [rolesOpen, setRolesOpen] = useState(false);
-  const [permissionsOpen, setPermissionsOpen] = useState(false);
 
   if (isLoading || !meData) {
     return <div className="p-8 text-center text-slate-500">Loading account...</div>;
@@ -93,40 +92,25 @@ export default function AccountPage() {
         <AppCard title={`Permissions (${user.permissions.length})`} className="lg:col-span-7">
           <SectionHeader
             title="Permission detail"
-            subtitle="Expanded permission list can be collapsed when you only need the summary"
-            action={
-              <button
-                type="button"
-                className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                onClick={() => setPermissionsOpen((open) => !open)}
-              >
-                {permissionsOpen ? "Collapse" : "Expand"}
-              </button>
-            }
+            subtitle="All permissions assigned to the current user"
           />
 
-          {permissionsOpen ? (
-            <div className="mt-4">
-              {user.permissions.length === 0 ? (
-                <p className="text-sm text-slate-500">No permissions assigned.</p>
-              ) : (
-                <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                  {user.permissions.map((p) => (
-                    <li
-                      key={p}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-700"
-                    >
-                      {p}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ) : (
-            <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-5 text-sm text-slate-500">
-              Permission detail is collapsed. Expand it to inspect the full list.
-            </div>
-          )}
+          <div className="mt-4">
+            {user.permissions.length === 0 ? (
+              <p className="text-sm text-slate-500">No permissions assigned.</p>
+            ) : (
+              <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {user.permissions.map((p) => (
+                  <li
+                    key={p}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-700"
+                  >
+                    {p}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </AppCard>
       </div>
     </div>

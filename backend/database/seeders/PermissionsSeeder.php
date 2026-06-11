@@ -41,8 +41,11 @@ class PermissionsSeeder extends Seeder
             // super_admin gets everything EXCEPT the stages reserved for other roles:
             // supervisor/HR access-request stages, and leave approval (dept_head only).
             'super_admin' => array_values(array_diff($permissions, [
+                // Access requests are reserved for dept_head / HR head / IT admin only.
+                'access_request.view',
                 'access_request.approve.supervisor',
                 'access_request.approve.hr',
+                'access_request.approve.it',
                 'leave.approve.any',
                 'leave.approve.self_dept',
                 // Approvals reserved for dept_head (consistent "immediate supervisor approves" model).

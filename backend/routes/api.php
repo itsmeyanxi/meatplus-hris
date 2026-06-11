@@ -86,6 +86,7 @@ Route::prefix('v1')->group(function () {
         Route::get('access-requests/{accessRequest}', [AccessRequestController::class, 'show']);
         Route::post('access-requests/{accessRequest}/approve', [AccessRequestController::class, 'approve']);
         Route::post('access-requests/{accessRequest}/reject', [AccessRequestController::class, 'reject']);
+        Route::post('access-requests/{accessRequest}/cancel', [AccessRequestController::class, 'cancel']);
 
         // Approval workflows (Phase 2.1)
         // User management (Phase 2.3)

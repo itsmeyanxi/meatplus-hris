@@ -21,7 +21,7 @@ class UpdateUserRequest extends FormRequest
             'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($userId)],
             'is_active' => ['sometimes', 'boolean'],
             'role' => ['sometimes', 'string', Rule::in([
-                'super_admin', 'hr_admin', 'hr_manager', 'payroll_officer', 'dept_head', 'employee',
+                'super_admin', 'hr_admin', 'hr_manager', 'it_admin', 'payroll_officer', 'dept_head', 'employee',
             ])],
         ];
     }

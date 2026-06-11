@@ -75,6 +75,7 @@ export type DailyTimeRecord = {
   overtime_minutes: number;
   night_diff_minutes: number;
   holiday_type: string | null;
+  holiday_name?: string | null;
   is_rest_day: boolean;
   is_absent: boolean;
   is_on_leave: boolean;

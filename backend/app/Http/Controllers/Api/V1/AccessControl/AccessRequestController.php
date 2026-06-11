@@ -4,13 +4,18 @@ namespace App\Http\Controllers\Api\V1\AccessControl;
 
 use App\Domain\AccessControl\Models\AccessRequest;
 use App\Domain\AccessControl\Models\AccessRequestApproval;
+use App\Domain\AccessControl\Services\AccessProvisioner;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AccessControl\StoreAccessRequestRequest;
 use App\Http\Resources\AccessControl\AccessRequestResource;
+use App\Models\User;
+use App\Notifications\AccessRequestAwaitingApproval;
+use App\Notifications\AccessRequestDecided;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 
 class AccessRequestController extends Controller
@@ -159,6 +164,9 @@ class AccessRequestController extends Controller
 
         $accessRequest->load(['requester:id,name,email', 'modules', 'approvals']);
 
+        // Alert the first-stage approvers that a request is waiting.
+        $this->notifyStageApprovers($accessRequest);
+
         return (new AccessRequestResource($accessRequest))->response()->setStatusCode(201);
     }
 
@@ -193,11 +201,19 @@ class AccessRequestController extends Controller
             ]);
         }
 
+        // Integrity: a requester may not decide on their own request.
+        abort_if(
+            $accessRequest->requested_by_user_id === $request->user()->id,
+            403,
+            'You cannot approve or reject your own access request.',
+        );
+
         $stage = $accessRequest->current_stage;
         $permission = self::STAGE_PERMISSION[$stage] ?? null;
         abort_unless($permission && $request->user()->can($permission), 403, "You cannot act on the {$stage} stage.");
 
-        DB::transaction(function () use ($request, $accessRequest, $decision, $stage, $validated) {
+        $completed = false;
+        DB::transaction(function () use ($request, $accessRequest, $decision, $stage, $validated, &$completed) {
             $accessRequest->approvals()
                 ->where('stage', $stage)
                 ->update([
@@ -222,10 +238,85 @@ class AccessRequestController extends Controller
                     ? ['status' => 'approved', 'current_stage' => 'done']
                     : ['current_stage' => $next],
             );
+
+            $completed = $next === null;
         });
 
+        $accessRequest->refresh();
+
+        if ($decision === 'rejected') {
+            $this->notifyRequester($accessRequest, 'rejected', $validated['remarks'] ?? null);
+        } elseif ($completed) {
+            // Final approval — apply the requested access to the target account.
+            app(AccessProvisioner::class)->apply($accessRequest);
+            $this->notifyRequester($accessRequest, 'approved');
+        } else {
+            // Moved to the next stage — alert that stage's approvers.
+            $this->notifyStageApprovers($accessRequest);
+        }
+
         return new AccessRequestResource(
-            $accessRequest->fresh()->load(['requester:id,name,email', 'modules', 'approvals.decider:id,name']),
+            $accessRequest->load(['requester:id,name,email', 'modules', 'approvals.decider:id,name']),
         );
+    }
+
+    /** Requester withdraws their own still-pending request. */
+    public function cancel(Request $request, AccessRequest $accessRequest): AccessRequestResource
+    {
+        abort_unless(
+            $accessRequest->requested_by_user_id === $request->user()->id,
+            403,
+            'You can only cancel your own request.',
+        );
+
+        if ($accessRequest->status !== 'pending') {
+            throw ValidationException::withMessages([
+                'status' => "This request is already {$accessRequest->status}.",
+            ]);
+        }
+
+        $accessRequest->update(['status' => 'cancelled', 'current_stage' => 'done']);
+
+        return new AccessRequestResource(
+            $accessRequest->load(['requester:id,name,email', 'modules', 'approvals.decider:id,name']),
+        );
+    }
+
+    /** Notify everyone who can act on the request's current stage. */
+    private function notifyStageApprovers(AccessRequest $accessRequest): void
+    {
+        $stage = $accessRequest->current_stage;
+        $permission = self::STAGE_PERMISSION[$stage] ?? null;
+        if (! $permission) {
+            return;
+        }
+
+        $roleIds = DB::table('role_has_permissions as rp')
+            ->join('permissions as p', 'p.id', '=', 'rp.permission_id')
+            ->where('p.name', $permission)
+            ->pluck('rp.role_id');
+
+        $userIds = DB::table('model_has_roles')
+            ->where('model_type', User::class)
+            ->whereIn('role_id', $roleIds)
+            ->where('company_id', $accessRequest->company_id)
+            ->pluck('model_id');
+
+        $approvers = User::whereIn('id', $userIds)
+            ->where('is_active', true)
+            ->where('id', '!=', $accessRequest->requested_by_user_id)
+            ->get();
+
+        if ($approvers->isNotEmpty()) {
+            Notification::send($approvers, new AccessRequestAwaitingApproval($accessRequest, $stage));
+        }
+    }
+
+    private function notifyRequester(AccessRequest $accessRequest, string $outcome, ?string $remarks = null): void
+    {
+        $requester = $accessRequest->requester;
+        if ($requester) {
+            $requester->notify(new AccessRequestDecided($accessRequest, $outcome, $remarks));
+        }
     }
 }
