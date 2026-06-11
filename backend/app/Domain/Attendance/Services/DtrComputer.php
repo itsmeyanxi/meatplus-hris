@@ -5,6 +5,7 @@ namespace App\Domain\Attendance\Services;
 use App\Domain\Attendance\Models\DailyTimeRecord;
 use App\Domain\Attendance\Models\EmployeeSchedule;
 use App\Domain\Attendance\Models\Holiday;
+use App\Domain\Attendance\Models\ShiftAdjustment;
 use App\Domain\Attendance\Models\TimeLog;
 use App\Domain\Attendance\Models\WorkScheduleDay;
 use App\Domain\HRIS\Models\Employee;
@@ -50,6 +51,12 @@ class DtrComputer
             ->get()
             ->groupBy(fn (TimeLog $l) => $l->logged_at->toDateString());
 
+        $adjustments = ShiftAdjustment::query()
+            ->where('employee_id', $employee->id)
+            ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])
+            ->get()
+            ->keyBy(fn (ShiftAdjustment $a) => $a->work_date->toDateString());
+
         $results = collect();
 
         for ($day = $from; $day->lte($to); $day = $day->addDay()) {
@@ -68,8 +75,9 @@ class DtrComputer
             $scheduleDay = $this->resolveScheduleDay($assignments, $day);
             $holiday = $holidays->get($dateStr);
             $dayLogs = $logs->get($dateStr, collect());
+            $adjustment = $adjustments->get($dateStr);
 
-            $dtr = $this->computeDay($employee, $day, $scheduleDay, $holiday, $dayLogs);
+            $dtr = $this->computeDay($employee, $day, $scheduleDay, $holiday, $dayLogs, $adjustment);
 
             $row = DailyTimeRecord::updateOrCreate(
                 ['employee_id' => $employee->id, 'work_date' => $dateStr],
@@ -185,6 +193,7 @@ class DtrComputer
         ?WorkScheduleDay $scheduleDay,
         ?Holiday $holiday,
         Collection $dayLogs,
+        ?ShiftAdjustment $adjustment = null,
     ): array {
         $isRestDay = (bool) ($scheduleDay?->is_rest_day);
         $hasAnyLogs = $dayLogs->isNotEmpty();
@@ -202,6 +211,28 @@ class DtrComputer
         $breakMinutes = (int) ($scheduleDay->break_minutes ?? 0);
         $breaksPaid = (bool) ($scheduleDay?->workSchedule?->breaks_paid ?? false);
         $requiredHours = (float) ($scheduleDay->required_hours ?? 0);
+
+        // HR override: an adjustment replaces this day's shift entirely.
+        $isAdjusted = (bool) $adjustment;
+        if ($adjustment) {
+            $isRestDay = $adjustment->is_rest_day;
+            if ($isRestDay) {
+                $scheduledIn = $scheduledOut = null;
+                $breakMinutes = 0;
+                $requiredHours = 0.0;
+            } else {
+                $scheduledIn = $adjustment->time_in;
+                $scheduledOut = $adjustment->time_out;
+                $breakMinutes = (int) ($adjustment->break_minutes ?? 60);
+                if ($scheduledIn && $scheduledOut) {
+                    $si = CarbonImmutable::parse($day->toDateString().' '.$scheduledIn);
+                    $so = CarbonImmutable::parse($day->toDateString().' '.$scheduledOut);
+                    $requiredHours = round(max(0, $si->diffInMinutes($so) - $breakMinutes) / 60, 2);
+                } else {
+                    $requiredHours = 0.0;
+                }
+            }
+        }
 
         if ($actualIn && $actualOut) {
             $minutes = $actualIn->diffInMinutes($actualOut);
@@ -245,6 +276,7 @@ class DtrComputer
             'is_rest_day' => $isRestDay,
             'is_absent' => $isAbsent,
             'is_on_leave' => false, // populated when leave module lands
+            'is_adjusted' => $isAdjusted,
             'status' => 'draft',
         ];
     }

@@ -27,6 +27,7 @@ class DailyTimeRecordResource extends JsonResource
             'is_rest_day' => $this->is_rest_day,
             'is_absent' => $this->is_absent,
             'is_on_leave' => $this->is_on_leave,
+            'is_adjusted' => $this->is_adjusted,
             'status' => $this->status,
             'day_status' => $this->dayStatus(),
             'remarks' => $this->remarks,

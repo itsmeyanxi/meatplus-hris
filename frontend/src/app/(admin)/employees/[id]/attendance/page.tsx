@@ -7,10 +7,12 @@ import { ChildListShell, EmptyRow, inputCls } from "@/components/employees/Child
 import {
   dtrApi,
   employeeSchedulesApi,
+  shiftAdjustmentsApi,
   timeLogsApi,
   workSchedulesApi,
   type DailyTimeRecord,
   type ScheduleAssignment,
+  type ShiftAdjustment,
 } from "@/lib/attendance";
 
 export default function EmployeeAttendanceTab() {
@@ -64,6 +66,44 @@ export default function EmployeeAttendanceTab() {
   const compute = useMutation({
     mutationFn: () => dtrApi.compute({ employee_id: employeeId, from, to }),
     onSuccess: () => qc.invalidateQueries({ queryKey: dtrKey }),
+  });
+
+  // ---- Shift adjustments (per-day shift override) ----
+  const adjKey = ["shift-adjustments", employeeId];
+  const { data: adjustments = [] } = useQuery({
+    queryKey: adjKey,
+    queryFn: () => shiftAdjustmentsApi.list(employeeId),
+  });
+  const [isAdjusting, setIsAdjusting] = useState(false);
+  const [adjForm, setAdjForm] = useState({
+    work_date: "",
+    is_rest_day: false,
+    time_in: "",
+    time_out: "",
+    reason: "",
+  });
+  const adjustDone = () => {
+    qc.invalidateQueries({ queryKey: adjKey });
+    qc.invalidateQueries({ queryKey: dtrKey });
+  };
+  const adjust = useMutation({
+    mutationFn: () =>
+      shiftAdjustmentsApi.create(employeeId, {
+        work_date: adjForm.work_date,
+        is_rest_day: adjForm.is_rest_day,
+        time_in: adjForm.is_rest_day ? null : adjForm.time_in,
+        time_out: adjForm.is_rest_day ? null : adjForm.time_out,
+        reason: adjForm.reason || null,
+      }),
+    onSuccess: () => {
+      adjustDone();
+      setIsAdjusting(false);
+      setAdjForm({ work_date: "", is_rest_day: false, time_in: "", time_out: "", reason: "" });
+    },
+  });
+  const removeAdj = useMutation({
+    mutationFn: (id: number) => shiftAdjustmentsApi.destroy(employeeId, id),
+    onSuccess: adjustDone,
   });
 
   // ---- Quick punch in/out ----
@@ -152,6 +192,101 @@ export default function EmployeeAttendanceTab() {
                     ({a.effective_from} → {a.effective_to ?? "ongoing"})
                   </span>
                 </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </ChildListShell>
+
+      {/* Shift adjustments */}
+      <ChildListShell
+        title="Shift adjustments"
+        count={adjustments.length}
+        isAdding={isAdjusting}
+        toggle={() => setIsAdjusting((v) => !v)}
+      >
+        {isAdjusting && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              adjust.mutate();
+            }}
+            className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3"
+          >
+            <input
+              type="date"
+              className={inputCls}
+              value={adjForm.work_date}
+              onChange={(e) => setAdjForm({ ...adjForm, work_date: e.target.value })}
+              required
+            />
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={adjForm.is_rest_day}
+                onChange={(e) => setAdjForm({ ...adjForm, is_rest_day: e.target.checked })}
+              />
+              Rest day
+            </label>
+            <input
+              className={inputCls}
+              placeholder="Reason (optional)"
+              value={adjForm.reason}
+              onChange={(e) => setAdjForm({ ...adjForm, reason: e.target.value })}
+            />
+            {!adjForm.is_rest_day && (
+              <>
+                <input
+                  type="time"
+                  className={inputCls}
+                  value={adjForm.time_in}
+                  onChange={(e) => setAdjForm({ ...adjForm, time_in: e.target.value })}
+                  required
+                />
+                <input
+                  type="time"
+                  className={inputCls}
+                  value={adjForm.time_out}
+                  onChange={(e) => setAdjForm({ ...adjForm, time_out: e.target.value })}
+                  required
+                />
+              </>
+            )}
+            <div className="flex justify-end sm:col-span-3">
+              <button
+                type="submit"
+                disabled={adjust.isPending}
+                className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {adjust.isPending ? "Saving…" : "Adjust shift"}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {adjustments.length === 0 ? (
+          <EmptyRow message="No shift adjustments. Add one to override a specific day's shift; that day will show as 'Adjusted'." />
+        ) : (
+          <ul className="space-y-2">
+            {adjustments.map((a: ShiftAdjustment) => (
+              <li
+                key={a.id}
+                className="flex items-center justify-between rounded-md border border-slate-200 bg-white px-4 py-2 text-sm"
+              >
+                <span>
+                  <strong className="font-mono">{a.work_date}</strong>{" "}
+                  <span className="text-slate-600">
+                    {a.is_rest_day ? "Rest day" : `${a.time_in?.slice(0, 5)}–${a.time_out?.slice(0, 5)}`}
+                  </span>
+                  {a.reason && <span className="text-slate-400"> · {a.reason}</span>}
+                </span>
+                <button
+                  onClick={() => removeAdj.mutate(a.id)}
+                  disabled={removeAdj.isPending}
+                  className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Remove
+                </button>
               </li>
             ))}
           </ul>

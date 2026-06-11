@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\Attendance\AttendanceCorrectionController;
 use App\Http\Controllers\Api\V1\Attendance\CertificateOfAttendanceRequestController;
 use App\Http\Controllers\Api\V1\Attendance\DailyTimeRecordController;
 use App\Http\Controllers\Api\V1\Attendance\EmployeeScheduleController;
+use App\Http\Controllers\Api\V1\Attendance\ShiftAdjustmentController;
 use App\Http\Controllers\Api\V1\Attendance\HolidayController;
 use App\Http\Controllers\Api\V1\Attendance\OfficialBusinessRequestController;
 use App\Http\Controllers\Api\V1\Attendance\OvertimeRequestController;
@@ -67,6 +68,10 @@ Route::prefix('v1')->group(function () {
         Route::get('employees/{employee}/schedule-assignments', [EmployeeScheduleController::class, 'index']);
         Route::post('employees/{employee}/schedule-assignments', [EmployeeScheduleController::class, 'store']);
         Route::delete('employees/{employee}/schedule-assignments/{schedule}', [EmployeeScheduleController::class, 'destroy']);
+
+        Route::get('employees/{employee}/shift-adjustments', [ShiftAdjustmentController::class, 'index']);
+        Route::post('employees/{employee}/shift-adjustments', [ShiftAdjustmentController::class, 'store']);
+        Route::delete('employees/{employee}/shift-adjustments/{shiftAdjustment}', [ShiftAdjustmentController::class, 'destroy']);
 
         // Leaves (Phase 3.0)
         Route::get('leave-types', [LeaveTypeController::class, 'index']);

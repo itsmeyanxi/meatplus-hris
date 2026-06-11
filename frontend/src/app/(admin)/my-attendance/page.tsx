@@ -10,6 +10,7 @@ import {
 } from "@/lib/attendance";
 import { AppCard, PageHeader } from "@/components/ui";
 import { MyAttendanceRequests } from "@/components/attendance/MyAttendanceRequests";
+import { MyAttendanceSummary } from "@/components/attendance/MyAttendanceSummary";
 
 const STATUS_STYLE: Record<DayStatus, { dot: string; cell: string; label: string }> = {
   present: { dot: "bg-emerald-500", cell: "bg-emerald-50 border-emerald-200", label: "Present" },
@@ -68,7 +69,7 @@ export default function MyAttendancePage() {
   const [view, setView] = useState<{ year: number; month: number } | null>(null);
   const cur = view ?? currentMonth;
 
-  const [tab, setTab] = useState<"calendar" | "requests">("calendar");
+  const [tab, setTab] = useState<"calendar" | "summary" | "requests">("calendar");
   const [detailDay, setDetailDay] = useState<DailyTimeRecord | null>(null);
 
   const monthLabel = new Date(cur.year, cur.month, 1).toLocaleDateString(undefined, {
@@ -126,7 +127,7 @@ export default function MyAttendancePage() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-slate-200">
-        {([["calendar", "Calendar"], ["requests", "Requests"]] as const).map(([k, labelText]) => (
+        {([["calendar", "Calendar"], ["summary", "Summary"], ["requests", "Requests"]] as const).map(([k, labelText]) => (
           <button
             key={k}
             onClick={() => setTab(k)}
@@ -143,6 +144,8 @@ export default function MyAttendancePage() {
 
       {tab === "requests" ? (
         <MyAttendanceRequests />
+      ) : tab === "summary" ? (
+        <MyAttendanceSummary employeeName={me?.user.employee?.full_name ?? "—"} />
       ) : (
       <>
 

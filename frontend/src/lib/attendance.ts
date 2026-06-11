@@ -77,6 +77,7 @@ export type DailyTimeRecord = {
   holiday_type: string | null;
   holiday_name?: string | null;
   is_rest_day: boolean;
+  is_adjusted?: boolean;
   is_absent: boolean;
   is_on_leave: boolean;
   status: "draft" | "posted" | "locked";
@@ -174,4 +175,42 @@ export const employeeSchedulesApi = {
   },
   destroy: (employeeId: number, id: number) =>
     api.delete(`/api/v1/employees/${employeeId}/schedule-assignments/${id}`),
+};
+
+export type ShiftAdjustment = {
+  id: number;
+  employee_id: number;
+  work_date: string;
+  is_rest_day: boolean;
+  time_in: string | null;
+  time_out: string | null;
+  break_minutes: number;
+  reason: string | null;
+};
+
+export type ShiftAdjustmentInput = {
+  work_date: string;
+  is_rest_day?: boolean;
+  time_in?: string | null;
+  time_out?: string | null;
+  break_minutes?: number;
+  reason?: string | null;
+};
+
+export const shiftAdjustmentsApi = {
+  list: async (employeeId: number): Promise<ShiftAdjustment[]> => {
+    const { data } = await api.get<Listed<ShiftAdjustment>>(
+      `/api/v1/employees/${employeeId}/shift-adjustments`,
+    );
+    return data.data;
+  },
+  create: async (employeeId: number, body: ShiftAdjustmentInput): Promise<ShiftAdjustment> => {
+    const { data } = await api.post<{ data: ShiftAdjustment }>(
+      `/api/v1/employees/${employeeId}/shift-adjustments`,
+      body,
+    );
+    return data.data;
+  },
+  destroy: (employeeId: number, id: number) =>
+    api.delete(`/api/v1/employees/${employeeId}/shift-adjustments/${id}`),
 };

@@ -16,7 +16,7 @@ class DailyTimeRecord extends Model
         'scheduled_in', 'scheduled_out', 'actual_in', 'actual_out',
         'hours_worked', 'late_minutes', 'undertime_minutes',
         'overtime_minutes', 'night_diff_minutes',
-        'holiday_type', 'is_rest_day', 'is_absent', 'is_on_leave',
+        'holiday_type', 'is_rest_day', 'is_absent', 'is_on_leave', 'is_adjusted',
         'leave_application_id', 'status', 'remarks',
     ];
 
@@ -30,6 +30,7 @@ class DailyTimeRecord extends Model
             'is_rest_day' => 'boolean',
             'is_absent' => 'boolean',
             'is_on_leave' => 'boolean',
+            'is_adjusted' => 'boolean',
         ];
     }
 
