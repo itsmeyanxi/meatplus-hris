@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\V1\Attendance\WorkScheduleController;
 use App\Http\Controllers\Api\V1\Auth\LoginController;
 use App\Http\Controllers\Api\V1\Auth\LogoutController;
 use App\Http\Controllers\Api\V1\Auth\MeController;
+use App\Http\Controllers\Api\V1\Me\PendingSummaryController;
+use App\Http\Controllers\Api\V1\Me\NotificationController;
 use App\Http\Controllers\Api\V1\Companies\SwitchCompanyController;
 use App\Http\Controllers\Api\V1\Employees\DependentController;
 use App\Http\Controllers\Api\V1\Employees\EducationController;
@@ -34,6 +36,10 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware(['auth:sanctum', SetPermissionsTeam::class])->group(function () {
         Route::get('me', MeController::class);
+        Route::get('my/pending-summary', PendingSummaryController::class);
+        Route::get('my/notifications', [NotificationController::class, 'index']);
+        Route::post('my/notifications/read-all', [NotificationController::class, 'markAllRead']);
+        Route::post('my/notifications/{id}/read', [NotificationController::class, 'markRead']);
         Route::post('logout', LogoutController::class);
         Route::post('companies/switch', SwitchCompanyController::class);
 

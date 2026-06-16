@@ -21,7 +21,22 @@ class AccessRequestDecided extends Notification
     /** @return array<int, string> */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return ['mail', 'database'];
+    }
+
+    /** @return array<string, mixed> */
+    public function toArray(object $notifiable): array
+    {
+        $r = $this->accessRequest;
+
+        return [
+            'type' => 'access_request.decided',
+            'title' => "Your access request was {$this->outcome}",
+            'message' => "Request for {$r->employee_name} ({$r->department}) was {$this->outcome}"
+                .($this->remarks ? " · {$this->remarks}" : ''),
+            'url' => "/access-requests/{$r->id}",
+            'access_request_id' => $r->id,
+        ];
     }
 
     public function toMail(object $notifiable): MailMessage

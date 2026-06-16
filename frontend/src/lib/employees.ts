@@ -86,6 +86,7 @@ export type EmployeeCreateInput = {
   email_personal?: string | null;
   email_company?: string | null;
   mobile?: string | null;
+  phone_home?: string | null;
   city?: string | null;
   province?: string | null;
   postal_code?: string | null;

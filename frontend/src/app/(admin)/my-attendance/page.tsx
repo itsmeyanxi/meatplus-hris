@@ -284,13 +284,13 @@ function DayDetailDrawer({ record, onClose }: { record: DailyTimeRecord; onClose
         </div>
 
         <div className="mt-5 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Detail label="Time in">{hm(record.actual_in)}</Detail>
             <Detail label="Time out">{hm(record.actual_out)}</Detail>
             <Detail label="Scheduled">{record.scheduled_in ?? "—"} – {record.scheduled_out ?? "—"}</Detail>
             <Detail label="Hours worked">{record.hours_worked}</Detail>
           </div>
-          <div className="grid grid-cols-3 gap-4 border-t border-slate-100 pt-4">
+          <div className="grid grid-cols-1 gap-4 border-t border-slate-100 pt-4 sm:grid-cols-3">
             <Detail label="Late">{record.late_minutes ? `${record.late_minutes}m` : "—"}</Detail>
             <Detail label="Undertime">{record.undertime_minutes ? `${record.undertime_minutes}m` : "—"}</Detail>
             <Detail label="Overtime">{record.overtime_minutes ? `${record.overtime_minutes}m` : "—"}</Detail>

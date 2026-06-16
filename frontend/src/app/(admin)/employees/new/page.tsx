@@ -31,7 +31,8 @@ const schema = z.object({
   date_hired: z.string().min(1, "Required"),
 });
 
-type FormValues = z.infer<typeof schema>;
+type FormInput = z.input<typeof schema>;
+type FormValues = z.output<typeof schema>;
 
 export default function NewEmployeePage() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function NewEmployeePage() {
   const { data: departments } = useQuery({ queryKey: ["departments"], queryFn: () => getLookup("departments") });
   const { data: employmentTypes } = useQuery({ queryKey: ["employment-types"], queryFn: () => getLookup("employment-types") });
 
-  const form = useForm<FormValues>({
+  const form = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { nationality: "Filipino", gender: "male", civil_status: "single" },
   });

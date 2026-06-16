@@ -9,10 +9,7 @@ import {
   getMyAccessRequests,
   type AccessRequest,
 } from "@/lib/access-requests";
-
-const inputClass =
-  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 outline-none focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900/50";
-const labelClass = "mb-1.5 block text-sm font-medium text-slate-700";
+import { inputCls as inputClass, labelCls as labelClass } from "@/lib/form-classes";
 
 function Req() {
   return <span className="text-red-500">*</span>;

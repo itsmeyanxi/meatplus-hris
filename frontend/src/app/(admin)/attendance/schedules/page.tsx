@@ -9,12 +9,11 @@ import {
 } from "@/lib/attendance";
 import { AppButton, AppCard, PageHeader, TableShell } from "@/components/ui";
 import { RoleGate, HR_ROLES } from "@/components/RoleGate";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const inputCls =
-  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900/50";
-const labelCls = "mb-1.5 block text-sm font-medium text-slate-700";
+import { inputCls, labelCls } from "@/lib/form-classes";
 
 type DayForm = {
   day_of_week: number;
@@ -91,6 +90,7 @@ export default function SchedulesPage() {
 
 function SchedulesPageInner() {
   const qc = useQueryClient();
+  const { confirm, dialog } = useConfirm();
   const { data, isLoading } = useQuery({
     queryKey: ["work-schedules"],
     queryFn: workSchedulesApi.list,
@@ -124,11 +124,13 @@ function SchedulesPageInner() {
       qc.invalidateQueries({ queryKey: ["work-schedules"] });
       closeEditor();
     },
+    meta: { successMessage: "Work schedule saved." },
   });
 
   const remove = useMutation({
     mutationFn: (id: number) => workSchedulesApi.destroy(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["work-schedules"] }),
+    meta: { successMessage: "Work schedule archived." },
   });
 
   const startNew = () =>
@@ -166,6 +168,7 @@ function SchedulesPageInner() {
 
   return (
     <div className="space-y-6">
+      {dialog}
       <PageHeader
         title="Work schedules"
         description={
@@ -372,8 +375,17 @@ function SchedulesPageInner() {
                 Edit
               </button>
               <button
-                onClick={() => {
-                  if (confirm(`Archive work schedule "${s.name}"?`)) remove.mutate(s.id);
+                onClick={async () => {
+                  if (
+                    await confirm({
+                      title: "Archive work schedule",
+                      message: `Archive "${s.name}"? It will be hidden from new assignments.`,
+                      confirmLabel: "Archive",
+                      danger: true,
+                    })
+                  ) {
+                    remove.mutate(s.id);
+                  }
                 }}
                 className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100"
               >

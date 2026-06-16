@@ -20,7 +20,21 @@ class AccessRequestAwaitingApproval extends Notification
     /** @return array<int, string> */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return ['mail', 'database'];
+    }
+
+    /** @return array<string, mixed> */
+    public function toArray(object $notifiable): array
+    {
+        $r = $this->accessRequest;
+
+        return [
+            'type' => 'access_request.awaiting',
+            'title' => 'Access request awaiting your approval',
+            'message' => "{$r->employee_name} ({$r->department}) · ".ucfirst($this->stage).' stage',
+            'url' => "/access-requests/{$r->id}",
+            'access_request_id' => $r->id,
+        ];
     }
 
     public function toMail(object $notifiable): MailMessage

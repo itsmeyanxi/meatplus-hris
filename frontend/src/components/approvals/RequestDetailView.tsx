@@ -58,14 +58,17 @@ export function RequestDetailView<T extends BaseReq>({
   const approve = useMutation({
     mutationFn: () => api.approve(id, remarks || undefined),
     onSuccess: invalidate,
+    meta: { successMessage: "Request approved." },
   });
   const reject = useMutation({
     mutationFn: () => api.reject(id, remarks || undefined),
     onSuccess: invalidate,
+    meta: { successMessage: "Request rejected." },
   });
   const cancel = useMutation({
     mutationFn: () => api.cancel(id),
     onSuccess: invalidate,
+    meta: { successMessage: "Request cancelled." },
   });
   const busy = approve.isPending || reject.isPending || cancel.isPending;
 

@@ -4,15 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { getMe } from "@/lib/auth";
-import { myAttendanceApi, holidaysApi, type DailyTimeRecord } from "@/lib/attendance";
-import { leaveBalancesApi, leaveAppsApi } from "@/lib/leaves";
-import {
-  overtimeApi,
-  undertimeApi,
-  officialBusinessApi,
-  certificateOfAttendanceApi,
-  correctionsApi,
-} from "@/lib/approvals";
+import { myAttendanceApi } from "@/lib/attendance";
+import { leaveBalancesApi } from "@/lib/leaves";
+import { getPendingSummary } from "@/lib/dashboard";
 import { PageHeader } from "@/components/ui";
 
 function ymd(d: Date): string {
@@ -20,9 +14,6 @@ function ymd(d: Date): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${m}-${day}`;
 }
-
-const hm = (v: string | null | undefined) => (v ? v.slice(0, 5) : null);
-const hmTs = (v: string | null | undefined) => (v ? v.slice(11, 16) : null);
 
 // "2026-06-11 17:02:00" -> "05:02 PM"
 function to12h(ts: string): string {
@@ -57,8 +48,6 @@ export default function DashboardPage() {
     return { from: ymd(first), to: ymd(last) };
   }, [today]);
 
-  const yearEnd = useMemo(() => ymd(new Date(today.getFullYear(), 11, 31)), [today]);
-
   const [showAttSummary, setShowAttSummary] = useState(false);
   const [showPayroll, setShowPayroll] = useState(false);
 
@@ -69,7 +58,7 @@ export default function DashboardPage() {
   const hasEmployee = Boolean(meData?.user.employee);
   const empId = meData?.user.employee?.id;
 
-  const { data: attendance, isLoading: attLoading } = useQuery({
+  const { data: attendance } = useQuery({
     queryKey: ["dash-attendance", monthRange.from, monthRange.to],
     queryFn: () => myAttendanceApi.list(monthRange.from, monthRange.to),
     enabled: hasEmployee,
@@ -81,26 +70,12 @@ export default function DashboardPage() {
     enabled: Boolean(empId),
   });
 
-  const { data: pendingCount } = useQuery({
+  const { data: pending } = useQuery({
     queryKey: ["dash-pending", empId],
-    queryFn: async () => {
-      const lists = await Promise.all([
-        leaveAppsApi.list({ status: "pending", employee_id: empId }),
-        overtimeApi.list({ status: "pending", employee_id: empId }),
-        undertimeApi.list({ status: "pending", employee_id: empId }),
-        officialBusinessApi.list({ status: "pending", employee_id: empId }),
-        certificateOfAttendanceApi.list({ status: "pending", employee_id: empId }),
-        correctionsApi.list({ status: "pending", employee_id: empId }),
-      ]);
-      return lists.reduce((n, l) => n + l.length, 0);
-    },
+    queryFn: getPendingSummary,
     enabled: Boolean(empId),
   });
-
-  const { data: holidays } = useQuery({
-    queryKey: ["dash-holidays", todayStr, yearEnd],
-    queryFn: () => holidaysApi.list({ from: todayStr, to: yearEnd }),
-  });
+  const pendingCount = pending?.pending_total;
 
   const logRange = useMemo(() => {
     const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 30);
@@ -119,12 +94,6 @@ export default function DashboardPage() {
 
   const { user } = meData;
   const summary = attendance?.summary;
-  const todayRecord = attendance?.data.find((r) => r.work_date === todayStr) ?? null;
-
-  const upcomingHolidays = (holidays ?? [])
-    .filter((h) => h.holiday_date >= todayStr)
-    .sort((a, b) => a.holiday_date.localeCompare(b.holiday_date))
-    .slice(0, 4);
 
   // Each clock in/out as its own row, most recent first.
   const events: PunchEvent[] = (logData?.data ?? [])
@@ -137,14 +106,14 @@ export default function DashboardPage() {
     .sort((a, b) => b.ts.localeCompare(a.ts));
 
   return (
-    <div className="space-y-4" style={{ zoom: 0.85 } as React.CSSProperties}>
+    <div className="space-y-4 md:[zoom:0.85]">
       <PageHeader
         title="Dashboard"
         description={`Welcome back, ${user.name || "User"}. Here is your overview.`}
       />
 
       {/* Hero */}
-      <section className="relative overflow-hidden rounded-3xl bg-slate-900 px-6 py-5 text-white shadow-xl sm:px-8">
+      <section className="relative overflow-hidden rounded-3xl bg-slate-900 px-4 py-5 text-white shadow-xl sm:px-8">
         <div className="relative z-10">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
             {MONTHS[today.getMonth()]} {today.getDate()}, {today.getFullYear()}
@@ -278,36 +247,6 @@ export default function DashboardPage() {
           </div>
         </Panel>
       </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        {hasEmployee && (
-          <Panel className="lg:col-span-2">
-            <h3 className="mb-3 text-sm font-semibold text-slate-900">Today</h3>
-            <TodaySnapshot record={todayRecord} loading={attLoading} />
-          </Panel>
-        )}
-
-        <Panel className={hasEmployee ? "" : "lg:col-span-3"}>
-          <h3 className="mb-3 text-sm font-semibold text-slate-900">Upcoming holidays</h3>
-          {upcomingHolidays.length === 0 ? (
-            <p className="text-sm text-slate-500">No upcoming holidays this year.</p>
-          ) : (
-            <ul className={hasEmployee ? "space-y-2.5" : "grid gap-2.5 sm:grid-cols-2"}>
-              {upcomingHolidays.map((h) => (
-                <li key={h.id} className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-                    <span className="text-[10px] font-medium uppercase leading-none">
-                      {MONTHS[Number(h.holiday_date.slice(5, 7)) - 1].slice(0, 3)}
-                    </span>
-                    <span className="text-sm font-bold leading-tight">{h.holiday_date.slice(8, 10)}</span>
-                  </div>
-                  <p className="truncate text-sm font-medium text-slate-800">{h.name}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-      </div>
     </div>
   );
 }
@@ -402,99 +341,6 @@ function Stat({ label, value }: { label: string; value: number }) {
     <div className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-center">
       <p className="text-base font-bold text-slate-800">{value}</p>
       <p className="text-[11px] text-slate-500">{label}</p>
-    </div>
-  );
-}
-
-function TodaySnapshot({ record, loading }: { record: DailyTimeRecord | null; loading: boolean }) {
-  if (loading) return <p className="text-sm text-slate-500">Loading…</p>;
-  if (!record) return <p className="text-sm text-slate-500">No schedule or record for today.</p>;
-
-  if (record.holiday_type) {
-    return (
-      <Banner tone="violet" title="Holiday" subtitle={record.holiday_name ?? "Holiday"} />
-    );
-  }
-  if (record.is_rest_day) {
-    return <Banner tone="slate" title="Rest day" subtitle="Enjoy your day off." />;
-  }
-  if (record.is_on_leave) {
-    return <Banner tone="sky" title="On leave" subtitle="You're on approved leave today." />;
-  }
-
-  const shift =
-    hm(record.scheduled_in) && hm(record.scheduled_out)
-      ? `${hm(record.scheduled_in)} – ${hm(record.scheduled_out)}`
-      : "—";
-  const clockIn = hmTs(record.actual_in);
-  const clockOut = hmTs(record.actual_out);
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <Field label="Shift">{shift}</Field>
-        <Field label="Clock in">{clockIn ?? <span className="text-slate-400">Not yet</span>}</Field>
-        <Field label="Clock out">{clockOut ?? <span className="text-slate-400">Not yet</span>}</Field>
-        <Field label="Hours">{record.hours_worked}</Field>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {record.late_minutes > 0 && (
-          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-            Late {record.late_minutes}m
-          </span>
-        )}
-        {record.undertime_minutes > 0 && (
-          <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-medium text-rose-800">
-            Undertime {record.undertime_minutes}m
-          </span>
-        )}
-        {record.overtime_minutes > 0 && (
-          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
-            OT {record.overtime_minutes}m
-          </span>
-        )}
-        {record.is_adjusted && (
-          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-            Adjusted shift
-          </span>
-        )}
-        {!clockIn && record.late_minutes === 0 && (
-          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-            Awaiting clock-in
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className="mt-0.5 font-mono text-sm font-semibold text-slate-800">{children}</p>
-    </div>
-  );
-}
-
-function Banner({
-  tone,
-  title,
-  subtitle,
-}: {
-  tone: "violet" | "slate" | "sky";
-  title: string;
-  subtitle: string;
-}) {
-  const tones: Record<string, string> = {
-    violet: "bg-violet-50 text-violet-800",
-    slate: "bg-slate-50 text-slate-700",
-    sky: "bg-sky-50 text-sky-800",
-  };
-  return (
-    <div className={`rounded-xl px-4 py-3 ${tones[tone]}`}>
-      <p className="text-base font-semibold">{title}</p>
-      <p className="mt-0.5 text-sm opacity-80">{subtitle}</p>
     </div>
   );
 }

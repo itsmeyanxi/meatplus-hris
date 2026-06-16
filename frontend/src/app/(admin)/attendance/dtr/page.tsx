@@ -7,9 +7,7 @@ import { listEmployees } from "@/lib/employees";
 import { dtrApi, type DailyTimeRecord } from "@/lib/attendance";
 import { AppButton, AppCard, PageHeader, TableShell } from "@/components/ui";
 
-const inputCls =
-  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900/50";
-const labelCls = "mb-1.5 block text-sm font-medium text-slate-700";
+import { inputCls, labelCls } from "@/lib/form-classes";
 
 export default function DtrPage() {
   const qc = useQueryClient();

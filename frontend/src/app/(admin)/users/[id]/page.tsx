@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { inputCls } from "@/components/employees/ChildList";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { ROLE_LABELS, usersApi, type Role, type UpdateUserInput } from "@/lib/users";
 
 export default function UserDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const qc = useQueryClient();
+  const { confirm, dialog } = useConfirm();
   const userId = Number(params.id);
 
   const { data: user, isLoading } = useQuery({
@@ -57,6 +59,7 @@ export default function UserDetailPage() {
 
   return (
     <div className="max-w-2xl space-y-6">
+      {dialog}
       <div>
         <Link href="/users" className="text-xs text-slate-500 hover:underline">← Users</Link>
         <h2 className="mt-1 text-2xl font-semibold">{user.name}</h2>
@@ -111,13 +114,13 @@ export default function UserDetailPage() {
         <h3 className="text-sm font-semibold">Actions</h3>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => { if (confirm("Generate a new temporary password? The user's current password will stop working.")) reset.mutate(); }}
+            onClick={async () => { if (await confirm({ title: "Reset password", message: "Generate a new temporary password? The user's current password will stop working.", confirmLabel: "Reset password" })) reset.mutate(); }}
             className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-100"
           >
             Reset password
           </button>
           <button
-            onClick={() => { if (confirm(`Deactivate ${user.name}? They will no longer be able to log in.`)) destroy.mutate(); }}
+            onClick={async () => { if (await confirm({ title: "Deactivate user", message: `Deactivate ${user.name}? They will no longer be able to log in.`, confirmLabel: "Deactivate", danger: true })) destroy.mutate(); }}
             className="rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
           >
             Deactivate user

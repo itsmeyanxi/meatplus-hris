@@ -6,9 +6,7 @@ import { AppButton, AppCard, PageHeader, TableShell } from "@/components/ui";
 import { RoleGate, HR_ROLES } from "@/components/RoleGate";
 import { holidaysApi, type Holiday, type HolidayInput } from "@/lib/attendance";
 
-const inputCls =
-  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900/50";
-const labelCls = "mb-1.5 block text-sm font-medium text-slate-700";
+import { inputCls, labelCls } from "@/lib/form-classes";
 
 const TYPE_LABELS: Record<Holiday["type"], string> = {
   regular: "Regular",
@@ -48,10 +46,12 @@ function HolidaysPageInner() {
       qc.invalidateQueries({ queryKey: key });
       closeForm();
     },
+    meta: { successMessage: "Holiday saved." },
   });
   const remove = useMutation({
     mutationFn: (id: number) => holidaysApi.destroy(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+    meta: { successMessage: "Holiday removed." },
   });
 
   const startEdit = (h: Holiday) => {

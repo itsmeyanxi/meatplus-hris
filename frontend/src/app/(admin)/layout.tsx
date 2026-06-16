@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { getMe, logout } from "@/lib/auth";
 import { AppButton } from "@/components/ui";
+import { NotificationBell } from "@/components/NotificationBell";
 
 type NavItem = {
   href: string;
@@ -240,18 +241,26 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       {/* MOBILE HEADER & MAIN CONTENT */}
       <div className="min-w-0">
+        {/* Desktop top bar */}
+        <div className="sticky top-0 z-20 hidden items-center justify-end border-b border-slate-200/80 bg-white/80 px-6 py-2 backdrop-blur lg:flex">
+          <NotificationBell />
+        </div>
+
         <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur lg:hidden">
           <div className="space-y-3 px-4 py-3 sm:px-6">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <div>
                 <h1 className="text-base font-semibold tracking-tight text-slate-900">
                   Meatplus HRIS
                 </h1>
                 <p className="mt-0.5 text-xs text-slate-500">{companyName}</p>
               </div>
-              <AppButton onClick={handleLogout} variant="secondary" className="shrink-0">
-                Log out
-              </AppButton>
+              <div className="flex items-center gap-1">
+                <NotificationBell />
+                <AppButton onClick={handleLogout} variant="secondary" className="shrink-0">
+                  Log out
+                </AppButton>
+              </div>
             </div>
 
             <nav className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">

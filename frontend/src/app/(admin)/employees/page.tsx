@@ -197,7 +197,7 @@ export default function EmployeesPage() {
 
               {/* Data Content Fields */}
               <div className="mt-6 space-y-5">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Status</label>
                     <div className="mt-1">

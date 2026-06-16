@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { AppButton, AppInput, AppCard, PageHeader } from "@/components/ui";
-import { getEmployee, updateEmployee } from "@/lib/employees";
+import { getEmployee, updateEmployee, type EmployeeCreateInput } from "@/lib/employees";
 
 export default function EditEmployeePage() {
   const router = useRouter();
@@ -53,7 +53,12 @@ export default function EditEmployeePage() {
   }, [emp]);
 
   const mutation = useMutation({
-    mutationFn: () => updateEmployee(employeeId, formData),
+    mutationFn: () =>
+      updateEmployee(employeeId, {
+        ...formData,
+        gender: formData.gender as EmployeeCreateInput["gender"],
+        civil_status: formData.civil_status as EmployeeCreateInput["civil_status"],
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
