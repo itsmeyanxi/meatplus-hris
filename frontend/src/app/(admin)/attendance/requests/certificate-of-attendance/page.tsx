@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useState } from "react";
 import { inputCls } from "@/components/employees/ChildList";
 import { StatusPill } from "@/components/approvals/StatusPill";
@@ -134,17 +135,20 @@ export default function COAPage() {
                 </td>
                 <td className="px-3 py-2 max-w-xs">{r.reason}</td>
                 <td className="px-3 py-2 text-right">
-                  {r.status === "pending" && (
-                    <div className="flex justify-end gap-1">
-                      {canApprove && (
-                        <>
-                          <button onClick={() => approve.mutate(r.id)} className="rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700">Approve</button>
-                          <button onClick={() => reject.mutate(r.id)} className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700">Reject</button>
-                        </>
-                      )}
-                      <button onClick={() => cancel.mutate(r.id)} className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium hover:bg-slate-100">Cancel</button>
-                    </div>
-                  )}
+                  <div className="flex items-center justify-end gap-1">
+                    <Link href={`/attendance/requests/certificate-of-attendance/${r.id}`} className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium hover:bg-slate-100">View</Link>
+                    {r.status === "pending" && (
+                      <>
+                        {canApprove && (
+                          <>
+                            <button onClick={() => approve.mutate(r.id)} className="rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700">Approve</button>
+                            <button onClick={() => reject.mutate(r.id)} className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700">Reject</button>
+                          </>
+                        )}
+                        <button onClick={() => cancel.mutate(r.id)} className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium hover:bg-slate-100">Cancel</button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

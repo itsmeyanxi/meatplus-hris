@@ -101,11 +101,40 @@ export type ScheduleAssignment = {
   effective_to: string | null;
 };
 
+export type WorkScheduleDayInput = {
+  day_of_week: number;
+  is_rest_day: boolean;
+  time_in: string | null;
+  time_out: string | null;
+  break_minutes: number;
+  required_hours: number;
+};
+
+export type WorkScheduleInput = {
+  code: string;
+  name: string;
+  description?: string | null;
+  is_flexible?: boolean;
+  breaks_paid?: boolean;
+  weekly_workdays?: number;
+  is_active?: boolean;
+  days?: WorkScheduleDayInput[];
+};
+
 export const workSchedulesApi = {
   list: async (): Promise<WorkSchedule[]> => {
     const { data } = await api.get<Listed<WorkSchedule>>("/api/v1/work-schedules");
     return data.data;
   },
+  create: async (body: WorkScheduleInput): Promise<WorkSchedule> => {
+    const { data } = await api.post<{ data: WorkSchedule }>("/api/v1/work-schedules", body);
+    return data.data;
+  },
+  update: async (id: number, body: WorkScheduleInput): Promise<WorkSchedule> => {
+    const { data } = await api.put<{ data: WorkSchedule }>(`/api/v1/work-schedules/${id}`, body);
+    return data.data;
+  },
+  destroy: (id: number) => api.delete(`/api/v1/work-schedules/${id}`),
 };
 
 export const holidaysApi = {
@@ -115,6 +144,10 @@ export const holidaysApi = {
   },
   create: async (body: HolidayInput): Promise<Holiday> => {
     const { data } = await api.post<{ data: Holiday }>("/api/v1/holidays", body);
+    return data.data;
+  },
+  update: async (id: number, body: HolidayInput): Promise<Holiday> => {
+    const { data } = await api.put<{ data: Holiday }>(`/api/v1/holidays/${id}`, body);
     return data.data;
   },
   destroy: (id: number) => api.delete(`/api/v1/holidays/${id}`),

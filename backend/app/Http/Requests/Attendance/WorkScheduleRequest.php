@@ -16,7 +16,7 @@ class WorkScheduleRequest extends FormRequest
     {
         $req = $this->isMethod('POST') ? 'required' : 'sometimes';
         $companyId = $this->user()->active_company_id;
-        $scheduleId = $this->route('work_schedule')?->id;
+        $scheduleId = ($this->route('workSchedule') ?? $this->route('work_schedule'))?->id;
 
         return [
             'code' => [

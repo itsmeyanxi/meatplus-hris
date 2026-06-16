@@ -51,6 +51,9 @@ class PermissionsSeeder extends Seeder
                 // Approvals reserved for dept_head (consistent "immediate supervisor approves" model).
                 'attendance.approve.any',
                 'attendance.approve.self_dept',
+                // Attendance administration (schedules, holidays, shift adjustments, time logs,
+                // DTR recompute, filing/approving for others) is reserved for HR only.
+                'attendance.manage',
             ])),
             'hr_admin' => [
                 'employee.view', 'employee.create', 'employee.update',
@@ -62,7 +65,7 @@ class PermissionsSeeder extends Seeder
             ],
             'hr_manager' => [
                 'employee.view',
-                'attendance.view', 'attendance.view.any', 'leave.view',
+                'attendance.view', 'attendance.view.any', 'attendance.manage', 'leave.view',
                 'compensation.view', 'audit.view',
                 'user.manage',
             ],

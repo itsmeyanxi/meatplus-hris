@@ -1,4 +1,9 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { getMe } from "@/lib/auth";
+import { HR_ROLES } from "@/components/RoleGate";
 import { PageHeader } from "@/components/ui";
 
 const TILES = [
@@ -6,6 +11,7 @@ const TILES = [
     href: "/attendance/schedules",
     title: "Work schedules",
     desc: "Templates that define daily shifts, rest days, and required hours per day of week.",
+    roles: HR_ROLES,
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -16,6 +22,7 @@ const TILES = [
     href: "/attendance/holidays",
     title: "Holidays",
     desc: "Regular and special holidays. Used by the DTR engine to flag holiday days.",
+    roles: HR_ROLES,
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -55,6 +62,10 @@ const TILES = [
 ];
 
 export default function AttendanceLandingPage() {
+  const { data } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const userRoles = data?.user.roles ?? [];
+  const tiles = TILES.filter((t) => !t.roles || t.roles.some((r) => userRoles.includes(r)));
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -62,7 +73,7 @@ export default function AttendanceLandingPage() {
         description="Manage work schedules, holidays, time logs, and computed daily time records."
       />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {TILES.map((t) => (
+        {tiles.map((t) => (
           <Link
             key={t.href}
             href={t.href}

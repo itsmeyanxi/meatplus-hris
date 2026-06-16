@@ -93,6 +93,10 @@ function makeApi<TList, TInput>(slug: string) {
       const { data } = await api.get<Listed<TList>>(`/api/v1/${slug}`, { params });
       return data.data;
     },
+    get: async (id: number): Promise<TList> => {
+      const { data } = await api.get<{ data: TList }>(`/api/v1/${slug}/${id}`);
+      return data.data;
+    },
     create: async (body: TInput): Promise<TList> => {
       const { data } = await api.post<{ data: TList }>(`/api/v1/${slug}`, body);
       return data.data;
