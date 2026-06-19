@@ -35,7 +35,7 @@ class LeaveApplicationController extends Controller
             ->orderByDesc('date_from');
 
         // Only the leave approver (dept_head) sees the whole company.
-        // Everyone else — employees, HR, super_admin — sees only their own.
+        // Everyone else — employees, HR, IT — sees only their own.
         if (! $user->can('leave.approve.any')) {
             if ($user->employee) {
                 $q->where('employee_id', $user->employee->id);

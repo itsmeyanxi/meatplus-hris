@@ -17,7 +17,9 @@ class LoginController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        if (! Auth::attempt($data, true)) {
+        // Require the account to be active as part of the credentials, so a
+        // deactivated (is_active = false) user cannot authenticate.
+        if (! Auth::attempt([...$data, 'is_active' => true], true)) {
             throw ValidationException::withMessages([
                 'email' => __('auth.failed'),
             ]);

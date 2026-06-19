@@ -15,7 +15,7 @@ class TimeLog extends Model
 
     protected $fillable = [
         'company_id', 'employee_id', 'logged_at', 'direction', 'source',
-        'device_id', 'ip_address', 'lat', 'lng', 'metadata',
+        'device_id', 'source_event_id', 'ip_address', 'lat', 'lng', 'metadata',
     ];
 
     protected function casts(): array

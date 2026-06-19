@@ -106,7 +106,7 @@ export default function DashboardPage() {
     .sort((a, b) => b.ts.localeCompare(a.ts));
 
   return (
-    <div className="space-y-4 md:[zoom:0.85]">
+    <div className="space-y-4 md:[zoom:0.95]">
       <PageHeader
         title="Dashboard"
         description={`Welcome back, ${user.name || "User"}. Here is your overview.`}
@@ -178,7 +178,21 @@ export default function DashboardPage() {
 
         {/* My stuff */}
         <Panel>
-          <CardHeader icon={<FolderIcon />} title="My stuff" />
+          <CardHeader
+            icon={<FolderIcon />}
+            title="My stuff"
+            action={
+              hasEmployee ? (
+                <Link
+                  href="/leaves"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700"
+                >
+                  <PlusIcon />
+                  Apply
+                </Link>
+              ) : null
+            }
+          />
 
           <div className="space-y-4">
             {/* Pending Requests */}
@@ -261,13 +275,22 @@ function Panel({ className = "", children }: { className?: string; children: Rea
   );
 }
 
-function CardHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
+function CardHeader({
+  icon,
+  title,
+  action,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  action?: React.ReactNode;
+}) {
   return (
     <div className="mb-3 flex items-center gap-2">
       <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white">
         {icon}
       </span>
       <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+      {action && <div className="ml-auto">{action}</div>}
     </div>
   );
 }
@@ -311,6 +334,14 @@ function CollapsibleSection({
   );
 }
 
+function PlusIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+    </svg>
+  );
+}
+
 function CalendarIcon() {
   return (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -340,7 +371,7 @@ function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-center">
       <p className="text-base font-bold text-slate-800">{value}</p>
-      <p className="text-[11px] text-slate-500">{label}</p>
+      <p className="text-xs text-slate-500">{label}</p>
     </div>
   );
 }

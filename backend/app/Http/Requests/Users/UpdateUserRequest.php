@@ -21,8 +21,23 @@ class UpdateUserRequest extends FormRequest
             'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($userId)],
             'is_active' => ['sometimes', 'boolean'],
             'role' => ['sometimes', 'string', Rule::in([
-                'super_admin', 'hr_admin', 'hr_manager', 'it_admin', 'payroll_officer', 'dept_head', 'employee',
-            ])],
+                'hr_admin', 'it_admin', 'payroll_officer', 'dept_head', 'employee',
+                'supervisor', 'team_lead', 'dept_admin', 'transport_access',
+                'sales_employee', 'timekeeper', 'hr_coordinator', 'garahe_teamlead',
+            ]), $this->blockItAdminEscalation()],
         ];
+    }
+
+    /**
+     * Only an existing it_admin may grant the it_admin role — otherwise a
+     * user.manage holder could escalate themselves to the top-level admin.
+     */
+    private function blockItAdminEscalation(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            if ($value === 'it_admin' && ! $this->user()?->hasRole('it_admin')) {
+                $fail('You are not allowed to assign the it_admin role.');
+            }
+        };
     }
 }

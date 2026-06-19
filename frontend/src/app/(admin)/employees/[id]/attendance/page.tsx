@@ -52,10 +52,9 @@ export default function EmployeeAttendanceTab() {
   });
 
   // ---- DTR range (default: last 30 days) ----
-  const today = new Date().toISOString().slice(0, 10);
-  const thirtyAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const [from, setFrom] = useState(thirtyAgo);
-  const [to, setTo] = useState(today);
+  // Lazy initializers keep these date reads out of the render path (they run once).
+  const [from, setFrom] = useState(() => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
 
   const dtrKey = ["dtr-for-employee", employeeId, from, to];
   const { data: dtrs = [] } = useQuery({

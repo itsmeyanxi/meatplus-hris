@@ -222,7 +222,7 @@ export default function MyAttendancePage() {
               >
                 <span className="text-xs font-medium text-slate-500">{dayNum}</span>
                 {cell && (
-                  <span className="mt-auto truncate text-[11px] font-medium text-slate-600">
+                  <span className="mt-auto truncate text-xs font-medium text-slate-600">
                     {label}
                   </span>
                 )}

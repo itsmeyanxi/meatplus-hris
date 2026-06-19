@@ -9,9 +9,11 @@ use App\Http\Requests\Employees\StoreEmployeeRequest;
 use App\Http\Requests\Employees\UpdateEmployeeRequest;
 use App\Http\Resources\Employees\EmployeeListResource;
 use App\Http\Resources\Employees\EmployeeResource;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmployeeController extends Controller
 {
@@ -22,8 +24,57 @@ class EmployeeController extends Controller
     {
         abort_unless($request->user()->can('employee.view'), 403);
 
-        $query = Employee::query()
-            ->with(['department:id,name', 'position:id,title', 'employmentType:id,name']);
+        $employees = $this->filteredQuery($request)
+            ->orderBy('last_name')->orderBy('first_name')
+            ->paginate($request->integer('per_page', 25));
+
+        return EmployeeListResource::collection($employees);
+    }
+
+    /**
+     * Export the (filtered) employee list as a CSV. Columns are import-compatible
+     * so an export can be edited and re-imported.
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        abort_unless($request->user()->can('employee.view'), 403);
+
+        $rows = $this->filteredQuery($request)->orderBy('last_name')->orderBy('first_name')->get();
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, [
+                'Employee ID', 'Last Name', 'Middle Name', 'First Name', 'Gender', 'Civil Status',
+                'Department', 'Location', 'Email', 'Position', 'Employment Type', 'Date Hired', 'Status',
+            ]);
+            foreach ($rows as $e) {
+                fputcsv($out, [
+                    $e->employee_no,
+                    $e->last_name,
+                    $e->middle_name,
+                    $e->first_name,
+                    $e->gender,
+                    $e->civil_status,
+                    $e->department?->name,
+                    $e->branch?->name,
+                    $e->email_company,
+                    $e->position?->title,
+                    $e->employmentType?->name,
+                    $e->date_hired?->toDateString(),
+                    $e->is_active ? 'Active' : 'Inactive',
+                ]);
+            }
+            fclose($out);
+        }, 'employees.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    /** Build the employee listing query with all supported filters applied. */
+    private function filteredQuery(Request $request): Builder
+    {
+        $query = Employee::query()->with([
+            'department:id,name', 'position:id,title', 'employmentType:id,name',
+            'company:id,code,legal_name,trade_name', 'branch:id,name',
+        ]);
 
         if ($search = $request->query('q')) {
             $like = '%'.str_replace('%', '\%', $search).'%';
@@ -38,14 +89,33 @@ class EmployeeController extends Controller
             });
         }
 
+        // Dedicated field filters (combine with AND).
+        if ($no = $request->query('employee_no')) {
+            $query->where('employee_no', 'like', '%'.str_replace('%', '\%', $no).'%');
+        }
+
+        if ($name = $request->query('name')) {
+            $like = '%'.str_replace('%', '\%', $name).'%';
+            $query->where(function ($q) use ($like) {
+                $q->where('first_name', 'like', $like)
+                    ->orWhere('last_name', 'like', $like)
+                    ->orWhereRaw("CONCAT(first_name, ' ', last_name) like ?", [$like]);
+            });
+        }
+
+        if ($departmentId = $request->query('department_id')) {
+            $query->where('department_id', $departmentId);
+        }
+
+        if ($companyId = $request->query('company_id')) {
+            $query->where('company_id', $companyId);
+        }
+
         if ($request->boolean('only_active', false)) {
             $query->where('is_active', true);
         }
 
-        $employees = $query->orderBy('last_name')->orderBy('first_name')
-            ->paginate($request->integer('per_page', 25));
-
-        return EmployeeListResource::collection($employees);
+        return $query;
     }
 
     /**

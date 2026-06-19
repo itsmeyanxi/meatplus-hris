@@ -12,29 +12,23 @@ class LeaveTypesSeeder extends Seeder
     {
         $company = Company::where('code', 'MPP-MAIN')->firstOrFail();
 
+        // Company policy: only these leave types are offered. HR adjusts credits as needed.
         $types = [
-            // PH-standard leave types with default policies. HR adjusts credits as needed.
-            ['code' => 'VL',   'name' => 'Vacation Leave',                    'credits' => 5,   'paid' => true,  'attach' => false, 'gender' => null,     'accrual' => 'annual',  'lead' => 1],
-            ['code' => 'SL',   'name' => 'Sick Leave',                        'credits' => 5,   'paid' => true,  'attach' => false, 'gender' => null,     'accrual' => 'annual',  'lead' => 0],
-            ['code' => 'EL',   'name' => 'Emergency Leave',                   'credits' => 3,   'paid' => true,  'attach' => false, 'gender' => null,     'accrual' => 'annual',  'lead' => 0],
-            ['code' => 'SIL',  'name' => 'Service Incentive Leave',           'credits' => 5,   'paid' => true,  'attach' => false, 'gender' => null,     'accrual' => 'annual',  'lead' => 0],
-            ['code' => 'BL',   'name' => 'Bereavement Leave',                 'credits' => 3,   'paid' => true,  'attach' => true,  'gender' => null,     'accrual' => 'none',    'lead' => 0],
-            ['code' => 'ML',   'name' => 'Maternity Leave (105 days)',        'credits' => 105, 'paid' => true,  'attach' => true,  'gender' => 'female', 'accrual' => 'none',    'lead' => 30, 'max' => 105],
-            ['code' => 'PL',   'name' => 'Paternity Leave (7 days)',          'credits' => 7,   'paid' => true,  'attach' => true,  'gender' => 'male',   'accrual' => 'none',    'lead' => 0,  'max' => 7],
-            ['code' => 'SPL',  'name' => 'Solo Parent Leave',                 'credits' => 7,   'paid' => true,  'attach' => true,  'gender' => null,     'accrual' => 'annual',  'lead' => 0,  'max' => 7],
-            ['code' => 'MCW',  'name' => 'Magna Carta for Women (60 days)',   'credits' => 60,  'paid' => true,  'attach' => true,  'gender' => 'female', 'accrual' => 'none',    'lead' => 0,  'max' => 60],
-            ['code' => 'VAWC', 'name' => 'VAWC Leave (10 days)',              'credits' => 10,  'paid' => true,  'attach' => true,  'gender' => 'female', 'accrual' => 'annual',  'lead' => 0,  'max' => 10],
+            ['code' => 'VL',   'name' => 'Vacation Leave',     'credits' => 0, 'paid' => true,  'attach' => false, 'accrual' => 'annual', 'lead' => 1],
+            ['code' => 'SL',   'name' => 'Sick Leave',         'credits' => 0, 'paid' => true,  'attach' => false, 'accrual' => 'annual', 'lead' => 0],
+            ['code' => 'BDL',  'name' => 'Birthday Leave',     'credits' => 0, 'paid' => true,  'attach' => false, 'accrual' => 'annual', 'lead' => 0, 'max' => 1],
+            ['code' => 'LWOP', 'name' => 'Leave Without Pay',  'credits' => 0, 'paid' => false, 'attach' => false, 'accrual' => 'none',   'lead' => 0],
         ];
 
         foreach ($types as $t) {
-            LeaveType::firstOrCreate(
+            LeaveType::updateOrCreate(
                 ['company_id' => $company->id, 'code' => $t['code']],
                 [
                     'name' => $t['name'],
                     'default_credits_per_year' => $t['credits'],
                     'is_paid' => $t['paid'],
                     'requires_attachment' => $t['attach'],
-                    'gender_restriction' => $t['gender'],
+                    'gender_restriction' => null,
                     'accrual_method' => $t['accrual'],
                     'min_days_filing_lead' => $t['lead'],
                     'max_consecutive_days' => $t['max'] ?? null,
@@ -42,5 +36,10 @@ class LeaveTypesSeeder extends Seeder
                 ],
             );
         }
+
+        // Anything not in the offered set is retired (kept for history, hidden from use).
+        LeaveType::where('company_id', $company->id)
+            ->whereNotIn('code', array_column($types, 'code'))
+            ->update(['is_active' => false]);
     }
 }

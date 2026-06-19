@@ -54,6 +54,8 @@ class OvertimeRequestController extends Controller
 
     public function show(Request $request, OvertimeRequest $overtimeRequest): OvertimeRequestResource
     {
+        $this->assertCanView($request, $overtimeRequest);
+
         return new OvertimeRequestResource(
             $overtimeRequest->load(['employee', 'approver:id,name', 'filer:id,name']),
         );

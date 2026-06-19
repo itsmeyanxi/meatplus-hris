@@ -54,6 +54,8 @@ class OfficialBusinessRequestController extends Controller
 
     public function show(Request $request, OfficialBusinessRequest $officialBusinessRequest): OfficialBusinessRequestResource
     {
+        $this->assertCanView($request, $officialBusinessRequest);
+
         return new OfficialBusinessRequestResource($officialBusinessRequest->load(['employee', 'approver:id,name']));
     }
 

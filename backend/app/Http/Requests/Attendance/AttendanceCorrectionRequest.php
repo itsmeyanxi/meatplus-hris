@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Attendance;
 
+use App\Domain\Attendance\Services\AttendanceCorrectionApplier;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -20,7 +21,7 @@ class AttendanceCorrectionRequest extends FormRequest
             'employee_id' => ['required', 'integer',
                 Rule::exists('employees', 'id')->where('company_id', $companyId)],
             'work_date' => ['required', 'date'],
-            'field_to_correct' => ['required', 'string', 'in:actual_in,actual_out,hours_worked,is_absent,is_rest_day,remarks'],
+            'field_to_correct' => ['required', 'string', Rule::in(AttendanceCorrectionApplier::CORRECTABLE_FIELDS)],
             'old_value' => ['nullable', 'string', 'max:100'],
             'new_value' => ['required', 'string', 'max:100'],
             'reason' => ['required', 'string', 'max:1000'],

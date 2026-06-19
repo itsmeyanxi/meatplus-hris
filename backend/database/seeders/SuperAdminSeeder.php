@@ -30,7 +30,8 @@ class SuperAdminSeeder extends Seeder
             $company->id => ['is_default' => true],
         ]);
 
-        $role = Role::findByName('super_admin', 'web');
+        // IT is the top-level administrator role (replaces the retired super_admin).
+        $role = Role::findByName('it_admin', 'web');
 
         $user->roles()->syncWithoutDetaching([
             $role->id => ['company_id' => $company->id],

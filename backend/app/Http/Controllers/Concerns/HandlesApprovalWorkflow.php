@@ -45,6 +45,23 @@ trait HandlesApprovalWorkflow
     }
 
     /**
+     * Throw 403 if the current user may not VIEW this single request.
+     * Mirrors applyListingScope: viewers see any company request; everyone else
+     * may only see their own. Prevents reading a colleague's request by ID.
+     */
+    protected function assertCanView(Request $request, Model $model): void
+    {
+        if ($request->user()->can('attendance.view')) {
+            return; // CompanyScope already constrained the binding to the tenant
+        }
+
+        $employee = $request->user()->employee;
+        if (! $employee || $model->employee_id !== $employee->id) {
+            abort(403, 'You do not have permission to view this request.');
+        }
+    }
+
+    /**
      * Resolve the effective employee_id when storing a new request.
      * Managers may submit any employee_id; others are forced to self.
      */

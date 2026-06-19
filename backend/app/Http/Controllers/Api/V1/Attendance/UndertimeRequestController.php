@@ -54,6 +54,8 @@ class UndertimeRequestController extends Controller
 
     public function show(Request $request, UndertimeRequest $undertimeRequest): UndertimeRequestResource
     {
+        $this->assertCanView($request, $undertimeRequest);
+
         return new UndertimeRequestResource(
             $undertimeRequest->load(['employee', 'approver:id,name']),
         );

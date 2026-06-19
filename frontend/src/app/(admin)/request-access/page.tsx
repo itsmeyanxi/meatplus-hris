@@ -149,7 +149,7 @@ export default function RequestAccessPage() {
           {["Supervisor", "HR", "IT"].map((step, i) => (
             <div key={step} className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 shadow-sm">
-                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-900 text-[10px] text-white">
+                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-900 text-xs text-white">
                   {i + 1}
                 </span>
                 {step}

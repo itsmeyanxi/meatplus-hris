@@ -180,5 +180,5 @@ function Pill({ color, children }: { color: "red" | "slate" | "amber" | "blue"; 
     amber: "bg-amber-100 text-amber-800",
     blue: "bg-blue-100 text-blue-800",
   };
-  return <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium ${cls[color]}`}>{children}</span>;
+  return <span className={`rounded-md px-1.5 py-0.5 text-xs font-medium ${cls[color]}`}>{children}</span>;
 }

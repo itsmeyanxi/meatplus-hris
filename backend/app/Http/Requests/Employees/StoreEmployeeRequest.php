@@ -21,6 +21,7 @@ class StoreEmployeeRequest extends FormRequest
                 'required', 'string', 'max:30',
                 Rule::unique('employees', 'employee_no')->where('company_id', $companyId),
             ],
+            'biometric_user_id' => ['nullable', 'string', 'max:50'],
             'first_name' => ['required', 'string', 'max:100'],
             'middle_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],

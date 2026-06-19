@@ -30,6 +30,11 @@ class EmployeeListResource extends JsonResource
                 'id' => $this->employmentType->id,
                 'name' => $this->employmentType->name,
             ]),
+            'company' => $this->whenLoaded('company', fn () => [
+                'id' => $this->company->id,
+                'code' => $this->company->code,
+                'name' => $this->company->trade_name ?: $this->company->legal_name,
+            ]),
         ];
     }
 }

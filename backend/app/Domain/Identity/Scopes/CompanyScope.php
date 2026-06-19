@@ -16,7 +16,8 @@ class CompanyScope implements Scope
 
         $user = auth()->user();
 
-        if ($user->hasRole('super_admin')) {
+        // IT admin is the top-level administrator and sees across companies.
+        if ($user->hasRole('it_admin')) {
             return;
         }
 

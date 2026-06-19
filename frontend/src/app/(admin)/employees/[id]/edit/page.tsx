@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AppButton, AppInput, AppCard, PageHeader } from "@/components/ui";
 import { getEmployee, updateEmployee, type EmployeeCreateInput } from "@/lib/employees";
 
@@ -26,6 +26,7 @@ export default function EditEmployeePage() {
     email_company: "",
     mobile: "",
     phone_home: "",
+    biometric_user_id: "",
   });
 
   const { data: emp, isLoading } = useQuery({
@@ -34,8 +35,11 @@ export default function EditEmployeePage() {
     enabled: !!employeeId,
   });
 
-  useEffect(() => {
-    if (!emp) return;
+  // Hydrate the form once the employee loads (guarded render-time sync rather
+  // than an effect, so a background refetch never clobbers in-progress edits).
+  const [hydrated, setHydrated] = useState(false);
+  if (emp && !hydrated) {
+    setHydrated(true);
     setFormData({
       first_name: emp.first_name ?? "",
       middle_name: emp.middle_name ?? "",
@@ -49,8 +53,9 @@ export default function EditEmployeePage() {
       email_company: emp.email_company ?? "",
       mobile: emp.mobile ?? "",
       phone_home: emp.phone_home ?? "",
+      biometric_user_id: emp.biometric_user_id ?? "",
     });
-  }, [emp]);
+  }
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -158,6 +163,18 @@ export default function EditEmployeePage() {
               <div>
                 <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Home Phone</label>
                 <AppInput name="phone_home" value={formData.phone_home} onChange={handleChange} />
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Biometric ID</label>
+                <AppInput
+                  name="biometric_user_id"
+                  value={formData.biometric_user_id}
+                  onChange={handleChange}
+                  placeholder="Employee No. enrolled on the device (defaults to Employee No.)"
+                />
+                <p className="mt-1 text-xs text-slate-400">
+                  Matches this person to their punches on the biometric terminal. Leave blank to use their Employee No.
+                </p>
               </div>
             </div>
           </AppCard>

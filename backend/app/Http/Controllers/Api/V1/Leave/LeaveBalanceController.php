@@ -41,7 +41,9 @@ class LeaveBalanceController extends Controller
         $q = LeaveBalance::query()
             ->with(['employee:id,employee_no,first_name,last_name,company_id', 'leaveType:id,code,name'])
             ->where('year', $year)
-            ->whereHas('employee', fn ($w) => $w->where('company_id', $companyId));
+            ->whereHas('employee', fn ($w) => $w->where('company_id', $companyId))
+            // Only surface balances for currently-offered leave types; retired types stay hidden.
+            ->whereHas('leaveType', fn ($w) => $w->where('is_active', true));
 
         if ($employeeIds !== null) {
             $q->whereIn('employee_id', $employeeIds);

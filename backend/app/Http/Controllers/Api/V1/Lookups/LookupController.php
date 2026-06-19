@@ -6,12 +6,33 @@ use App\Domain\HRIS\Models\Department;
 use App\Domain\HRIS\Models\EmploymentType;
 use App\Domain\HRIS\Models\Position;
 use App\Domain\Identity\Models\Branch;
+use App\Domain\Identity\Models\Company;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class LookupController extends Controller
 {
+    public function companies(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $query = Company::query()->orderBy('legal_name');
+
+        // IT admin sees every company; everyone else only the ones they belong to.
+        if (! $user->hasRole('it_admin')) {
+            $query->whereIn('id', $user->companies()->pluck('companies.id'));
+        }
+
+        return response()->json([
+            'data' => $query->get(['id', 'code', 'legal_name', 'trade_name'])->map(fn ($c) => [
+                'id' => $c->id,
+                'code' => $c->code,
+                'name' => $c->trade_name ?: $c->legal_name,
+            ]),
+        ]);
+    }
+
     public function branches(Request $request): JsonResponse
     {
         return response()->json([

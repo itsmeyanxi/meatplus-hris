@@ -17,7 +17,7 @@ class SwitchCompanyController extends Controller
         $user = $request->user();
         $target = $user->companies()->where('companies.id', $data['company_id'])->first();
 
-        if (! $target && ! $user->hasRole('super_admin')) {
+        if (! $target && ! $user->hasRole('it_admin')) {
             throw ValidationException::withMessages([
                 'company_id' => 'You are not a member of this company.',
             ]);

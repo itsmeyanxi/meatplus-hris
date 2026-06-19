@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Attendance\AttendanceCorrectionController;
+use App\Http\Controllers\Api\V1\Attendance\AttendanceDeviceController;
+use App\Http\Controllers\Api\V1\Employees\EmployeeImportController;
 use App\Http\Controllers\Api\V1\Attendance\CertificateOfAttendanceRequestController;
 use App\Http\Controllers\Api\V1\Attendance\DailyTimeRecordController;
 use App\Http\Controllers\Api\V1\Attendance\EmployeeScheduleController;
@@ -48,8 +50,12 @@ Route::prefix('v1')->group(function () {
         Route::get('lookups/departments', [LookupController::class, 'departments']);
         Route::get('lookups/positions', [LookupController::class, 'positions']);
         Route::get('lookups/employment-types', [LookupController::class, 'employmentTypes']);
+        Route::get('lookups/companies', [LookupController::class, 'companies']);
 
         // Employees + nested resources (scoped binding ensures child belongs to parent)
+        Route::get('employees/import/template', [EmployeeImportController::class, 'template']);
+        Route::post('employees/import', [EmployeeImportController::class, 'store']);
+        Route::get('employees/export', [EmployeeController::class, 'export']);
         Route::apiResource('employees', EmployeeController::class);
         Route::apiResource('employees.dependents', DependentController::class)->scoped();
         Route::apiResource('employees.emergency-contacts', EmergencyContactController::class)
@@ -63,6 +69,13 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('work-schedules', WorkScheduleController::class)
             ->parameters(['work-schedules' => 'workSchedule']);
         Route::apiResource('holidays', HolidayController::class);
+
+        // Biometric attendance devices (IT + HR)
+        Route::apiResource('attendance-devices', AttendanceDeviceController::class)
+            ->parameters(['attendance-devices' => 'attendanceDevice']);
+        Route::post('attendance-devices/{attendanceDevice}/test', [AttendanceDeviceController::class, 'test']);
+        Route::post('attendance-devices/{attendanceDevice}/sync', [AttendanceDeviceController::class, 'sync']);
+        Route::get('attendance-devices/{attendanceDevice}/users', [AttendanceDeviceController::class, 'users']);
 
         Route::get('time-logs', [TimeLogController::class, 'index']);
         Route::post('time-logs', [TimeLogController::class, 'store']);
@@ -101,6 +114,7 @@ Route::prefix('v1')->group(function () {
 
         // Approval workflows (Phase 2.1)
         // User management (Phase 2.3)
+        Route::get('roles', [\App\Http\Controllers\Api\V1\Users\RoleController::class, 'index']);
         Route::apiResource('users', UserController::class);
         Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
         Route::post('employees/{employee}/provision-login', [UserController::class, 'provisionForEmployee']);

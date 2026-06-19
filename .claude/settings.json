@@ -22,7 +22,25 @@
       "PowerShell(\"Removed dead middleware.\")",
       "Bash(git init *)",
       "Bash(git add *)",
-      "Bash(grep -E \"\\\\.env$|\\\\.env\\\\.local$\")"
+      "Bash(grep -E \"\\\\.env$|\\\\.env\\\\.local$\")",
+      "Bash(cd /c/xampp/htdocs/meatplus-hris/backend && grep -rn \"public function authorize\" app/Http/Requests/ | head -50)",
+      "Read(//c/c/xampp/htdocs/meatplus-hris/backend/app/Http/**)",
+      "Bash(cd /c/xampp/htdocs/meatplus-hris/backend && grep -rn \"return true\\\\|return false\\\\|->can\\(\" app/Http/Requests/ | head -80)",
+      "Bash(echo \"EXIT CODE: $?\")",
+      "Bash(cd /c/xampp/htdocs/meatplus-hris/frontend && find . -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) -not -path \"./node_modules/*\" -not -path \"./.next/*\" | sort)",
+      "Read(//c/c/xampp/htdocs/meatplus-hris/**)",
+      "Bash(grep -rln \"use App\\\\\\\\\\\\\\\\Domain\\\\\\\\\\\\\\\\Identity\\\\\\\\\\\\\\\\Concerns\\\\\\\\\\\\\\\\BelongsToCompany\\\\|BelongsToCompany\" app/Domain --include=*.php)",
+      "Bash(npx next *)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(npx eslint *)",
+      "Bash(ESLINT_USE_FLAT_CONFIG=false npx eslint src --ext .ts,.tsx)",
+      "PowerShell($base = \"c:\\\\xampp\\\\htdocs\\\\meatplus-hris\\\\frontend\\\\node_modules\"; \"eslintrc pkg:\"; Test-Path \"$base\\\\@eslint\\\\eslintrc\"; \"--- eslint-config-next files:\"; Get-ChildItem \"$base\\\\eslint-config-next\" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name; \"--- eslint-config-next package.json exports:\"; if \\(Test-Path \"$base\\\\eslint-config-next\\\\package.json\"\\) { \\(Get-Content \"$base\\\\eslint-config-next\\\\package.json\" -Raw | ConvertFrom-Json\\).exports })",
+      "PowerShell($base = \"c:\\\\xampp\\\\htdocs\\\\meatplus-hris\\\\frontend\\\\node_modules\\\\eslint-config-next\"; \"exports keys:\"; \\(Get-Content \"$base\\\\package.json\" -Raw | ConvertFrom-Json\\).exports.PSObject.Properties.Name; \"--- index.d.ts head:\"; Get-Content \"$base\\\\dist\\\\index.d.ts\" -TotalCount 20)",
+      "PowerShell(\"removed legacy config\")",
+      "Bash(php -l app/Http/Controllers/Api/V1/Leave/LeaveBalanceController.php)",
+      "Bash(/c/xampp/php/php.exe -l app/Http/Controllers/Api/V1/Leave/LeaveBalanceController.php)",
+      "Bash(php -v)",
+      "Bash(/c/xampp/php/php.exe -v)"
     ],
     "additionalDirectories": [
       "C:\\Users\\WIN11RESOLVEIT\\bin"

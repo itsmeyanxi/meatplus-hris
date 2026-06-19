@@ -46,4 +46,4 @@ export function RoleGate({ roles, children }: { roles: string[]; children: React
 }
 
 /** Roles that count as "HR" across the app. */
-export const HR_ROLES = ["hr_admin", "hr_manager"];
+export const HR_ROLES = ["hr_admin"];

@@ -14,7 +14,9 @@ class DatabaseSeeder extends Seeder
             SuperAdminSeeder::class,
             EmployeeUsersSeeder::class,
             OrgStructureSeeder::class,
+            LeaveTypesSeeder::class,
             AttendanceSeeder::class,
+            DemoEmployeesSeeder::class,
         ]);
     }
 }

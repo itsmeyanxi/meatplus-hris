@@ -187,6 +187,25 @@ class DtrComputer
         return $active->workSchedule->days->firstWhere('day_of_week', $dow);
     }
 
+    /**
+     * Resolve a day's scheduled in/out as datetimes, rolling the out time to the
+     * next calendar day for overnight shifts (e.g. 22:00→06:00) so duration,
+     * lateness and undertime are computed across midnight rather than backwards.
+     *
+     * @return array{0: ?CarbonImmutable, 1: ?CarbonImmutable}
+     */
+    private function scheduledWindow(string $dateStr, ?string $in, ?string $out): array
+    {
+        $si = $in ? CarbonImmutable::parse("{$dateStr} {$in}") : null;
+        $so = $out ? CarbonImmutable::parse("{$dateStr} {$out}") : null;
+
+        if ($si && $so && $so->lte($si)) {
+            $so = $so->addDay();
+        }
+
+        return [$si, $so];
+    }
+
     private function computeDay(
         Employee $employee,
         CarbonInterface $day,
@@ -224,9 +243,8 @@ class DtrComputer
                 $scheduledIn = $adjustment->time_in;
                 $scheduledOut = $adjustment->time_out;
                 $breakMinutes = (int) ($adjustment->break_minutes ?? 60);
-                if ($scheduledIn && $scheduledOut) {
-                    $si = CarbonImmutable::parse($day->toDateString().' '.$scheduledIn);
-                    $so = CarbonImmutable::parse($day->toDateString().' '.$scheduledOut);
+                [$si, $so] = $this->scheduledWindow($day->toDateString(), $scheduledIn, $scheduledOut);
+                if ($si && $so) {
                     $requiredHours = round(max(0, $si->diffInMinutes($so) - $breakMinutes) / 60, 2);
                 } else {
                     $requiredHours = 0.0;
@@ -241,13 +259,12 @@ class DtrComputer
             }
             $hoursWorked = round($minutes / 60, 2);
 
-            if ($scheduledIn && ! $isRestDay) {
-                $schedIn = CarbonImmutable::parse($day->toDateString().' '.$scheduledIn);
-                $lateMinutes = max(0, (int) $schedIn->diffInMinutes($actualIn, false));
+            [$schedIn, $schedOut] = $this->scheduledWindow($day->toDateString(), $scheduledIn, $scheduledOut);
+            if ($schedIn && ! $isRestDay) {
+                $lateMinutes = max(0, (int) round($schedIn->diffInMinutes($actualIn, false)));
             }
-            if ($scheduledOut && ! $isRestDay) {
-                $schedOut = CarbonImmutable::parse($day->toDateString().' '.$scheduledOut);
-                $undertimeMinutes = max(0, (int) $actualOut->diffInMinutes($schedOut, false));
+            if ($schedOut && ! $isRestDay) {
+                $undertimeMinutes = max(0, (int) round($actualOut->diffInMinutes($schedOut, false)));
             }
 
             if ($requiredHours > 0) {

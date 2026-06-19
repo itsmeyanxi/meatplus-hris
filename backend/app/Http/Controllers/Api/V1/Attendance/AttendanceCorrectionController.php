@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Attendance;
 
 use App\Domain\Attendance\Models\AttendanceCorrection;
+use App\Domain\Attendance\Services\AttendanceCorrectionApplier;
 use App\Http\Controllers\Concerns\HandlesApprovalWorkflow;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendance\AttendanceCorrectionRequest;
@@ -11,6 +12,7 @@ use App\Http\Resources\Attendance\AttendanceCorrectionResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 
 class AttendanceCorrectionController extends Controller
 {
@@ -54,19 +56,29 @@ class AttendanceCorrectionController extends Controller
 
     public function show(Request $request, AttendanceCorrection $attendanceCorrection): AttendanceCorrectionResource
     {
+        $this->assertCanView($request, $attendanceCorrection);
+
         return new AttendanceCorrectionResource($attendanceCorrection->load(['employee', 'approver:id,name']));
     }
 
-    public function approve(AttendanceDecisionRequest $request, AttendanceCorrection $attendanceCorrection): AttendanceCorrectionResource
-    {
+    public function approve(
+        AttendanceDecisionRequest $request,
+        AttendanceCorrection $attendanceCorrection,
+        AttendanceCorrectionApplier $applier,
+    ): AttendanceCorrectionResource {
         $this->assertCanDecide($request, $attendanceCorrection);
 
-        $attendanceCorrection->update([
-            'status' => 'approved',
-            'approved_by_user_id' => $request->user()->id,
-            'decided_at' => now(),
-            'decision_remarks' => $request->validated('decision_remarks'),
-        ]);
+        DB::transaction(function () use ($request, $attendanceCorrection, $applier) {
+            $attendanceCorrection->update([
+                'status' => 'approved',
+                'approved_by_user_id' => $request->user()->id,
+                'decided_at' => now(),
+                'decision_remarks' => $request->validated('decision_remarks'),
+            ]);
+
+            // Apply the approved change to the daily time record (and lock it).
+            $applier->apply($attendanceCorrection);
+        });
 
         return new AttendanceCorrectionResource($attendanceCorrection->load(['employee', 'approver:id,name']));
     }

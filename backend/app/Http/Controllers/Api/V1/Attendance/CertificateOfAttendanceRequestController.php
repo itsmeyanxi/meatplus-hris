@@ -54,6 +54,8 @@ class CertificateOfAttendanceRequestController extends Controller
 
     public function show(Request $request, CertificateOfAttendanceRequest $certificateOfAttendanceRequest): CertificateOfAttendanceRequestResource
     {
+        $this->assertCanView($request, $certificateOfAttendanceRequest);
+
         return new CertificateOfAttendanceRequestResource(
             $certificateOfAttendanceRequest->load(['employee', 'approver:id,name']),
         );

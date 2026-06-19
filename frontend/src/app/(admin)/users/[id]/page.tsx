@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { inputCls } from "@/components/employees/ChildList";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { ROLE_LABELS, usersApi, type Role, type UpdateUserInput } from "@/lib/users";
@@ -26,11 +26,13 @@ export default function UserDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      setForm({ name: user.name, email: user.email, role: user.roles[0] ?? "employee", is_active: user.is_active });
-    }
-  }, [user]);
+  // Hydrate the form once the user loads (guarded render-time sync rather than an
+  // effect, so a background refetch never clobbers in-progress edits).
+  const [hydrated, setHydrated] = useState(false);
+  if (user && !hydrated) {
+    setHydrated(true);
+    setForm({ name: user.name, email: user.email, role: user.roles[0] ?? "employee", is_active: user.is_active });
+  }
 
   const update = useMutation({
     mutationFn: () => usersApi.update(userId, form),

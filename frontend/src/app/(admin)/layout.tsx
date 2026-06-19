@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { getMe, logout } from "@/lib/auth";
+import { getRoles, ROLE_LABELS } from "@/lib/users";
 import { AppButton } from "@/components/ui";
 import { NotificationBell } from "@/components/NotificationBell";
 
@@ -84,7 +85,7 @@ const NAV: NavItem[] = [
   {
     href: "/request-access",
     label: "Request Access",
-    roles: ["dept_head"],
+    roles: ["dept_head", "hr_admin", "it_admin"],
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -98,6 +99,16 @@ const NAV: NavItem[] = [
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    )
+  },
+  {
+    href: "/devices",
+    label: "Devices",
+    permissions: ["device.manage"],
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
       </svg>
     )
   },
@@ -129,6 +140,29 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     if (isError) router.replace("/login");
   }, [isError, router]);
 
+  // --- "View as role" preview (IT Admin only) ---
+  const realRoles = data?.user.roles ?? [];
+  const isItAdmin = realRoles.includes("it_admin");
+
+  const [previewRole, setPreviewRole] = useState<string | null>(() =>
+    typeof window !== "undefined" ? localStorage.getItem("previewRole") : null,
+  );
+  const changePreview = (role: string | null) => {
+    setPreviewRole(role);
+    if (role) localStorage.setItem("previewRole", role);
+    else localStorage.removeItem("previewRole");
+  };
+
+  const { data: rolesData } = useQuery({
+    queryKey: ["roles-with-perms"],
+    queryFn: getRoles,
+    enabled: isItAdmin,
+    staleTime: 5 * 60_000,
+  });
+
+  // Resolve the previewed role's permission set; until it loads, stay on real access.
+  const previewEntry = isItAdmin && previewRole ? rolesData?.find((r) => r.name === previewRole) : undefined;
+
   const handleLogout = async () => {
     await logout();
     router.replace("/login");
@@ -137,8 +171,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   const companyName = data?.user.active_company?.legal_name ?? "Meatplus HRIS";
 
-  const userRoles = data?.user.roles ?? [];
-  const userPermissions = data?.user.permissions ?? [];
+  const userRoles = previewEntry ? [previewEntry.name] : realRoles;
+  const userPermissions = previewEntry ? previewEntry.permissions : (data?.user.permissions ?? []);
   const hasEmployee = Boolean(data?.user.employee);
   const isAllowed = (item: NavItem) => {
     const roleOk = !item.roles || item.roles.some((r) => userRoles.includes(r));
@@ -171,7 +205,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             {!isCollapsed && (
               <div className="transition-opacity duration-200 min-w-0">
                 <h1 className="text-base font-semibold tracking-tight text-slate-900 truncate">Meatplus HRIS</h1>
-                <p className="mt-0.5 text-[11px] text-slate-500 truncate max-w-[150px]">{companyName}</p>
+                <p className="mt-0.5 text-xs text-slate-500 truncate max-w-[150px]">{companyName}</p>
               </div>
             )}
             <button
@@ -227,7 +261,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             </button>
           ) : (
             <div className="min-w-0">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Signed in</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Signed in</p>
               <p className="mt-0.5 break-all text-xs font-medium text-slate-900 line-clamp-2">
                 {isLoading ? "Loading…" : data?.user.email}
               </p>
@@ -241,8 +275,25 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       {/* MOBILE HEADER & MAIN CONTENT */}
       <div className="min-w-0">
+        {/* Preview banner */}
+        {previewEntry && (
+          <div className="sticky top-0 z-30 flex items-center justify-between gap-3 bg-amber-500 px-4 py-1.5 text-sm text-white sm:px-6">
+            <span className="truncate">
+              Previewing as <strong>{ROLE_LABELS[previewEntry.name] ?? previewEntry.name}</strong> — navigation reflects this role. Your real access is unchanged.
+            </span>
+            <button onClick={() => changePreview(null)} className="shrink-0 font-medium underline underline-offset-2 hover:no-underline">
+              Exit preview
+            </button>
+          </div>
+        )}
+
         {/* Desktop top bar */}
-        <div className="sticky top-0 z-20 hidden items-center justify-end border-b border-slate-200/80 bg-white/80 px-6 py-2 backdrop-blur lg:flex">
+        <div className="sticky top-0 z-20 hidden items-center justify-between border-b border-slate-200/80 bg-white/80 px-6 py-2 backdrop-blur lg:flex">
+          {isItAdmin ? (
+            <RolePreviewControl value={previewRole} roles={rolesData ?? []} onChange={changePreview} />
+          ) : (
+            <div />
+          )}
           <NotificationBell />
         </div>
 
@@ -291,6 +342,42 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </main>
       </div>
     </div>
+  );
+}
+
+function RolePreviewControl({
+  value,
+  roles,
+  onChange,
+}: {
+  value: string | null;
+  roles: { name: string; permissions: string[] }[];
+  onChange: (role: string | null) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-sm text-slate-600">
+      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+      </svg>
+      <span className="hidden font-medium sm:inline">View as</span>
+      <select
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || null)}
+        className={`rounded-lg border px-2.5 py-1.5 text-sm font-medium outline-none transition focus:ring-2 focus:ring-slate-900 ${
+          value ? "border-amber-400 bg-amber-50 text-amber-800" : "border-slate-200 bg-white text-slate-700"
+        }`}
+      >
+        <option value="">My view (IT Admin)</option>
+        {roles
+          .filter((r) => r.name !== "it_admin")
+          .map((r) => (
+            <option key={r.name} value={r.name}>
+              {ROLE_LABELS[r.name as keyof typeof ROLE_LABELS] ?? r.name}
+            </option>
+          ))}
+      </select>
+    </label>
   );
 }
 

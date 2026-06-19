@@ -78,7 +78,7 @@ export function NotificationBell() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
         {unread > 0 && (
-          <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+          <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -112,7 +112,7 @@ export function NotificationBell() {
                         <div className={n.read_at ? "pl-4" : ""}>
                           <p className="text-sm font-medium text-slate-800">{n.title}</p>
                           {n.message && <p className="mt-0.5 text-xs text-slate-500">{n.message}</p>}
-                          <p className="mt-1 text-[11px] text-slate-400">{timeAgo(n.created_at)}</p>
+                          <p className="mt-1 text-xs text-slate-400">{timeAgo(n.created_at)}</p>
                         </div>
                       </div>
                     </div>

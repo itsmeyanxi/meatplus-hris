@@ -12,9 +12,11 @@ export type EmployeeListItem = {
   department?: { id: number; name: string };
   position?: { id: number; title: string };
   employment_type?: { id: number; name: string };
+  company?: { id: number; code: string; name: string };
 };
 
 export type EmployeeDetail = EmployeeListItem & {
+  biometric_user_id: string | null;
   middle_name: string | null;
   suffix: string | null;
   birth_date: string | null;
@@ -53,6 +55,10 @@ export type LookupItem = { id: number; code?: string; name?: string; title?: str
 
 export async function listEmployees(params: {
   q?: string;
+  employeeNo?: string;
+  name?: string;
+  departmentId?: number | "";
+  companyId?: number | "";
   page?: number;
   perPage?: number;
   onlyActive?: boolean;
@@ -60,12 +66,47 @@ export async function listEmployees(params: {
   const { data } = await api.get<PaginatedResponse<EmployeeListItem>>("/api/v1/employees", {
     params: {
       q: params.q || undefined,
+      employee_no: params.employeeNo || undefined,
+      name: params.name || undefined,
+      department_id: params.departmentId || undefined,
+      company_id: params.companyId || undefined,
       page: params.page,
       per_page: params.perPage,
       only_active: params.onlyActive,
     },
   });
   return data;
+}
+
+export type ImportResult = {
+  created: number;
+  skipped: number;
+  total: number;
+  errors: { row: number; message: string }[];
+};
+
+export async function importEmployees(file: File): Promise<ImportResult> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const { data } = await api.post<ImportResult>("/api/v1/employees/import", fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
+export const employeeImportTemplateUrl = "/api/v1/employees/import/template";
+
+/** URL for the filtered CSV export (download via a plain link — uses the session cookie). */
+export function employeeExportUrl(
+  params: { employeeNo?: string; name?: string; departmentId?: number | ""; companyId?: number | "" } = {},
+): string {
+  const qs = new URLSearchParams();
+  if (params.employeeNo) qs.set("employee_no", params.employeeNo);
+  if (params.name) qs.set("name", params.name);
+  if (params.departmentId) qs.set("department_id", String(params.departmentId));
+  if (params.companyId) qs.set("company_id", String(params.companyId));
+  const q = qs.toString();
+  return `/api/v1/employees/export${q ? `?${q}` : ""}`;
 }
 
 export async function getEmployee(id: number): Promise<EmployeeDetail> {
@@ -75,6 +116,7 @@ export async function getEmployee(id: number): Promise<EmployeeDetail> {
 
 export type EmployeeCreateInput = {
   employee_no: string;
+  biometric_user_id?: string | null;
   first_name: string;
   middle_name?: string | null;
   last_name: string;
@@ -111,7 +153,7 @@ export async function updateEmployee(
 }
 
 export async function getLookup(
-  resource: "branches" | "departments" | "positions" | "employment-types",
+  resource: "branches" | "departments" | "positions" | "employment-types" | "companies",
   params: { department_id?: number } = {},
 ): Promise<LookupItem[]> {
   const { data } = await api.get<{ data: LookupItem[] }>(`/api/v1/lookups/${resource}`, { params });

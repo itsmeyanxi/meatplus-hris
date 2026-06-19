@@ -24,6 +24,8 @@ class UpdateEmployeeRequest extends FormRequest
                     ->where('company_id', $companyId)
                     ->ignore($employeeId),
             ],
+            // Biometric terminal "Employee No." — used to match device punches to this person.
+            'biometric_user_id' => ['nullable', 'string', 'max:50'],
             'first_name' => ['sometimes', 'string', 'max:100'],
             'middle_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['sometimes', 'string', 'max:100'],

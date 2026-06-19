@@ -1,33 +1,84 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getMe } from "@/lib/auth";
-import { listEmployees } from "@/lib/employees";
+import {
+  listEmployees,
+  getLookup,
+  importEmployees,
+  employeeImportTemplateUrl,
+  employeeExportUrl,
+  type ImportResult,
+} from "@/lib/employees";
 import { AppButton, AppInput, PageHeader, StatusBadge, TableShell } from "@/components/ui";
+import { inputCls, labelCls } from "@/lib/form-classes";
 
 export default function EmployeesPage() {
   const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const qc = useQueryClient();
+  const [showImport, setShowImport] = useState(false);
+  const [empNo, setEmpNo] = useState("");
+  const [name, setName] = useState("");
+  const [departmentId, setDepartmentId] = useState<number | "">("");
+  const [companyId, setCompanyId] = useState<number | "">("");
+  const [debEmpNo, setDebEmpNo] = useState("");
+  const [debName, setDebName] = useState("");
   const [page, setPage] = useState(1);
   const [previewEmployee, setPreviewEmployee] = useState<any | null>(null);
 
+  // Debounce the free-text filters; the company dropdown applies immediately.
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    const t = setTimeout(() => {
+      setDebEmpNo(empNo);
+      setDebName(name);
+      setPage(1);
+    }, 300);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [empNo, name]);
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
 
+  const { data: companies } = useQuery({
+    queryKey: ["lookup-companies"],
+    queryFn: () => getLookup("companies"),
+    enabled: !!me,
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: departments } = useQuery({
+    queryKey: ["lookup-departments"],
+    queryFn: () => getLookup("departments"),
+    enabled: !!me,
+    staleTime: 5 * 60_000,
+  });
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["employees", { search: debouncedSearch, page }],
-    queryFn: () => listEmployees({ q: debouncedSearch, page, perPage: 25 }),
+    queryKey: ["employees", { empNo: debEmpNo, name: debName, departmentId, companyId, page }],
+    queryFn: () => listEmployees({ employeeNo: debEmpNo, name: debName, departmentId, companyId, page, perPage: 25 }),
     enabled: !!me,
     staleTime: 30_000,
   });
+
+  const onExport = () => {
+    const a = document.createElement("a");
+    a.href = employeeExportUrl({ employeeNo: debEmpNo, name: debName, departmentId, companyId });
+    a.download = "employees.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  const hasFilters = empNo !== "" || name !== "" || departmentId !== "" || companyId !== "";
+  const clearFilters = () => {
+    setEmpNo("");
+    setName("");
+    setDepartmentId("");
+    setCompanyId("");
+    setPage(1);
+  };
 
   return (
     <div className="relative space-y-4">
@@ -35,24 +86,106 @@ export default function EmployeesPage() {
         title="Employees"
         description={data ? `${data.meta.total} total employees` : "Loading employees…"}
         actions={
-          <Link
-            href="/employees/new"
-            className="inline-flex items-center rounded-xl border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
-          >
-            + New employee
-          </Link>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowImport(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Import
+            </button>
+            <button
+              type="button"
+              onClick={onExport}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Export
+            </button>
+            <Link
+              href="/employees/new"
+              className="inline-flex items-center rounded-xl border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+            >
+              + New employee
+            </Link>
+          </div>
         }
       />
 
-      <AppInput
-        type="search"
-        placeholder="Search by name, employee no, email, or department…"
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          setPage(1);
-        }}
-      />
+      <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className={labelCls}>Employee ID</label>
+            <AppInput
+              type="search"
+              placeholder="e.g. EMP-0002"
+              value={empNo}
+              onChange={(e) => setEmpNo(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Employee Name</label>
+            <AppInput
+              type="search"
+              placeholder="Search name…"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Department</label>
+            <select
+              className={inputCls}
+              value={departmentId}
+              onChange={(e) => {
+                setDepartmentId(e.target.value === "" ? "" : Number(e.target.value));
+                setPage(1);
+              }}
+            >
+              <option value="">All departments</option>
+              {departments?.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Company</label>
+            <select
+              className={inputCls}
+              value={companyId}
+              onChange={(e) => {
+                setCompanyId(e.target.value === "" ? "" : Number(e.target.value));
+                setPage(1);
+              }}
+            >
+              <option value="">All companies</option>
+              {companies?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code ? `${c.code} — ${c.name}` : c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {hasFilters && (
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-xs font-medium text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
+      </div>
 
       <TableShell>
         <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -165,6 +298,13 @@ export default function EmployeesPage() {
         </div>
       )}
 
+      {showImport && (
+        <ImportModal
+          onClose={() => setShowImport(false)}
+          onDone={() => qc.invalidateQueries({ queryKey: ["employees"] })}
+        />
+      )}
+
       {/* RECORD PREVIEW DRAWER OVERLAY */}
       {previewEmployee && (
         <>
@@ -270,4 +410,102 @@ function Th({ children }: { children: React.ReactNode }) {
 
 function Td({ children }: { children: React.ReactNode }) {
   return <td className="px-4 py-3 align-top">{children}</td>;
+}
+
+function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
+
+  const upload = useMutation({
+    mutationFn: () => importEmployees(file!),
+    onSuccess: (res) => {
+      setResult(res);
+      if (res.created > 0) onDone();
+    },
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="dialog" aria-modal>
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+        <h2 className="text-lg font-semibold text-slate-900">Import employees</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Upload a CSV or Excel (.xlsx) file. Columns: Employee ID, Last Name, Middle Name, First Name, Gender, Civil
+          Status, Department, Location, Email. Missing departments/locations are created automatically; existing
+          employee IDs are skipped.
+        </p>
+
+        <a
+          href={employeeImportTemplateUrl}
+          className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 underline-offset-2 hover:underline"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5l5 5v9a2 2 0 01-2 2z" />
+          </svg>
+          Download template
+        </a>
+
+        {!result && (
+          <div className="mt-4">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,.xlsx,text/csv"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800"
+            />
+            {file && <p className="mt-2 text-xs text-slate-500">Selected: {file.name}</p>}
+          </div>
+        )}
+
+        {result && (
+          <div className="mt-4 space-y-3">
+            <div className="flex gap-3">
+              <Stat label="Created" value={result.created} tone="emerald" />
+              <Stat label="Skipped" value={result.skipped} tone="amber" />
+              <Stat label="Errors" value={result.errors.length} tone="red" />
+            </div>
+            {result.errors.length > 0 && (
+              <div className="max-h-40 overflow-y-auto rounded-lg border border-red-100 bg-red-50/50 p-3 text-xs text-red-700">
+                {result.errors.map((e, i) => (
+                  <div key={i}>Row {e.row}: {e.message}</div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-slate-500">
+              Imported records have blank birth date, hire date, position and employment type — complete those in each
+              profile when ready.
+            </p>
+          </div>
+        )}
+
+        <div className="mt-5 flex justify-end gap-2">
+          {result ? (
+            <AppButton onClick={onClose}>Done</AppButton>
+          ) : (
+            <>
+              <AppButton variant="secondary" onClick={onClose}>Cancel</AppButton>
+              <AppButton onClick={() => upload.mutate()} disabled={!file || upload.isPending}>
+                {upload.isPending ? "Importing…" : "Import"}
+              </AppButton>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "red" }) {
+  const tones = {
+    emerald: "bg-emerald-50 text-emerald-700",
+    amber: "bg-amber-50 text-amber-700",
+    red: "bg-red-50 text-red-700",
+  };
+  return (
+    <div className={`flex-1 rounded-lg px-3 py-2 text-center ${tones[tone]}`}>
+      <div className="text-lg font-bold tabular-nums">{value}</div>
+      <div className="text-xs font-medium">{label}</div>
+    </div>
+  );
 }
