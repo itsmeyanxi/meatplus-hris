@@ -64,6 +64,11 @@ class Employee extends Model
         return $this->belongsTo(Branch::class);
     }
 
+    public function compensation(): HasOne
+    {
+        return $this->hasOne(\App\Domain\Payroll\Models\EmployeeCompensation::class);
+    }
+
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);

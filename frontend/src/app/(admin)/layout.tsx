@@ -62,6 +62,17 @@ const NAV: NavItem[] = [
     )
   },
   {
+    href: "/payroll",
+    label: "Payroll",
+    permissions: ["payroll.view"],
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 8h6m-6 4h6m-7 8h8a2 2 0 002-2V6a2 2 0 00-2-2H8a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 14.5V16m0-9v1.5m1.5 0h-2.25a1.25 1.25 0 000 2.5h1.5a1.25 1.25 0 010 2.5H10.5" />
+      </svg>
+    )
+  },
+  {
     href: "/users",
     label: "Users",
     permissions: ["user.manage"],
@@ -85,7 +96,7 @@ const NAV: NavItem[] = [
   {
     href: "/request-access",
     label: "Request Access",
-    roles: ["dept_head", "hr_admin", "it_admin"],
+    roles: ["dept_head", "hr_admin", "it_admin", "employee"],
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -247,29 +258,38 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </nav>
         </div>
 
-        {/* User profile & Logout footer info */}
-        <div className={`mt-auto border border-slate-200 bg-slate-50 p-2.5 transition-all ${isCollapsed ? "rounded-xl text-center" : "rounded-xl"}`}>
-          {isCollapsed ? (
-            <button 
-              onClick={handleLogout} 
-              className="text-slate-500 hover:text-red-600 transition p-1" 
-              title="Log out"
-            >
-              <svg className="w-4 h-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </button>
-          ) : (
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Signed in</p>
-              <p className="mt-0.5 break-all text-xs font-medium text-slate-900 line-clamp-2">
-                {isLoading ? "Loading…" : data?.user.email}
-              </p>
-              <AppButton onClick={handleLogout} variant="secondary" className="mt-3 w-full text-xs py-1.5 h-auto">
-                Log out
-              </AppButton>
+        <div className="mt-auto space-y-2.5">
+          {/* View as role (IT Admin only) */}
+          {isItAdmin && !isCollapsed && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+              <RolePreviewControl value={previewRole} roles={rolesData ?? []} onChange={changePreview} />
             </div>
           )}
+
+          {/* User profile & Logout footer info */}
+          <div className={`border border-slate-200 bg-slate-50 p-2.5 transition-all ${isCollapsed ? "rounded-xl text-center" : "rounded-xl"}`}>
+            {isCollapsed ? (
+              <button
+                onClick={handleLogout}
+                className="text-slate-500 hover:text-red-600 transition p-1"
+                title="Log out"
+              >
+                <svg className="w-4 h-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
+            ) : (
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Signed in</p>
+                <p className="mt-0.5 break-all text-xs font-medium text-slate-900 line-clamp-2">
+                  {isLoading ? "Loading…" : data?.user.email}
+                </p>
+                <AppButton onClick={handleLogout} variant="secondary" className="mt-3 w-full text-xs py-1.5 h-auto">
+                  Log out
+                </AppButton>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
 
@@ -288,12 +308,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         )}
 
         {/* Desktop top bar */}
-        <div className="sticky top-0 z-20 hidden items-center justify-between border-b border-slate-200/80 bg-white/80 px-6 py-2 backdrop-blur lg:flex">
-          {isItAdmin ? (
-            <RolePreviewControl value={previewRole} roles={rolesData ?? []} onChange={changePreview} />
-          ) : (
-            <div />
-          )}
+        <div className="sticky top-0 z-20 hidden items-center justify-end border-b border-slate-200/80 bg-white/80 px-6 py-2 backdrop-blur lg:flex">
           <NotificationBell />
         </div>
 
@@ -355,16 +370,18 @@ function RolePreviewControl({
   onChange: (role: string | null) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-slate-600">
-      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-      </svg>
-      <span className="hidden font-medium sm:inline">View as</span>
+    <div>
+      <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+        </svg>
+        View as
+      </p>
       <select
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value || null)}
-        className={`rounded-lg border px-2.5 py-1.5 text-sm font-medium outline-none transition focus:ring-2 focus:ring-slate-900 ${
+        className={`w-full rounded-lg border px-2.5 py-1.5 text-sm font-medium outline-none transition focus:ring-2 focus:ring-slate-900 ${
           value ? "border-amber-400 bg-amber-50 text-amber-800" : "border-slate-200 bg-white text-slate-700"
         }`}
       >
@@ -377,7 +394,7 @@ function RolePreviewControl({
             </option>
           ))}
       </select>
-    </label>
+    </div>
   );
 }
 

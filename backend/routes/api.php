@@ -102,6 +102,17 @@ Route::prefix('v1')->group(function () {
         Route::post('leave-applications/{leaveApplication}/reject', [LeaveApplicationController::class, 'reject']);
         Route::post('leave-applications/{leaveApplication}/cancel', [LeaveApplicationController::class, 'cancel']);
 
+        // Payroll
+        Route::get('compensations', [\App\Http\Controllers\Api\V1\Payroll\CompensationController::class, 'index']);
+        Route::post('compensations', [\App\Http\Controllers\Api\V1\Payroll\CompensationController::class, 'store']);
+        Route::get('payroll-runs', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'index']);
+        Route::post('payroll-runs', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'store']);
+        Route::get('payroll-runs/{payrollRun}', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'show']);
+        Route::post('payroll-runs/{payrollRun}/compute', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'compute']);
+        Route::post('payroll-runs/{payrollRun}/approve', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'approve']);
+        Route::post('payroll-runs/{payrollRun}/post', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'post']);
+        Route::delete('payroll-runs/{payrollRun}', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'destroy']);
+
         // Access requests (system access request form + supervisor -> HR -> IT approval)
         Route::get('access-requests', [AccessRequestController::class, 'index']);
         Route::get('my/access-requests', [AccessRequestController::class, 'mine']);
