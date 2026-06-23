@@ -17,6 +17,7 @@ class AttendanceDeviceResource extends JsonResource
             'ip_address' => $this->ip_address,
             'port' => $this->port,
             'timezone' => $this->timezone,
+            'use_server_time' => $this->use_server_time,
             'username' => $this->username,
             // password is never exposed
             'is_active' => $this->is_active,

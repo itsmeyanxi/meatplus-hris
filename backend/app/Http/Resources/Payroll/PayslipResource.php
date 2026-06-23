@@ -23,6 +23,7 @@ class PayslipResource extends JsonResource
             'overtime_minutes' => $this->overtime_minutes,
             'basic_pay' => $this->basic_pay,
             'overtime_pay' => $this->overtime_pay,
+            'night_diff_pay' => $this->night_diff_pay,
             'allowance' => $this->allowance,
             'gross_pay' => $this->gross_pay,
             'sss' => $this->sss,

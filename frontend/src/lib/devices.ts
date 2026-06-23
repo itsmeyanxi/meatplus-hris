@@ -8,6 +8,7 @@ export type Device = {
   ip_address: string;
   port: number;
   timezone: string | null;
+  use_server_time: boolean;
   username: string;
   is_active: boolean;
   branch_id: number | null;
@@ -21,6 +22,7 @@ export type DeviceInput = {
   ip_address: string;
   port: number;
   timezone: string;
+  use_server_time: boolean;
   username: string;
   password?: string; // blank on edit = keep stored credential
   serial_no?: string | null;

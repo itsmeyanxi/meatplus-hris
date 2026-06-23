@@ -21,6 +21,7 @@ class AttendanceDeviceRequest extends FormRequest
             'ip_address' => ['required', 'string', 'max:45'],
             'port' => ['nullable', 'integer', 'between:1,65535'],
             'timezone' => ['nullable', 'string', 'max:64', 'timezone'],
+            'use_server_time' => ['boolean'],
             'username' => ['required', 'string', 'max:120'],
             // Password required on create; on update, blank means "keep the stored one".
             'password' => [$isCreate ? 'required' : 'nullable', 'string', 'max:120'],

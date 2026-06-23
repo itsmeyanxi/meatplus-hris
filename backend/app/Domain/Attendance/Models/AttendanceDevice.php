@@ -17,7 +17,7 @@ class AttendanceDevice extends Model
 
     protected $fillable = [
         'company_id', 'branch_id', 'name', 'vendor', 'serial_no',
-        'ip_address', 'port', 'timezone', 'username', 'password', 'is_active',
+        'ip_address', 'port', 'timezone', 'use_server_time', 'username', 'password', 'is_active',
         'last_synced_at', 'last_event_at',
     ];
 
@@ -28,6 +28,7 @@ class AttendanceDevice extends Model
         return [
             'password' => 'encrypted',
             'port' => 'integer',
+            'use_server_time' => 'boolean',
             'is_active' => 'boolean',
             'last_synced_at' => 'datetime',
             'last_event_at' => 'datetime',

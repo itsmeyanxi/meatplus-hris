@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Leave;
 
+use App\Domain\Attendance\Services\DtrComputer;
 use App\Domain\HRIS\Models\Employee;
 use App\Domain\Leave\Models\LeaveApplication;
 use App\Domain\Leave\Models\LeaveType;
@@ -141,11 +142,11 @@ class LeaveApplicationController extends Controller
         );
     }
 
-    public function approve(LeaveDecisionRequest $request, LeaveApplication $leaveApplication): LeaveApplicationResource
+    public function approve(LeaveDecisionRequest $request, LeaveApplication $leaveApplication, DtrComputer $dtr): LeaveApplicationResource
     {
         $this->assertCanDecide($request, $leaveApplication);
 
-        DB::transaction(function () use ($request, $leaveApplication) {
+        DB::transaction(function () use ($request, $leaveApplication, $dtr) {
             $leaveApplication->update([
                 'status' => 'approved',
                 'approved_by_user_id' => $request->user()->id,
@@ -161,6 +162,13 @@ class LeaveApplicationController extends Controller
                 $year,
             );
             $this->balanceService->consume($balance, (float) $leaveApplication->days_count);
+
+            // Post the leave onto the daily time records for the covered dates.
+            $dtr->computeForEmployee(
+                $leaveApplication->employee,
+                CarbonImmutable::parse($leaveApplication->date_from),
+                CarbonImmutable::parse($leaveApplication->date_to),
+            );
         });
 
         return new LeaveApplicationResource(
@@ -184,7 +192,7 @@ class LeaveApplicationController extends Controller
         );
     }
 
-    public function cancel(Request $request, LeaveApplication $leaveApplication): LeaveApplicationResource
+    public function cancel(Request $request, LeaveApplication $leaveApplication, DtrComputer $dtr): LeaveApplicationResource
     {
         $user = $request->user();
 
@@ -201,7 +209,7 @@ class LeaveApplicationController extends Controller
         // If cancelling an APPROVED leave, restore the balance
         $wasApproved = $leaveApplication->status === 'approved';
 
-        DB::transaction(function () use ($leaveApplication, $wasApproved) {
+        DB::transaction(function () use ($leaveApplication, $wasApproved, $dtr) {
             $leaveApplication->update(['status' => 'cancelled']);
 
             if ($wasApproved) {
@@ -212,6 +220,13 @@ class LeaveApplicationController extends Controller
                     $year,
                 );
                 $this->balanceService->restore($balance, (float) $leaveApplication->days_count);
+
+                // Un-post the leave from the daily time records.
+                $dtr->computeForEmployee(
+                    $leaveApplication->employee,
+                    CarbonImmutable::parse($leaveApplication->date_from),
+                    CarbonImmutable::parse($leaveApplication->date_to),
+                );
             }
         });
 

@@ -12,7 +12,7 @@ import { devicesApi, type Device, type DeviceInput, type SyncSummary, type Enrol
 const QK = ["attendance-devices"];
 
 function blankForm(): DeviceInput {
-  return { name: "", ip_address: "", port: 80, timezone: "Asia/Manila", username: "", password: "", serial_no: "", is_active: true };
+  return { name: "", ip_address: "", port: 80, timezone: "Asia/Manila", use_server_time: false, username: "", password: "", serial_no: "", is_active: true };
 }
 
 export default function DevicesPage() {
@@ -39,6 +39,7 @@ export default function DevicesPage() {
       ip_address: d.ip_address,
       port: d.port,
       timezone: d.timezone ?? "Asia/Manila",
+      use_server_time: d.use_server_time,
       username: d.username,
       password: "", // blank = keep
       serial_no: d.serial_no ?? "",
@@ -350,6 +351,13 @@ function DeviceFormModal({
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input type="checkbox" checked={form.is_active} onChange={(e) => set("is_active", e.target.checked)} />
             Active (included in scheduled sync)
+          </label>
+          <label className="flex items-start gap-2 text-sm text-slate-700">
+            <input type="checkbox" className="mt-0.5" checked={form.use_server_time} onChange={(e) => set("use_server_time", e.target.checked)} />
+            <span>
+              Use server time for punches <span className="text-slate-400">(testing)</span>
+              <span className="block text-xs text-slate-400">Anchors punches to this server&apos;s clock instead of the device&apos;s time — for when the terminal clock is off.</span>
+            </span>
           </label>
 
           <div className="flex justify-end gap-2 pt-2">

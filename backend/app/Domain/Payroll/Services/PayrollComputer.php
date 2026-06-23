@@ -79,6 +79,7 @@ class PayrollComputer
         $daysAbsent = 0;
         $lateMinutes = 0;
         $otMinutes = 0;
+        $nightMinutes = 0;
         foreach ($dtrs as $d) {
             if ($d->is_absent) {
                 $daysAbsent++;
@@ -87,16 +88,18 @@ class PayrollComputer
             }
             $lateMinutes += (int) $d->late_minutes;
             $otMinutes += (int) $d->overtime_minutes;
+            $nightMinutes += (int) $d->night_diff_minutes;
         }
 
         // Earnings (semi-monthly = half the monthly figures).
         $basicPay = round($basicMonthly / 2, 2);
         $allowance = round((float) $comp->allowance_monthly / 2, 2);
         $overtimePay = round(($otMinutes / 60) * $hourlyRate * 1.25, 2);
+        $nightDiffPay = round(($nightMinutes / 60) * $hourlyRate * 0.10, 2); // 10% night differential
         $absencesDeduction = round($daysAbsent * $dailyRate, 2);
         $tardinessDeduction = round($lateMinutes * $minuteRate, 2);
 
-        $grossPay = round($basicPay + $allowance + $overtimePay, 2);
+        $grossPay = round($basicPay + $allowance + $overtimePay + $nightDiffPay, 2);
 
         // Statutory + tax (monthly figures, split across two cutoffs).
         $contrib = $this->statutory->monthlyContributions($basicMonthly);
@@ -121,8 +124,10 @@ class PayrollComputer
             'days_absent' => $daysAbsent,
             'late_minutes' => $lateMinutes,
             'overtime_minutes' => $otMinutes,
+            'night_diff_minutes' => $nightMinutes,
             'basic_pay' => $basicPay,
             'overtime_pay' => $overtimePay,
+            'night_diff_pay' => $nightDiffPay,
             'allowance' => $allowance,
             'gross_pay' => $grossPay,
             'sss' => $sss,

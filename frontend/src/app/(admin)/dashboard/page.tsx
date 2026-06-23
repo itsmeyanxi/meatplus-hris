@@ -36,7 +36,7 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-type PunchEvent = { id: string; date: string; dir: "IN" | "OUT"; ts: string };
+type PunchEvent = { id: string; date: string; dir: "IN" | "OUT"; ts: string; late?: boolean };
 
 export default function DashboardPage() {
   const today = useMemo(() => new Date(), []);
@@ -100,7 +100,7 @@ export default function DashboardPage() {
     .flatMap((r) => {
       const out: PunchEvent[] = [];
       if (r.actual_out) out.push({ id: `${r.id}-out`, date: r.work_date, dir: "OUT", ts: r.actual_out });
-      if (r.actual_in) out.push({ id: `${r.id}-in`, date: r.work_date, dir: "IN", ts: r.actual_in });
+      if (r.actual_in) out.push({ id: `${r.id}-in`, date: r.work_date, dir: "IN", ts: r.actual_in, late: r.late_minutes > 0 });
       return out;
     })
     .sort((a, b) => b.ts.localeCompare(a.ts));
@@ -148,9 +148,12 @@ export default function DashboardPage() {
                   <span className="text-sm text-slate-500">{mdy(e.date)}</span>
                   <span className="justify-self-center">
                     <span
+                      title={e.dir === "IN" && e.late ? "Late" : undefined}
                       className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                         e.dir === "IN"
-                          ? "bg-sky-50 text-sky-700"
+                          ? e.late
+                            ? "bg-red-50 text-red-600"
+                            : "bg-sky-50 text-sky-700"
                           : "bg-orange-50 text-orange-600"
                       }`}
                     >

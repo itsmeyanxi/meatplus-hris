@@ -5,10 +5,12 @@ namespace App\Domain\Attendance\Services;
 use App\Domain\Attendance\Models\DailyTimeRecord;
 use App\Domain\Attendance\Models\EmployeeSchedule;
 use App\Domain\Attendance\Models\Holiday;
+use App\Domain\Attendance\Models\OvertimeRequest;
 use App\Domain\Attendance\Models\ShiftAdjustment;
 use App\Domain\Attendance\Models\TimeLog;
 use App\Domain\Attendance\Models\WorkScheduleDay;
 use App\Domain\HRIS\Models\Employee;
+use App\Domain\Leave\Models\LeaveApplication;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -57,6 +59,29 @@ class DtrComputer
             ->get()
             ->keyBy(fn (ShiftAdjustment $a) => $a->work_date->toDateString());
 
+        // Approved leave overlapping the window, expanded to a per-day map.
+        $leaveByDate = [];
+        $leaves = LeaveApplication::query()
+            ->where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->where('date_from', '<=', $to->toDateString())
+            ->where('date_to', '>=', $from->toDateString())
+            ->with('leaveType:id,is_paid')
+            ->get();
+        foreach ($leaves as $lv) {
+            for ($d = CarbonImmutable::parse($lv->date_from); $d->lte(CarbonImmutable::parse($lv->date_to)); $d = $d->addDay()) {
+                $leaveByDate[$d->toDateString()] = $lv;
+            }
+        }
+
+        // Approved overtime requests, keyed by date (authoritative for credited OT).
+        $overtimes = OvertimeRequest::query()
+            ->where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->get()
+            ->keyBy(fn (OvertimeRequest $o) => $o->date->toDateString());
+
         $results = collect();
 
         for ($day = $from; $day->lte($to); $day = $day->addDay()) {
@@ -77,7 +102,10 @@ class DtrComputer
             $dayLogs = $logs->get($dateStr, collect());
             $adjustment = $adjustments->get($dateStr);
 
-            $dtr = $this->computeDay($employee, $day, $scheduleDay, $holiday, $dayLogs, $adjustment);
+            $dtr = $this->computeDay(
+                $employee, $day, $scheduleDay, $holiday, $dayLogs, $adjustment,
+                $leaveByDate[$dateStr] ?? null, $overtimes->get($dateStr),
+            );
 
             $row = DailyTimeRecord::updateOrCreate(
                 ['employee_id' => $employee->id, 'work_date' => $dateStr],
@@ -213,6 +241,8 @@ class DtrComputer
         ?Holiday $holiday,
         Collection $dayLogs,
         ?ShiftAdjustment $adjustment = null,
+        ?LeaveApplication $leave = null,
+        ?OvertimeRequest $overtime = null,
     ): array {
         $isRestDay = (bool) ($scheduleDay?->is_rest_day);
         $hasAnyLogs = $dayLogs->isNotEmpty();
@@ -276,7 +306,21 @@ class DtrComputer
             }
         }
 
-        $isAbsent = ! $hasAnyLogs && ! $isRestDay && ! $holiday;
+        // An approved overtime request is authoritative for credited OT on its date.
+        if ($overtime) {
+            $overtimeMinutes = (int) round((float) $overtime->requested_hours * 60);
+        }
+
+        // Night differential: worked minutes that fall within 22:00–06:00.
+        $nightDiffMinutes = ($actualIn && $actualOut)
+            ? $this->nightDiffMinutes($day->toDateString(), $actualIn, $actualOut)
+            : 0;
+
+        // Approved leave: paid leave is not absent; unpaid leave still deducts (absent)
+        // but is flagged on-leave for display.
+        $onLeave = (bool) $leave;
+        $leavePaid = $onLeave && (bool) ($leave->leaveType?->is_paid ?? true);
+        $isAbsent = ! $hasAnyLogs && ! $isRestDay && ! $holiday && ! $leavePaid;
 
         return [
             'company_id' => $employee->company_id,
@@ -288,13 +332,38 @@ class DtrComputer
             'late_minutes' => $lateMinutes,
             'undertime_minutes' => $undertimeMinutes,
             'overtime_minutes' => $overtimeMinutes,
-            'night_diff_minutes' => 0, // deferred to Phase 2.1
+            'night_diff_minutes' => $nightDiffMinutes,
             'holiday_type' => $holiday?->type,
             'is_rest_day' => $isRestDay,
             'is_absent' => $isAbsent,
-            'is_on_leave' => false, // populated when leave module lands
+            'is_on_leave' => $onLeave,
+            'leave_application_id' => $leave?->id,
             'is_adjusted' => $isAdjusted,
             'status' => 'draft',
         ];
+    }
+
+    /** Minutes of the worked span [in, out] that fall within the 22:00–06:00 night window. */
+    private function nightDiffMinutes(string $dateStr, CarbonInterface $in, CarbonInterface $out): int
+    {
+        $in = CarbonImmutable::parse($in);
+        $out = CarbonImmutable::parse($out);
+
+        // Two windows relative to the work date: early morning and late night (into next day).
+        $windows = [
+            [CarbonImmutable::parse("{$dateStr} 00:00"), CarbonImmutable::parse("{$dateStr} 06:00")],
+            [CarbonImmutable::parse("{$dateStr} 22:00"), CarbonImmutable::parse("{$dateStr} 06:00")->addDay()],
+        ];
+
+        $minutes = 0;
+        foreach ($windows as [$ws, $we]) {
+            $start = $in->greaterThan($ws) ? $in : $ws;
+            $end = $out->lessThan($we) ? $out : $we;
+            if ($end->greaterThan($start)) {
+                $minutes += (int) round($start->diffInMinutes($end));
+            }
+        }
+
+        return $minutes;
     }
 }

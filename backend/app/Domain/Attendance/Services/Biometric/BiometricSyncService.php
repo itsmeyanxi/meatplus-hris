@@ -43,16 +43,31 @@ class BiometricSyncService
         $tz = $device->tz();
 
         // Pull from a little before the last sync (boundary safety); dedup handles overlap.
+        // When the device clock is untrusted (use_server_time), its event timestamps don't
+        // align with server time, so a last-sync window can sit in the device's "future"
+        // and miss events — pull a wide window instead and let dedup handle overlap.
         $to = Carbon::now($tz);
-        $from = $device->last_synced_at
-            ? $device->last_synced_at->copy()->subMinutes(15)
-            : $to->copy()->subDays(7);
+        if ($device->use_server_time) {
+            $from = $to->copy()->subDays(3);
+        } else {
+            $from = $device->last_synced_at
+                ? $device->last_synced_at->copy()->subMinutes(15)
+                : $to->copy()->subDays(7);
+        }
 
         $client = new HikvisionIsapiClient($device);
         $events = $client->fetchEvents($from, $to);
 
         // Process oldest-first so same-day in/out inference is stable.
         usort($events, fn ($a, $b) => strcmp($a['time'], $b['time']));
+
+        // Testing aid: anchor punches to the server clock (newest event = now),
+        // keeping each event's relative spacing so in/out pairs stay correct.
+        $shiftSeconds = 0;
+        if ($device->use_server_time && $events) {
+            $maxTs = max(array_map(fn ($e) => Carbon::parse($e['time'])->timestamp, $events));
+            $shiftSeconds = Carbon::now()->timestamp - $maxTs;
+        }
 
         $inserted = 0;
         $duplicate = 0;
@@ -71,7 +86,7 @@ class BiometricSyncService
                 continue;
             }
 
-            $ts = Carbon::parse($e['time'])->setTimezone($tz);
+            $ts = Carbon::parse($e['time'])->addSeconds($shiftSeconds)->setTimezone($tz);
             $date = $ts->toDateString();
             $maxEventTime = $maxEventTime && $maxEventTime->gte($ts) ? $maxEventTime : $ts;
 

@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api\V1\Attendance;
 
 use App\Domain\Attendance\Models\OvertimeRequest;
+use App\Domain\Attendance\Services\DtrComputer;
 use App\Http\Controllers\Concerns\HandlesApprovalWorkflow;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendance\AttendanceDecisionRequest;
 use App\Http\Requests\Attendance\OvertimeRequestRequest;
 use App\Http\Resources\Attendance\OvertimeRequestResource;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -61,7 +63,7 @@ class OvertimeRequestController extends Controller
         );
     }
 
-    public function approve(AttendanceDecisionRequest $request, OvertimeRequest $overtimeRequest): OvertimeRequestResource
+    public function approve(AttendanceDecisionRequest $request, OvertimeRequest $overtimeRequest, DtrComputer $dtr): OvertimeRequestResource
     {
         $this->assertCanDecide($request, $overtimeRequest);
 
@@ -71,6 +73,8 @@ class OvertimeRequestController extends Controller
             'decided_at' => now(),
             'decision_remarks' => $request->validated('decision_remarks'),
         ]);
+
+        $this->recomputeDay($dtr, $overtimeRequest);
 
         return new OvertimeRequestResource($overtimeRequest->load(['employee', 'approver:id,name']));
     }
@@ -89,12 +93,21 @@ class OvertimeRequestController extends Controller
         return new OvertimeRequestResource($overtimeRequest->load(['employee', 'approver:id,name']));
     }
 
-    public function cancel(Request $request, OvertimeRequest $overtimeRequest): OvertimeRequestResource
+    public function cancel(Request $request, OvertimeRequest $overtimeRequest, DtrComputer $dtr): OvertimeRequestResource
     {
         $this->assertCanCancel($request, $overtimeRequest);
 
         $overtimeRequest->update(['status' => 'cancelled']);
 
+        $this->recomputeDay($dtr, $overtimeRequest);
+
         return new OvertimeRequestResource($overtimeRequest->load(['employee']));
+    }
+
+    /** Recompute the OT date's daily record so the approved/cancelled OT is reflected. */
+    private function recomputeDay(DtrComputer $dtr, OvertimeRequest $overtimeRequest): void
+    {
+        $date = CarbonImmutable::parse($overtimeRequest->date);
+        $dtr->computeForEmployee($overtimeRequest->employee, $date, $date);
     }
 }
