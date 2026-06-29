@@ -45,7 +45,7 @@ class EmployeeController extends Controller
             $out = fopen('php://output', 'w');
             fputcsv($out, [
                 'Employee ID', 'Last Name', 'Middle Name', 'First Name', 'Gender', 'Civil Status',
-                'Department', 'Location', 'Email', 'Position', 'Employment Type', 'Date Hired', 'Status',
+                'Department', 'Location', 'Email', 'Position', 'Employment Type', 'Date Hired', 'Birth Date', 'Status',
             ]);
             foreach ($rows as $e) {
                 fputcsv($out, [
@@ -61,6 +61,7 @@ class EmployeeController extends Controller
                     $e->position?->title,
                     $e->employmentType?->name,
                     $e->date_hired?->toDateString(),
+                    $e->birth_date?->toDateString(),
                     $e->is_active ? 'Active' : 'Inactive',
                 ]);
             }

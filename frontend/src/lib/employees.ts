@@ -80,6 +80,7 @@ export async function listEmployees(params: {
 
 export type ImportResult = {
   created: number;
+  updated: number;
   skipped: number;
   total: number;
   errors: { row: number; message: string }[];

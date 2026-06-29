@@ -421,7 +421,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
     mutationFn: () => importEmployees(file!),
     onSuccess: (res) => {
       setResult(res);
-      if (res.created > 0) onDone();
+      if (res.created > 0 || res.updated > 0) onDone();
     },
   });
 
@@ -431,8 +431,9 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
         <h2 className="text-lg font-semibold text-slate-900">Import employees</h2>
         <p className="mt-1 text-sm text-slate-500">
           Upload a CSV or Excel (.xlsx) file. Columns: Employee ID, Last Name, Middle Name, First Name, Gender, Civil
-          Status, Department, Location, Email. Missing departments/locations are created automatically; existing
-          employee IDs are skipped.
+          Status, Department, Location, Email, Position, Employment Type, Date Hired, Birth Date. Missing
+          departments, locations, positions and employment types are created automatically. Existing employee IDs are
+          updated (blank cells never overwrite existing data); new IDs are created.
         </p>
 
         <a
@@ -462,6 +463,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
           <div className="mt-4 space-y-3">
             <div className="flex gap-3">
               <Stat label="Created" value={result.created} tone="emerald" />
+              <Stat label="Updated" value={result.updated} tone="sky" />
               <Stat label="Skipped" value={result.skipped} tone="amber" />
               <Stat label="Errors" value={result.errors.length} tone="red" />
             </div>
@@ -473,8 +475,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
               </div>
             )}
             <p className="text-xs text-slate-500">
-              Imported records have blank birth date, hire date, position and employment type — complete those in each
-              profile when ready.
+              Any columns left blank can be completed later in each profile (or in a follow-up import).
             </p>
           </div>
         )}
@@ -496,9 +497,10 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "red" }) {
+function Stat({ label, value, tone }: { label: string; value: number; tone: "emerald" | "sky" | "amber" | "red" }) {
   const tones = {
     emerald: "bg-emerald-50 text-emerald-700",
+    sky: "bg-sky-50 text-sky-700",
     amber: "bg-amber-50 text-amber-700",
     red: "bg-red-50 text-red-700",
   };

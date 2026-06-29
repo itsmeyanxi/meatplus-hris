@@ -42,8 +42,8 @@ class EmployeeImportController extends Controller
     {
         abort_unless($request->user()->can('employee.create'), 403);
 
-        $headers = ['Employee ID', 'Last Name', 'Middle Name', 'First Name', 'Gender', 'Civil Status', 'Department', 'Location', 'Email'];
-        $example = ['EMP-1001', 'Dela Cruz', 'Santos', 'Juan', 'Male', 'Single', 'Operations', 'Head Office', 'juan.delacruz@meatplus.ph'];
+        $headers = ['Employee ID', 'Last Name', 'Middle Name', 'First Name', 'Gender', 'Civil Status', 'Department', 'Location', 'Email', 'Position', 'Employment Type', 'Date Hired', 'Birth Date'];
+        $example = ['EMP-1001', 'Dela Cruz', 'Santos', 'Juan', 'Male', 'Single', 'Operations', 'Head Office', 'juan.delacruz@meatplus.ph', 'Warehouse Staff', 'Regular', '2020-05-01', '1995-03-12'];
 
         return response()->streamDownload(function () use ($headers, $example) {
             $out = fopen('php://output', 'w');

@@ -1,8 +1,16 @@
 # 🟢 Connect the ZKTeco device (ADMS / Push)
 
+> **Hardware in use:** ZKTeco **MB460** (fingerprint + face). These steps apply to most
+> ADMS-capable ZKTeco terminals; menu labels vary slightly by firmware.
+
 Your ZKTeco terminal **pushes** attendance to the HRIS by itself (the ADMS / "iclock"
-protocol). The server already has the receiver built. You just point the device at
-the server and enroll people.
+protocol). The server already has the receiver built (`routes/iclock.php` →
+`IclockController` → `AdmsIngestionService`). You just point the device at the server
+and enroll people.
+
+> **Networking note:** the device and the server PC must be on the **same network** (same
+> router — the first three numbers of their IPs must match). A device on `192.168.1.x`
+> cannot reach a PC on `192.168.110.x`. Wire both to the same router for a stable setup.
 
 ---
 
@@ -90,10 +98,10 @@ you used.
 | Punches show wrong time | Device clock is off | Set the device's date/time (or its timezone) correctly |
 | All punches show as "IN" | Device isn't tagging in/out | Set the device's **work/attendance status** per scan, or we infer by alternation |
 
-> 📋 **Important for the first test:** after one scan, **send me the contents of
+> 📋 **Important for the first test:** after one scan, **check
 > `backend/storage/logs/iclock.log`**. Different ZKTeco firmwares format the push
-> slightly differently — that log shows exactly what *your* device sends, so I can
-> fine‑tune the parser if needed.
+> slightly differently — that log shows exactly what *your* device sends, so the parser
+> in `AdmsIngestionService` can be fine‑tuned to match it if needed.
 
 ---
 

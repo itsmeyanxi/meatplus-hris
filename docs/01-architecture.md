@@ -1,320 +1,259 @@
-# Meatplus HRIS — System Architecture
+# Meatplus HRIS — Software Architecture
 
-> **Document owner:** itdevice@meatplus.ph
-> **Last updated:** 2026-05-20
-> **Status:** Design — pre-implementation
+> **Status:** living document. Sections marked **(planned)** are target-state, not yet built.
+> **Current deployment:** runs locally on a Laragon stack (PHP 8.3 + Node) against a
+> **Supabase Postgres** database in `ap-southeast-1`. The ZKTeco ADMS receiver is **built**.
 
----
+## 0. Design principles & non-goals
 
-## 1. Goals & non-goals
+**Principles**
+1. **Modular monolith first** — one Laravel app, bounded domains (`HRIS`, `Attendance`,
+   `Leave`, `Payroll`, `Identity`, `AccessControl`). Microservices only if scale forces it.
+2. **API-first** — versioned REST (`/api/v1`); the Next.js frontend is fully decoupled
+   (a mobile client is feasible later without re-architecture).
+3. **The relational DB is the source of truth.** Cache/queue are volatile.
+4. **Money is always `DECIMAL`/`NUMERIC`**, never float.
+5. **Multi-tenant by `company_id`** — every tenant-scoped table carries it; a global
+   Eloquent scope enforces tenancy.
+6. **Long operations are queued** — HTTP returns fast; heavy work (DTR recompute,
+   payroll) runs in workers.
+7. **Idempotent, offline-tolerant ingestion** — devices may buffer and re-send.
+8. **Compliance over ergonomics** — when PH labor/tax rules conflict with a "nice"
+   implementation, regulation wins.
 
-### Goals
-- Single in-house system covering: HRIS, attendance, leave, payroll, government reports, employee self-service.
-- Full PH labor & tax compliance (BIR, SSS, PhilHealth, Pag-IBIG, DOLE).
-- Multi-company / multi-branch ready (Meatplus may operate multiple legal entities).
-- Immutable audit trail for all payroll-affecting changes.
-- API-first: backend and frontend are decoupled; mobile app is feasible later without re-architecture.
+**Non-goals** — not a generic SaaS for resale (single customer, multi-entity); not a
+device manufacturer (we ingest from existing terminals); not an accounting ledger (we
+export journal entries, not replace the books); no recruitment/ATS in v1.
 
-### Non-goals (explicit, to prevent scope creep)
-- Not building a generic multi-tenant SaaS for sale (single-customer system; multi-tenant model only because Meatplus has multiple entities).
-- No biometric device manufacturing — we import from existing devices via CSV / TCP polling.
-- No accounting ledger — we generate journal entries / exports for the accounting system, not replace it.
-- No recruitment / ATS in v1 (Phase 7+ if ever).
+## 1. Purpose & scope
 
----
+A Human Resource Information System for Meatplus: employee management, attendance
+(biometric + manual), leave, payroll, and role-based access — designed to run
+**centrally in the cloud** and serve **multiple branches/locations**, each with its
+own biometric device(s).
 
-## 2. Design principles
+Core capabilities (built): employees (+ CSV/XLSX import/export), attendance
+(schedules, holidays, time logs, DTR engine, corrections, OT/UT/OB/COA requests),
+leave (types/balances/applications), payroll (semi-monthly + PH statutory),
+RBAC, access requests, notifications, dashboard.
 
-1. **Modular monolith first.** One Laravel application, organized into bounded domains (`HRIS`, `Attendance`, `Leave`, `Payroll`, `Government`). Microservices only if and when scale forces it.
-2. **API-first.** Backend exposes versioned REST (`/api/v1`); no server-rendered Blade for the main app UI.
-3. **The relational DB is the source of truth.** Redis (when added) is volatile cache; everything durable lives in MySQL.
-4. **Money is always `DECIMAL(15,4)`.** Never `FLOAT` / `DOUBLE`. Period.
-4a. **All timestamps stored as UTC.** MySQL has no `timestamptz`; we set `app.timezone = 'UTC'`, store in UTC, and convert in the UI layer.
-5. **Every payroll-affecting change is auditable.** Field-level diff, who did it, when, why.
-6. **Soft delete payroll data.** Hard-delete is forbidden for payslips, payroll runs, gov filings.
-7. **Long operations are queued.** HTTP requests return in < 2s; payroll computations run in workers.
-8. **Multi-tenant by `company_id`.** Every tenant-scoped table carries `company_id`; global Eloquent scope enforces tenancy.
-9. **Compliance over ergonomics.** When DOLE / BIR rules conflict with a "nice" implementation, regulation wins.
+## 2. Architectural goals & constraints
 
----
+- **Single source of truth** — all branches' data in one central database.
+- **Distributed capture** — biometric devices live on separate branch LANs.
+- **No inbound access to branches** — a central server can't reach `192.168.x.x`
+  at each branch, so **devices push data outward** to the center (see ADMS, §8).
+- **Multi-company / multi-branch tenancy** with scoped access.
+- **Cloud-hostable** with a **minimal local footprint** per branch (ideally none).
+- **Idempotent, offline-tolerant ingestion** — devices may buffer and re-send.
 
-## 3. Tech stack & rationale
-
-| Layer | Choice | Why this, not the alternative |
-| --- | --- | --- |
-| Backend | **Laravel 11** (PHP 8.3+) | Mature ecosystem, queues, scheduler, batteries-included. PH dev market knows it. Strong replacement candidates (Django, NestJS) bring no decisive win here. |
-| API style | **REST** + Laravel API Resources | Simpler than GraphQL for an internal CRUD-heavy system; well-understood by all stakeholders. |
-| Auth | **Laravel Sanctum** | First-party. Supports both SPA (cookie) and token (mobile) modes. JWT is overkill here. |
-| RBAC | **spatie/laravel-permission** | Industry standard for Laravel; battle-tested. |
-| Audit | **spatie/laravel-activitylog** + custom `payroll_audit_log` | General activity log is noisy; payroll needs a dedicated, append-only, field-diff trail for BIR audits. |
-| File mgmt | **spatie/laravel-medialibrary** | Handles 201 file attachments, payslip PDFs, conversions. |
-| Frontend | **Next.js 14 (App Router)** | User knows it. Server Components reduce bundle size. Mobile-friendly out of the box. |
-| UI library | **shadcn/ui** + Tailwind CSS | Copy-paste components; no vendor lock-in; accessibility built-in. |
-| Data fetching | **TanStack Query** | Caching, optimistic updates, request dedup. |
-| Forms | **react-hook-form** + **zod** | Type-safe validation shared between client and (optionally) server. |
-| Database | **MySQL 8 / MariaDB 10.6+** (XAMPP locally) | `DECIMAL(15,4)` for money is identical to Postgres `NUMERIC`. MySQL `JSON` replaces Postgres `JSONB` (validated JSON, slightly less optimized — acceptable). Standardize all timestamps on **UTC** since MySQL lacks `timestamptz`. Chosen for operational familiarity (phpMyAdmin GUI, XAMPP bundling). |
-| Cache / Queue | **Database driver (dev) → Redis 7 (prod)** | Local dev uses MySQL-backed `cache` and `jobs` tables to avoid extra services. Production swaps to Redis once deployed. |
-| Search | **MySQL FULLTEXT** | Avoid Elasticsearch operational overhead until scale demands it. |
-| File storage | **Local filesystem (dev) → S3 / DO Spaces (prod)** | `storage/app/` for local dev; flysystem S3 driver in prod. |
-| PDF | **Laravel-Snappy** (wkhtmltopdf) | Pixel-perfect payslip / BIR form rendering. DomPDF is acceptable fallback. |
-| Email | Laravel Mail + **Resend** or **SES** | Transactional emails for payslips, approvals. |
-| Local dev | **XAMPP** (Apache + MySQL/MariaDB + phpMyAdmin) on Windows | Already installed; lower friction than Docker. Production still targets Linux + Forge. |
-| CI/CD | **GitHub Actions** | Free for private repos at this team size. |
-| Production hosting | **Laravel Forge** on DigitalOcean (Singapore region) | Low latency to PH users; sysadmin offloaded to Forge. |
-
----
-
-## 4. High-level architecture
+## 3. High-level topology
 
 ```
-                    ┌─────────────────────────────────────┐
-                    │  Browsers (HR admins, employees,    │
-                    │  managers — desktop & mobile web)   │
-                    └────────────────┬────────────────────┘
-                                     │ HTTPS
-                                     ▼
-                    ┌─────────────────────────────────────┐
-                    │   Next.js 14 — App Router           │
-                    │   • Server Components               │
-                    │   • TanStack Query                  │
-                    │   • shadcn/ui + Tailwind            │
-                    │   • Auth: Sanctum cookie session    │
-                    └────────────────┬────────────────────┘
-                                     │ REST /api/v1 (JSON)
-                                     ▼
-                    ┌─────────────────────────────────────┐
-                    │   Laravel 11 — API                  │
-                    │  ┌─────────────────────────────────┐│
-                    │  │  HTTP Layer (controllers,       ││
-                    │  │  resources, form requests)      ││
-                    │  └─────────────────────────────────┘│
-                    │  ┌─────────────────────────────────┐│
-                    │  │  Domain Modules                 ││
-                    │  │  HRIS · Attendance · Leave      ││
-                    │  │  Payroll Engine · Gov Reports   ││
-                    │  └─────────────────────────────────┘│
-                    │  ┌─────────────────────────────────┐│
-                    │  │  Jobs · Events · Policies       ││
-                    │  └─────────────────────────────────┘│
-                    └────────┬───────────┬───────────┬────┘
-                             │           │           │
-                  ┌──────────▼─┐  ┌──────▼────┐  ┌──▼─────────┐
-                  │  MySQL 8 / │  │ DB driver │  │  Local FS  │
-                  │  MariaDB   │  │  (dev) →  │  │  (dev) →   │
-                  │  (XAMPP)   │  │  Redis    │  │  S3 (prod) │
-                  └────────────┘  └──────┬────┘  └────────────┘
-                                         │
-                                  ┌──────▼─────────┐
-                                  │ Queue Worker(s)│
-                                  │ (payroll runs, │
-                                  │  PDF gen,      │
-                                  │  gov reports)  │
-                                  └────────────────┘
+   BRANCH A                 BRANCH B                 BRANCH C
+ ┌──────────┐             ┌──────────┐             ┌──────────┐
+ │ Biometric│             │ Biometric│             │ Biometric│
+ │ device(s)│             │ device(s)│             │ device(s)│
+ └────┬─────┘             └────┬─────┘             └────┬─────┘
+      │ ADMS push (HTTPS)      │                        │
+      └───────────────┬───────┴────────────────────────┘
+                      ▼
+            ┌─────────────────────┐        ┌────────────────────┐
+            │   Central API        │  uses  │  PostgreSQL        │
+            │   (Laravel)          │◄──────►│  (Supabase / mgd)  │
+            │  - ingestion         │        └────────────────────┘
+            │  - DTR engine        │        ┌────────────────────┐
+            │  - payroll, leave    │  jobs  │  Queue + Workers   │
+            │  - RBAC / auth       │◄──────►│  (recompute, mail) │
+            └──────────┬──────────┘        └────────────────────┘
+                       ▲  HTTPS / JSON (Sanctum cookie)
+                       │
+            ┌──────────┴──────────┐
+            │  Web frontend        │  ← HR, payroll, managers, employees
+            │  (Next.js, hosted)   │     (any branch, any browser)
+            └─────────────────────┘
 ```
 
----
+Per branch: just the device(s) pushing out. No branch server required when devices
+speak ADMS (§8). A small local **sync agent** is only needed for pull-only devices.
 
-## 5. Domain modules
+## 4. Components
 
-```
-app/
-└── Domain/
-    ├── HRIS/             # employees, contracts, org structure
-    ├── Attendance/       # schedules, time logs, DTR, OT
-    ├── Leave/            # leave types, balances, applications, approvals
-    ├── Payroll/          # pay periods, runs, payslips, computation engine
-    ├── Government/       # SSS / PhilHealth / Pag-IBIG / BIR brackets + reports
-    └── Identity/         # users, roles, permissions, audit (cross-cutting)
-```
+| Component | Tech | Responsibility |
+|---|---|---|
+| Web frontend | Next.js 16 (App Router), TypeScript, TanStack Query, Tailwind | All user UIs; talks to the API over HTTPS |
+| API / app server | Laravel (PHP 8.3), DDD layout | Business logic, ingestion, auth, REST API |
+| Database | PostgreSQL (Supabase or managed) | System of record |
+| Ingestion layer | Laravel controllers + adapters | Receive punches from devices (ADMS push / ISAPI pull) |
+| Background workers | Queue (Redis or DB driver) | DTR recompute, payroll compute, notifications, mail |
+| File storage | S3-compatible / Supabase Storage | Attachments, payslip PDFs *(planned)*, imports |
+| Auth | Sanctum (cookie/session) | User auth; device auth by serial + token |
 
-Each domain owns its: models, services, jobs, events, policies, validators, API controllers. Cross-domain communication is through **events** (e.g., `PayslipFinalized` → triggers employee email notification).
+## 5. Domain model (DDD modules)
 
----
+The backend is organized by domain under `app/Domain/*`:
 
-## 6. Multi-tenancy
+- **Identity** — `Company`, `Branch`, `User`, company↔user membership, `CompanyScope`.
+- **HRIS** — `Employee` (+ dependents, education, emergency contacts, employment
+  history, government IDs, bank accounts, contracts), org structure
+  (`Department`, `Position`, `EmploymentType`).
+- **Attendance** — `AttendanceDevice`, `TimeLog`, `DailyTimeRecord` (DTR),
+  `WorkSchedule`/`WorkScheduleDay`, `EmployeeSchedule`, `Holiday`,
+  `ShiftAdjustment`, request types (overtime/undertime/official-business/
+  certificate-of-attendance/correction). Services: `DtrComputer`,
+  `AttendanceCorrectionApplier`, biometric `HikvisionIsapiClient` + `BiometricSyncService`.
+- **Leave** — `LeaveType`, `LeaveBalance`, `LeaveApplication`, `LeaveBalanceService`.
+- **Payroll** — `EmployeeCompensation`, `PayrollRun`, `Payslip`. Services:
+  `PayrollComputer`, `StatutoryCalculator`.
+- **AccessControl** — `AccessRequest` + supervisor→HR→IT approval workflow.
 
-**Strategy:** single database, shared schema, `company_id` foreign key.
+The web/HTTP layer (`app/Http/*`) exposes these as a versioned REST API
+(`/api/v1/...`) with FormRequest validation and API Resources.
 
-- `companies` table is the tenant root.
-- Every business table includes `company_id` (NOT NULL, indexed).
-- A global Eloquent scope (`CompanyScope`) auto-filters all queries by the authenticated user's active company.
-- A user may belong to multiple companies (via `company_user` pivot), and switches active company via UI; the active company is held in the session.
-- `super_admin` role bypasses the global scope.
+## 6. Tenancy & access model
 
-**Why not schema-per-tenant?** Operational complexity (migrations × N schemas), no real isolation benefit at our scale.
-**Why not DB-per-tenant?** Same — plus disqualifies cheap managed Postgres tiers.
+- **Company = tenant.** Spatie Permission runs in **teams mode** with the team =
+  `company_id`; roles/permissions are scoped per company.
+- **Branch** is a sub-unit of a company; employees, devices, and holidays carry
+  `branch_id`; data and reports can be filtered by branch.
+- **`CompanyScope`** global scope auto-filters most models by the actor's
+  `active_company_id`; **IT Admin** bypasses it (top-level administrator).
+- **Roles** (13): it_admin (full), hr_admin, payroll_officer, dept_head,
+  supervisor, team_lead, dept_admin, timekeeper, hr_coordinator, transport_access,
+  sales_employee, garahe_teamlead, employee — each a permission set.
+- **"View as role"** lets IT Admin preview any role's navigation/access.
 
----
+## 7. Request / auth flow
 
-## 7. Authentication & authorization
+1. Frontend gets a CSRF cookie (`/sanctum/csrf-cookie`), then `POST /api/v1/login`.
+2. Sanctum issues a **stateful session cookie**; subsequent requests are
+   cookie-authenticated, with the active company resolved per request.
+3. Permission middleware sets the Spatie team to `active_company_id`.
+4. Authorization is enforced in FormRequests / controllers via `can(...)`.
 
-### Authentication
-- Laravel Sanctum.
-- Web: SPA cookie session (CSRF-protected).
-- Mobile (future): personal access tokens.
-- Password policy: min 10 chars, complexity enforced, bcrypt hash.
-- Failed-login throttle: 5 attempts / IP / 15 min.
-- 2FA (TOTP) — Phase 5+ for HR admins and payroll officers.
+## 8. Biometric attendance — data flow & ingestion
 
-### Authorization
-- Spatie `laravel-permission`. Roles and permissions are scoped per company.
-
-**Default role set:**
-
-| Role | Scope | Sample capabilities |
-| --- | --- | --- |
-| `super_admin` | global | Everything across all companies |
-| `hr_admin` | company | Manage employees, leaves, attendance, settings |
-| `hr_manager` | company | Approve leave, view all dept data, no payroll write |
-| `payroll_officer` | company | Run payroll, manage compensation, generate gov reports |
-| `dept_head` | dept | Approve own-dept leave, view own-dept attendance |
-| `employee` | self | Self-service: own DTR, payslips, file leave |
-
-Permissions are granular (e.g., `payroll.run`, `payroll.approve`, `employee.create`, `leave.approve.self_dept`) and bundled into roles via seeders.
-
-Enforcement: Laravel **Policies** for model authorization + route middleware for coarse gating.
-
----
-
-## 8. Audit & compliance
-
-Two-tier strategy:
-
-| Tier | Logged via | Stores | Purpose |
-| --- | --- | --- | --- |
-| 1. General activity | `spatie/laravel-activitylog` | `activity_log` table | Who created/updated/deleted what model. Used for general traceability. |
-| 2. Payroll audit | Custom `PayrollAuditLogger` service | `payroll_audit_log` table (append-only) | Field-level diffs on payroll runs, payslips, compensations, contributions. Required for BIR / DOLE audit. |
-
-**Append-only enforcement:** the payroll audit table has no `UPDATE` or `DELETE` privilege granted to the application's DB role.
-
----
-
-## 9. Background processing
-
-All operations exceeding ~2s of work must be queued.
-
-| Job | Trigger | Driver |
-| --- | --- | --- |
-| `RunPayrollJob` | Payroll officer clicks "Run" | Redis queue, `payroll` connection |
-| `GeneratePayslipPdfJob` | Per employee after payroll run | Redis queue, `pdf` connection |
-| `EmailPayslipJob` | After PDF generated | Redis queue, `notifications` connection |
-| `ImportBiometricLogsJob` | CSV upload | Redis queue, `imports` connection |
-| `GenerateGovReportJob` | HR officer requests BIR / SSS / PHIC / HDMF report | Redis queue, `reports` connection |
-| `RecalculateLeaveBalancesJob` | Year-end, leave-type change | Redis queue, `default` |
-
-Queue runner: `supervisor`-managed `php artisan queue:work` workers in production (one worker per connection above).
-
----
-
-## 10. Security baseline
-
-- HTTPS-only (HSTS).
-- All money fields: `DECIMAL(15,4)` — never floats.
-- PII at rest: TIN, SSS#, PhilHealth#, Pag-IBIG# are encrypted via Laravel `Crypt::encryptString` (column-level).
-- Rate limit: auth endpoints 5/min/IP; general API 60/min/user.
-- Input validation: every endpoint uses a Laravel **Form Request**.
-- SQL injection: Eloquent + parameterized queries only — `DB::raw()` is forbidden outside reviewed analytics queries.
-- XSS: Next.js auto-escapes; backend never returns HTML.
-- CSRF: Sanctum SPA mode.
-- File uploads: MIME-type whitelist, max 10 MB, antivirus scan optional (Phase 5+).
-- Backups: nightly `pg_dump` → encrypted offsite S3 bucket, 30-day rolling retention + monthly snapshots kept 12 months.
-- Secrets: `.env` never committed; production secrets in Forge's environment manager.
-
----
-
-## 11. Repository layout
+The capture protocol is **decoupled** from the rest of the system; only the
+ingestion adapter is vendor-specific.
 
 ```
-meatplus-hris/
-├── backend/                       # Laravel 11
-│   ├── app/
-│   │   ├── Domain/                # HRIS, Attendance, Leave, Payroll, Government, Identity
-│   │   ├── Http/
-│   │   ├── Models/                # Base models (light)
-│   │   ├── Providers/
-│   │   └── Support/
-│   ├── bootstrap/
-│   ├── config/
-│   ├── database/
-│   │   ├── factories/
-│   │   ├── migrations/
-│   │   └── seeders/
-│   ├── routes/
-│   ├── tests/
-│   │   ├── Feature/
-│   │   └── Unit/
-│   └── composer.json
-├── frontend/                      # Next.js 14
-│   ├── app/
-│   │   ├── (auth)/                # login, forgot password
-│   │   ├── (admin)/               # HR admin shell
-│   │   │   ├── employees/
-│   │   │   ├── attendance/
-│   │   │   ├── leave/
-│   │   │   ├── payroll/
-│   │   │   └── reports/
-│   │   ├── (employee)/            # Self-service shell
-│   │   └── api/                   # Next.js API routes (BFF if needed)
-│   ├── components/
-│   │   ├── ui/                    # shadcn/ui primitives
-│   │   └── features/
-│   ├── hooks/
-│   ├── lib/                       # api client, auth, utils
-│   └── package.json
-├── docs/
-│   ├── 01-architecture.md         # this file
-│   ├── 02-database-schema.md
-│   └── (more to come)
-├── docker/
-│   ├── nginx/
-│   ├── php/
-│   └── postgres/
-├── compose.yml                    # docker-compose root
-└── README.md
+Device scan → [ingestion adapter] → TimeLog → DtrComputer → DailyTimeRecord → Payroll
+                                       │
+                          map device PIN → employee.biometric_user_id
 ```
 
----
+**Enrollment / identity mapping**
+- Each person is enrolled on the device under a numeric **PIN / "Employee No."**.
+- The sync maps that to `employee.biometric_user_id` (fallback: `employee_no`).
+- Unmatched scans are reported as *unmapped* and skipped — never lost.
 
-## 12. Deployment topology
+**Ingestion adapters**
+- **ADMS push (built — ZKTeco; current production path):** the device is configured
+  with the server URL and **POSTs attendance records to it** (the `iclock/cdata`
+  protocol). Works outbound through any branch firewall/NAT; **no per-branch server
+  needed.** Implemented in `routes/iclock.php` (middleware-free), `IclockController`,
+  and `AdmsIngestionService`. Devices **auto-register by serial** on first contact and
+  every raw request is logged to `storage/logs/iclock.log`. Hardware in use: **ZKTeco
+  MB460**. See [06-biometric-zkteco.md](06-biometric-zkteco.md).
+- **ISAPI pull (legacy/optional — Hikvision):** the server *pulls* events from the
+  device by IP over ISAPI (`HikvisionIsapiClient` + `BiometricSyncService`). Requires
+  the server to reach the device LAN, so it's only for on-site/test use.
 
-| Environment | Infra |
-| --- | --- |
-| **Local dev** | XAMPP on Windows: Apache + MySQL/MariaDB + phpMyAdmin. Laravel served as Apache vhost from `backend/public/`. Next.js runs on `node` (port 3000). Cache + queue use MySQL driver; storage = local filesystem; mail = log driver. |
-| **Staging** | Single DO droplet (4 GB) via Forge. Nginx + php-fpm + MySQL 8 + Redis + local FS. |
-| **Production (initial)** | DO droplet (8 GB CPU-optimized) for app + managed MySQL 8 + managed Redis + DO Spaces (S3). |
-| **Production (scaled)** | Add: read replicas, dedicated worker droplet, CDN (BunnyCDN / Cloudflare), separate DB for analytics. |
+**Guarantees**
+- **Idempotent** — punches are deduped on `(device_id, source_event_id)`.
+- **Direction** — from the device's attendance status (check-in/out/break) when
+  provided, else inferred by daily alternation.
+- **Timezone** — stored per device; punches normalized to the device's local time.
+- **Offline tolerance** — devices buffer scans and re-send; dedup absorbs replays.
+- **Recompute** — after ingest (and on approval of leave/OT/corrections), the
+  affected employee+date range is re-run through `DtrComputer`.
 
----
+**Device registry & auth**
+- `attendance_devices` holds each device (branch, vendor, serial, timezone,
+  credentials encrypted at rest).
+- Devices authenticate by **serial number + a registration/token** *(token: planned)*.
 
-## 13. Observability
+## 9. Key data stores
 
-| Concern | Tool |
-| --- | --- |
-| Application logs | Laravel logs → BetterStack (or Papertrail) |
-| Errors | Sentry (free tier suffices initially) |
-| Uptime | BetterUptime (5 pings: app, API health, queue health, DB, Redis) |
-| Performance | Laravel Pulse (first-party, free) |
-| DB slow queries | `pg_stat_statements` enabled, weekly review |
+| Table | Holds |
+|---|---|
+| `companies`, `branches`, `users`, `company_user` | tenancy & accounts |
+| `employees` (+ sub-tables), `departments`, `positions`, `employment_types` | HR records & org |
+| `attendance_devices` | device registry (per branch) |
+| `time_logs` | raw punches (append-only; idempotent) |
+| `daily_time_records` | computed daily summary (hours, late, OT, night-diff, leave) |
+| `work_schedules`/`_days`, `employee_schedules`, `holidays`, `shift_adjustments` | schedule inputs |
+| `leave_types`, `leave_balances`, `leave_applications` | leave |
+| `employee_compensations`, `payroll_runs`, `payslips` | payroll |
+| `permissions`, `roles`, `model_has_roles`, … | RBAC |
+| `notifications`, `access_requests*` | notifications & access workflow |
 
----
+## 10. Security
 
-## 14. Scaling roadmap
+- **Transport:** HTTPS everywhere (devices → API, browser → API).
+- **User auth:** Sanctum cookie/session; CORS locked to the frontend origin.
+- **RBAC:** team-scoped Spatie permissions; IT-Admin escalation guarded.
+- **Device auth:** serial + token *(planned)*; device credentials encrypted at rest.
+- **Secrets:** environment-based; no secrets in VCS.
+- **Hardening (planned):** force-reset of shared seed passwords, password policy,
+  2FA, account lockout, audit logging (activitylog is installed but unused).
 
-| Trigger | Action |
-| --- | --- |
-| > 50 concurrent users | Profile slow queries, add Redis caching tier for org lookups |
-| > 1 000 employees / payroll > 5 min | Chunk payroll job per dept/batch; multiple parallel workers |
-| > 5 concurrent payroll runs | Horizontal scale workers; dedicated `payroll` queue connection |
-| > 10 000 employees | Read replicas; partition `payslips`, `payslip_items`, `time_logs` by year |
-| > 50 000 employees / multi-region | Reconsider monolith — extract Payroll service; introduce event bus |
+## 11. Reliability & scale
 
----
+- **Stateless API** → scales horizontally behind a load balancer.
+- **Queue workers** for heavy/async work (DTR recompute, payroll, mail).
+- **Idempotent ingestion** → safe device retries; no double punches.
+- **Indexes** on hot columns (`employee_id`, `work_date`, `logged_at`, `company_id`).
+- **Recompute is bounded** to affected employee+date ranges, not full rebuilds.
+- **Branch isolation of failure** — one branch's device/network issue doesn't
+  affect others; its scans simply arrive when connectivity returns.
 
-## 15. Open questions / decisions deferred
+## 12. Environments & delivery
 
-- [ ] Biometric device model(s) in use at Meatplus — drives integration approach (CSV poll vs. ZKTeco SDK vs. push).
-- [ ] Number of legal entities under "Meatplus" — confirms multi-company necessity.
-- [ ] Current payroll provider (Sprout? In-house Excel? other?) — drives migration data import scope.
-- [ ] Pay frequency policy: semi-monthly, monthly, weekly? Multiple per company?
-- [ ] Government remittance method preferred — manual file generation vs. eGov direct submission.
-- [ ] Existing accounting system to integrate with (QuickBooks / SAP / Xero / custom)?
+- **Local dev / current run:** a **Laragon** stack (PHP 8.3 + Node) on Windows.
+  `start-app.bat` launches the Laravel API (`php artisan serve --host=0.0.0.0`, so the
+  biometric device can reach it on the LAN) and the Next.js frontend. The database is
+  **Supabase Postgres** (cloud). See [04-setup-supabase-laragon.md](04-setup-supabase-laragon.md).
+- **Staging / production (planned):** Next.js hosted (e.g., Vercel); Laravel on a
+  managed PHP host (PHP-FPM/Octane); queue worker; scheduled tasks (`schedule:run`).
+- **CI/CD (planned):** automated tests + deploy pipeline.
+
+## 13. Tech stack
+
+- **Backend:** Laravel (PHP 8.3), Sanctum, Spatie Permission (teams), openspout
+  (CSV/XLSX), domain-driven layout.
+- **Frontend:** Next.js 16 (App Router), TypeScript, TanStack Query, Tailwind, sonner.
+- **Database:** PostgreSQL (**Supabase**, `ap-southeast-1`) — **live**. The codebase is
+  driver-agnostic (Postgres + MySQL) via a `likeOperator()` helper (ILIKE/LIKE),
+  driver-aware migrations (`ALTER COLUMN` vs `MODIFY`), and `DB_SSLMODE`.
+- **Async:** queue (database driver today; Redis in prod) + scheduler.
+
+## 14. Migration path (progress)
+
+1. **DB → Supabase Postgres — ✅ done.** Provisioned, MySQL-specific bits ported
+   (driver-aware migrations, ILIKE/LIKE), schema + data migrated. (Old XAMPP/MySQL
+   retired in favor of Laragon + Supabase.)
+2. **Devices → ADMS — ✅ done (receiver).** ADMS endpoint built; ZKTeco MB460 in
+   onboarding (point device at the server, enroll employees: PIN ↔ `biometric_user_id`).
+3. **App hosting — ⏳ planned.** Deploy Laravel to a managed PHP host (PHP-FPM/Octane);
+   enable a queue worker + scheduler.
+4. **Frontend hosting — ⏳ planned.** Deploy and point at the hosted API origin via an
+   env-driven backend URL (replace the `localhost:8000` proxy).
+5. **Cutover — ⏳ planned.** Run parallel, verify attendance/payroll, then go cloud-hosted
+   so the app is reachable from any browser.
+
+## 15. Open decisions
+
+- **Database host:** Supabase Postgres (recommended) vs other managed Postgres/MySQL.
+- **App host:** Laravel Cloud / Railway / Render / VPS.
+- **Frontend host:** Vercel / Netlify / same host.
+- **Biometric device vendor/model** (determines exact ADMS protocol variant).
+- **Queue driver:** Redis vs database.
+
+## 16. Roadmap (not yet built)
+
+Org-structure admin (departments/positions/branches) • employee government IDs + bank
+accounts UI • printable/PDF payslips + employee self-service • loans/other deductions,
+13th-month, gov remittance reports • reporting & analytics • audit logging (activitylog
+installed, unused) • per-device push tokens + disable auto-register • production hardening
+(2FA, password policy, force-reset of shared seed passwords, tests/CI, real mail/queue).

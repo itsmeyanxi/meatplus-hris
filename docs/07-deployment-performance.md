@@ -1,13 +1,15 @@
-# Go-Live Performance Checklist
+# Deployment & Performance Checklist
 
 Performance steps to run **at deployment**, not during active development.
 Each item notes *why*, the *command*, and the *dev-loop caveat* (why we don't do it
 while building).
 
-> Context: dev runs Next.js (`npm run dev`) + Laravel (`php artisan serve`) on XAMPP.
-> Production target (per README) is Laravel Forge + Next.js. The dev box already has
-> **OPcache enabled** (see "OPcache" below) — keep it, but switch to the production
-> settings noted there when you deploy.
+> **Context (current):** the app runs on a **Laragon** stack (PHP 8.3 + Node) against a
+> **Supabase Postgres** database (`ap-southeast-1`). `start-app.bat` already serves the
+> **production frontend build** (`npm run build && npm run start`) — adopted because dev
+> mode's on-demand compiling was the biggest source of slow page loads. The remaining
+> latency is the ~145 ms/query round-trip to the cloud DB (see "Database latency" below).
+> Production target is a hosted Laravel (PHP-FPM/Octane) + hosted Next.js.
 
 ---
 
@@ -101,9 +103,26 @@ Boots the app once, keeps it in memory.
 
 ---
 
-## 5. Data layer (prod env)
+## 5. Database latency (Supabase)
 
-Per README, dev uses DB drivers; production should use Redis + S3.
+The DB is **Supabase Postgres in Singapore (`ap-southeast-1`)**; the app currently runs
+on a local laptop. Measured round-trip is **~145 ms per query**, so a page that issues
+10–25 queries spends **1.5–3.6 s** purely waiting on the network — independent of code or
+CPU. To address it:
+
+- **Reduce queries per page** — eager-load relations (the employee list already does),
+  cache static lookups. Helps, but the floor is ~1 s/page.
+- **Run the database locally** (Postgres on the server box), keep Supabase as backup —
+  drops query latency to **<1 ms**; pages become near-instant. Best for an on-site server.
+- **Host the app next to the DB** (same datacenter) — app↔DB <1 ms *and* reachable from
+  any browser. The production end-state.
+
+> Sessions and cache are already on the **`file`** driver (local disk), so they do **not**
+> add remote round-trips — good, leave them.
+
+## 6. Data layer (prod env)
+
+In production, swap the local drivers for Redis + S3.
 
 ```env
 CACHE_STORE=redis
@@ -120,7 +139,7 @@ FILESYSTEM_DISK=s3          # or DO Spaces
 
 ---
 
-## 6. Quick release script (sketch)
+## 7. Quick release script (sketch)
 
 ```bash
 # backend

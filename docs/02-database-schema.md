@@ -1,15 +1,29 @@
 # Meatplus HRIS — Database Schema
 
-> **Engine:** MySQL 8 / MariaDB 10.6+ (InnoDB, `utf8mb4_unicode_ci`)
+> **Engine (live):** **PostgreSQL** (Supabase, `ap-southeast-1`). This doc was first
+> written against MySQL 8 and the **types below use MySQL spelling** — read them as the
+> design contract, with the Postgres equivalents noted under "Portability" below. The
+> Laravel migration files are the executable source of truth.
 > **Naming:** `snake_case`, plural table names, singular column names.
-> **Money:** all monetary columns use `DECIMAL(15,4)`.
-> **Timestamps:** every table has `created_at`, `updated_at` (and `deleted_at` where soft-deletable). All times stored as **UTC**.
-> **JSON:** Postgres `JSONB` → MySQL `JSON` (validated JSON, slightly less optimized — fine for our volumes).
-> **IP addresses:** Postgres `inet` → MySQL `VARCHAR(45)` (fits IPv6).
-> **Tenancy:** every business table includes `company_id BIGINT UNSIGNED REFERENCES companies(id)` unless explicitly global.
+> **Money:** all monetary columns use `DECIMAL(15,4)` (Postgres `NUMERIC(15,4)`).
+> **Timestamps:** every table has `created_at`, `updated_at` (and `deleted_at` where soft-deletable). Times stored as **UTC**.
+> **Tenancy:** every business table includes `company_id` (FK → `companies(id)`) unless explicitly global.
 > **PII encryption:** columns marked **🔒** are encrypted at rest via Laravel `Crypt`.
 
-This document is the canonical schema for v1. Migration files will be the executable source of truth; this doc is the design contract.
+### Portability (MySQL ⇄ Postgres)
+The codebase runs on **both** engines; the app is kept driver-agnostic:
+
+| Concern | MySQL | PostgreSQL (current) |
+|---|---|---|
+| Money | `DECIMAL(15,4)` | `NUMERIC(15,4)` |
+| JSON | `JSON` | `JSONB` |
+| IP address | `VARCHAR(45)` | `inet` (we use varchar for portability) |
+| Auto-id | `BIGINT UNSIGNED AUTO_INCREMENT` | `bigserial` |
+| Case-insensitive search | `LIKE` | `ILIKE` — via `Controller::likeOperator()` |
+| Relax NOT NULL | `MODIFY col … NULL` | `ALTER COLUMN col DROP NOT NULL` — driver-aware migration |
+| TLS | n/a | `DB_SSLMODE` (`prefer`/`require`) |
+
+This document is the canonical schema for v1; migration files are the executable source of truth.
 
 ---
 

@@ -59,3 +59,7 @@ docker/minio-data/
 *.tar.gz
 *.zip
 dist/
+
+# Generated employee exports (contain PII — keep out of the repo)
+employee_import_ready.csv
+employee_list_*.csv

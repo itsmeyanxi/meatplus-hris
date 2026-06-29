@@ -27,8 +27,11 @@ cd /d "C:\xampp\htdocs\meatplus-hris\backend"
 start "Meatplus Backend" /min cmd /k "php artisan serve --host=0.0.0.0 --port=8000"
 
 REM --- Frontend (Next.js) -> http://localhost:3000 ---
+REM  PRODUCTION mode: build once on startup, then serve the optimized build.
+REM  This is dramatically faster to load than "npm run dev" (no on-demand
+REM  compiling, minified JS). The one-time build adds ~1-2 min to startup.
 cd /d "C:\xampp\htdocs\meatplus-hris\frontend"
-start "Meatplus Frontend" /min cmd /k "npm run dev"
+start "Meatplus Frontend" /min cmd /k "npm run build && npm run start"
 
 echo.
 echo Started! Two minimized windows are running the app.
