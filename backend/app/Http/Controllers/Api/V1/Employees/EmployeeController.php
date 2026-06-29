@@ -76,30 +76,32 @@ class EmployeeController extends Controller
             'company:id,code,legal_name,trade_name', 'branch:id,name',
         ]);
 
+        $op = $this->likeOperator();
+
         if ($search = $request->query('q')) {
             $like = '%'.str_replace('%', '\%', $search).'%';
-            $query->where(function ($q) use ($like) {
-                $q->where('employee_no', 'like', $like)
-                    ->orWhere('first_name', 'like', $like)
-                    ->orWhere('last_name', 'like', $like)
-                    ->orWhere('email_company', 'like', $like)
-                    ->orWhereHas('department', function ($departmentQuery) use ($like) {
-                        $departmentQuery->where('name', 'like', $like);
+            $query->where(function ($q) use ($like, $op) {
+                $q->where('employee_no', $op, $like)
+                    ->orWhere('first_name', $op, $like)
+                    ->orWhere('last_name', $op, $like)
+                    ->orWhere('email_company', $op, $like)
+                    ->orWhereHas('department', function ($departmentQuery) use ($like, $op) {
+                        $departmentQuery->where('name', $op, $like);
                     });
             });
         }
 
         // Dedicated field filters (combine with AND).
         if ($no = $request->query('employee_no')) {
-            $query->where('employee_no', 'like', '%'.str_replace('%', '\%', $no).'%');
+            $query->where('employee_no', $op, '%'.str_replace('%', '\%', $no).'%');
         }
 
         if ($name = $request->query('name')) {
             $like = '%'.str_replace('%', '\%', $name).'%';
-            $query->where(function ($q) use ($like) {
-                $q->where('first_name', 'like', $like)
-                    ->orWhere('last_name', 'like', $like)
-                    ->orWhereRaw("CONCAT(first_name, ' ', last_name) like ?", [$like]);
+            $query->where(function ($q) use ($like, $op) {
+                $q->where('first_name', $op, $like)
+                    ->orWhere('last_name', $op, $like)
+                    ->orWhereRaw("CONCAT(first_name, ' ', last_name) {$op} ?", [$like]);
             });
         }
 

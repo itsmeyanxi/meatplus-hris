@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getMe } from "@/lib/auth";
 import { myAttendanceApi } from "@/lib/attendance";
 import { leaveBalancesApi } from "@/lib/leaves";
@@ -114,18 +114,21 @@ export default function DashboardPage() {
 
       {/* Hero */}
       <section className="relative overflow-hidden rounded-3xl bg-slate-900 px-4 py-5 text-white shadow-xl sm:px-8">
-        <div className="relative z-10">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-            {MONTHS[today.getMonth()]} {today.getDate()}, {today.getFullYear()}
-          </p>
-          <h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
-            Hello, {user.employee?.full_name || user.name || "there"}
-          </h2>
-          <p className="mt-2 max-w-xl text-sm text-slate-300">
-            {hasEmployee
-              ? "Here's your attendance and leave at a glance."
-              : "Manage your account and request access from one central place."}
-          </p>
+        <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              {MONTHS[today.getMonth()]} {today.getDate()}, {today.getFullYear()}
+            </p>
+            <h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
+              Hello, {user.employee?.full_name || user.name || "there"}
+            </h2>
+            <p className="mt-2 max-w-xl text-sm text-slate-300">
+              {hasEmployee
+                ? "Here's your attendance and leave at a glance."
+                : "Manage your account and request access from one central place."}
+            </p>
+          </div>
+          <LiveClock />
         </div>
         <div className="absolute -right-12 -top-12 h-64 w-64 rounded-full bg-slate-800 opacity-50" />
       </section>
@@ -333,6 +336,31 @@ function CollapsibleSection({
         </span>
       </button>
       {open && children}
+    </div>
+  );
+}
+
+function LiveClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const h = now.getHours();
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  const ap = h >= 12 ? "PM" : "AM";
+  const h12 = String(h % 12 || 12).padStart(2, "0");
+  const weekday = now.toLocaleDateString("en-US", { weekday: "long" });
+
+  return (
+    <div className="shrink-0 text-left sm:text-right" suppressHydrationWarning>
+      <div className="font-mono text-3xl font-bold tabular-nums tracking-tight sm:text-4xl">
+        {h12}:{mm}
+        <span className="text-lg font-semibold text-slate-400 sm:text-xl">:{ss} {ap}</span>
+      </div>
+      <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-slate-400">{weekday}</p>
     </div>
   );
 }

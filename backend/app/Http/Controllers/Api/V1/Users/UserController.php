@@ -28,8 +28,9 @@ class UserController extends Controller
 
         if ($search = $request->query('q')) {
             $like = '%'.str_replace('%', '\%', $search).'%';
-            $q->where(function ($w) use ($like) {
-                $w->where('name', 'like', $like)->orWhere('email', 'like', $like);
+            $op = $this->likeOperator();
+            $q->where(function ($w) use ($like, $op) {
+                $w->where('name', $op, $like)->orWhere('email', $op, $like);
             });
         }
 
