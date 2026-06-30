@@ -65,14 +65,17 @@ class IclockController extends Controller
     private function logRequest(Request $request): void
     {
         $entry = sprintf(
-            "[%s] %s %s\n%s\n%s\n",
+            "[%s] %s %s\nBODY: %s\n%s\n",
             now()->toDateTimeString(),
             $request->method(),
             $request->fullUrl(),
-            $request->getContent() !== '' ? 'BODY: '.$request->getContent() : 'BODY: (empty)',
+            $request->getContent() !== '' ? $request->getContent() : '(empty)',
             str_repeat('-', 60),
         );
 
-        @file_put_contents(storage_path('logs/iclock.log'), $entry, FILE_APPEND);
+        $written = file_put_contents(storage_path('logs/iclock.log'), $entry, FILE_APPEND | LOCK_EX);
+        if ($written === false) {
+            \Illuminate\Support\Facades\Log::channel('single')->info('iclock request (file write failed): ' . $entry);
+        }
     }
 }

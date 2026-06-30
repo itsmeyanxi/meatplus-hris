@@ -94,6 +94,7 @@ you used.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Nothing in `iclock.log` | Device can't reach the PC | Same network? Correct SERVER IP + port 8000? Firewall (Step 2)? |
+| Backend terminal shows **`Invalid request (Unsupported SSL request)`** | Device is trying HTTPS despite ADMS set to HTTP | Check **Menu → Comm. → Cloud Server**: `Enable HTTPS` = OFF, `Enable Domain Name` = OFF. Also check **Menu → System → Security** for a global SSL toggle. Save and reboot. |
 | Log shows the push, but no employee punch | PIN doesn't match | Set the employee's **Biometric ID** to the device PIN (Step 5) |
 | Punches show wrong time | Device clock is off | Set the device's date/time (or its timezone) correctly |
 | All punches show as "IN" | Device isn't tagging in/out | Set the device's **work/attendance status** per scan, or we infer by alternation |
