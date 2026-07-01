@@ -107,10 +107,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4 md:[zoom:0.95]">
-      <PageHeader
-        title="Dashboard"
-        description={`Welcome back, ${user.name || "User"}. Here is your overview.`}
-      />
+      <PageHeader title="Dashboard" />
 
       {/* Hero */}
       <section className="relative overflow-hidden rounded-3xl bg-slate-900 px-4 py-5 text-white shadow-xl sm:px-8">

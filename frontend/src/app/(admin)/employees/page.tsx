@@ -193,6 +193,7 @@ export default function EmployeesPage() {
             <tr>
               <Th>Employee #</Th>
               <Th>Name</Th>
+              <Th>Company</Th>
               <Th>Department</Th>
               <Th>Position</Th>
               <Th>Type</Th>
@@ -207,6 +208,7 @@ export default function EmployeesPage() {
                   <tr key={i} className="animate-pulse">
                     <Td><div className="h-4 w-20 rounded bg-slate-200" /></Td>
                     <Td><div className="h-4 w-40 rounded bg-slate-200" /></Td>
+                    <Td><div className="h-4 w-24 rounded bg-slate-200" /></Td>
                     <Td><div className="h-4 w-32 rounded bg-slate-200" /></Td>
                     <Td><div className="h-4 w-32 rounded bg-slate-200" /></Td>
                     <Td><div className="h-4 w-20 rounded bg-slate-200" /></Td>
@@ -218,14 +220,14 @@ export default function EmployeesPage() {
             )}
             {isError && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-red-600">
+                <td colSpan={8} className="px-4 py-6 text-center text-red-600">
                   Could not load employees (check you are signed in and have employee.view permission). Refresh the page.
                 </td>
               </tr>
             )}
             {!isLoading && !isError && data?.data.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-6 text-center text-slate-500">
                   No employees yet.{" "}
                   <Link href="/employees/new" className="text-slate-900 underline">
                     Add the first one
@@ -259,6 +261,7 @@ export default function EmployeesPage() {
                     {emp.full_name}
                   </span>
                 </Td>
+                <Td>{emp.company?.name ?? "—"}</Td>
                 <Td>{emp.department?.name ?? "—"}</Td>
                 <Td>{emp.position?.title ?? "—"}</Td>
                 <Td>{emp.employment_type?.name ?? "—"}</Td>

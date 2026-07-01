@@ -2,7 +2,7 @@
 
 > **Status:** Design doc — not yet implemented.
 
-The HRIS serves multiple companies (e.g. MTC, PASEI) from a single server and a single
+The HRIS serves multiple companies (e.g. Meatplus, PASEI) from a single server and a single
 database. Each company's data is isolated by a `company_id` column on every relevant
 table. Users only ever see their own company. Biometric devices from any company can be
 read correctly even if an employee from another company scans on them.
@@ -19,21 +19,21 @@ read correctly even if an employee from another company scans on them.
          │              │                             │              │
          ▼              └────────────┬────────────────┘              ▼
   ┌─────────────┐                    │                      ┌─────────────┐
-  │  MTC ADMIN  │                    ▼                      │ PASEI ADMIN │
+  │  Meatplus ADMIN  │                    ▼                      │ PASEI ADMIN │
   │  (browser)  │        ┌───────────────────────┐         │  (browser)  │
   └─────────────┘        │    ONE DATABASE       │         └─────────────┘
                          │                       │
                          │  companies            │
-                         │  ├─ MTC  (id=1)       │
+                         │  ├─ Meatplus  (id=1)       │
                          │  └─ PASEI (id=2)      │
                          │                       │
                          │  employees            │
-                         │  ├─ EMP-0001 (MTC)    │
-                         │  ├─ EMP-0002 (MTC)    │
+                         │  ├─ EMP-0001 (Meatplus)    │
+                         │  ├─ EMP-0002 (Meatplus)    │
                          │  └─ EMP-0001 (PASEI)  │
                          │                       │
                          │  devices              │
-                         │  ├─ MB460 → MTC       │
+                         │  ├─ MB460 → Meatplus       │
                          │  └─ MB460 → PASEI     │
                          └───────────────────────┘
 ```
@@ -47,7 +47,7 @@ companies
 ┌────┬─────────┬──────────┐
 │ id │ name    │ slug     │
 ├────┼─────────┼──────────┤
-│  1 │ MTC     │ mtc      │
+│  1 │ Meatplus     │ mtc      │
 │  2 │ PASEI   │ pasei    │
 └────┴─────────┴──────────┘
 
@@ -55,8 +55,8 @@ employees                               users
 ┌────┬────────────┬───────────── ─ ─    ┌────┬────────────┬──────────────┐
 │ id │ company_id │ employee_no  ...     │ id │ company_id │ email        │
 ├────┼────────────┼─────────────         ├────┼────────────┼──────────────┤
-│  1 │     1      │ MTC-0001             │  1 │     1      │ hr@mtc.ph    │
-│  2 │     1      │ MTC-0002             │  2 │     2      │ hr@pasei.ph  │
+│  1 │     1      │ Meatplus-0001             │  1 │     1      │ hr@mtc.ph    │
+│  2 │     1      │ Meatplus-0002             │  2 │     2      │ hr@pasei.ph  │
 │  3 │     2      │ PASEI-0001           └────┴────────────┴──────────────┘
 └────┴────────────┴─────────────
 
@@ -78,12 +78,12 @@ devices                                 attendance_logs
 ## What each user can see
 
 ```
-MTC HR login                          PASEI HR login
+Meatplus HR login                          PASEI HR login
 ──────────────────────────────────    ──────────────────────────────────
-Employees  → only MTC employees       Employees  → only PASEI employees
-Attendance → only MTC punches         Attendance → only PASEI punches
-Devices    → only MTC devices         Devices    → only PASEI devices
-Reports    → only MTC data            Reports    → only PASEI data
+Employees  → only Meatplus employees       Employees  → only PASEI employees
+Attendance → only Meatplus punches         Attendance → only PASEI punches
+Devices    → only Meatplus devices         Devices    → only PASEI devices
+Reports    → only Meatplus data            Reports    → only PASEI data
 ```
 
 This is enforced by a **global scope** (automatically added to every query) that
@@ -112,32 +112,32 @@ crosses company lines.
   │       WHERE biometric_user_id = '2'                      │
   │       LIMIT 1                                            │
   │                                                          │
-  │  4. Found: Kenth Alfred Condez (MTC, company_id = 1)    │
+  │  4. Found: Kenth Alfred Condez (Meatplus, company_id = 1)    │
   │                                                          │
   │  5. Save punch → attendance_logs.employee_id = Kenth's  │
   └──────────────────────────────────────────────────────────┘
          │
          ▼
-  MTC HR opens Attendance → sees Kenth's punch ✓
+  Meatplus HR opens Attendance → sees Kenth's punch ✓
   PASEI HR opens Attendance → does NOT see it  ✓
 ```
 
 The punch follows the **employee**, not the device. A PASEI device scanning an
-MTC employee still records the punch under MTC.
+Meatplus employee still records the punch under Meatplus.
 
 ---
 
 ## The PIN uniqueness rule
 
 Because the biometric lookup is global, **two employees at different companies cannot
-share the same PIN**. If MTC's Kenth is PIN `2` and PASEI also has someone enrolled
+share the same PIN**. If Meatplus's Kenth is PIN `2` and PASEI also has someone enrolled
 as PIN `2`, the lookup is ambiguous.
 
 **Recommended PIN scheme — use a company prefix:**
 
 | Company | PIN format | Example       |
 |---------|------------|---------------|
-| MTC     | `1` + 4-digit seq | `10001`, `10002` |
+| Meatplus     | `1` + 4-digit seq | `10001`, `10002` |
 | PASEI   | `2` + 4-digit seq | `20001`, `20002` |
 
 Enroll each person on the device using their company-prefixed PIN, then set that
@@ -181,7 +181,7 @@ production.
 
 ```
 Phase 1 — Database
-  [ ] Create companies table + seed MTC, PASEI
+  [ ] Create companies table + seed Meatplus, PASEI
   [ ] Add company_id to: users, employees, devices, branches, positions,
       departments, pay_grades (everything tenant-owned)
   [ ] Write migration; add indexes on (company_id, id)
@@ -201,7 +201,7 @@ Phase 4 — Devices
       (or manually assign in admin panel)
 
 Phase 5 — Testing
-  [ ] Log in as MTC HR → confirm no PASEI data leaks
+  [ ] Log in as Meatplus HR → confirm no PASEI data leaks
   [ ] Simulate cross-company scan → confirm punch lands on correct company
 ```
 
@@ -215,7 +215,7 @@ the IT admin. This user bypasses `CompanyScope` and can view/manage any company.
 ```
 Super-admin dashboard
   ┌──────────────────────────────────┐
-  │  Viewing: [ MTC ▼ ]             │  ← company switcher
+  │  Viewing: [ Meatplus ▼ ]             │  ← company switcher
   │                                 │
   │  Employees: 129                 │
   │  Devices:   2                   │
@@ -232,6 +232,6 @@ Super-admin dashboard
 | Separate databases per company? | No — one DB, scoped by `company_id` |
 | Employee numbers unique globally? | No — unique per company only |
 | Biometric PINs unique globally? | **Yes — required** (use company prefix) |
-| Can a PASEI device clock in an MTC employee correctly? | Yes — lookup is global, punch follows the employee |
-| Can PASEI HR see MTC data? | No — CompanyScope blocks it automatically |
+| Can a PASEI device clock in an Meatplus employee correctly? | Yes — lookup is global, punch follows the employee |
+| Can PASEI HR see Meatplus data? | No — CompanyScope blocks it automatically |
 | Who can see everything? | Super-admin (Meatplus IT) only |

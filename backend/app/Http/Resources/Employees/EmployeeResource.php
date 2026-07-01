@@ -48,6 +48,11 @@ class EmployeeResource extends JsonResource
                 'country' => $this->permanent_country,
             ],
 
+            'company' => $this->whenLoaded('company', fn () => [
+                'id' => $this->company->id,
+                'code' => $this->company->code,
+                'name' => $this->company->trade_name ?? $this->company->legal_name,
+            ]),
             'branch' => $this->whenLoaded('branch', fn () => [
                 'id' => $this->branch->id,
                 'name' => $this->branch->name,
