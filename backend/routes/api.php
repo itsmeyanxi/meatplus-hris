@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\Auth\LogoutController;
 use App\Http\Controllers\Api\V1\Auth\MeController;
 use App\Http\Controllers\Api\V1\Me\PendingSummaryController;
 use App\Http\Controllers\Api\V1\Me\NotificationController;
+use App\Http\Controllers\Api\V1\Companies\CompanyController;
 use App\Http\Controllers\Api\V1\Companies\SwitchCompanyController;
 use App\Http\Controllers\Api\V1\Employees\DependentController;
 use App\Http\Controllers\Api\V1\Employees\EducationController;
@@ -44,6 +45,7 @@ Route::prefix('v1')->group(function () {
         Route::post('my/notifications/{id}/read', [NotificationController::class, 'markRead']);
         Route::post('logout', LogoutController::class);
         Route::post('companies/switch', SwitchCompanyController::class);
+        Route::apiResource('companies', CompanyController::class)->only(['index', 'store', 'show', 'update']);
 
         // Lookups for dropdowns
         Route::get('lookups/branches', [LookupController::class, 'branches']);

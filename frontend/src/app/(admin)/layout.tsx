@@ -4,8 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { getMe, logout } from "@/lib/auth";
+import { getMe, logout, switchCompany } from "@/lib/auth";
 import { getRoles, ROLE_LABELS } from "@/lib/users";
+import { getCompanies } from "@/lib/companies";
 import { AppButton } from "@/components/ui";
 import { NotificationBell } from "@/components/NotificationBell";
 
@@ -41,6 +42,16 @@ const NAV: NavItem[] = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
       </svg>
     )
+  },
+  {
+    href: "/companies",
+    label: "Companies",
+    roles: ["it_admin"],
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+      </svg>
+    ),
   },
   {
     href: "/attendance",
@@ -182,6 +193,28 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   const companyName = data?.user.active_company?.legal_name ?? "Meatplus HRIS";
 
+  const [companyOpen, setCompanyOpen] = useState(false);
+  const [switchingId, setSwitchingId] = useState<number | null>(null);
+
+  const { data: companiesData } = useQuery({
+    queryKey: ["companies-list"],
+    queryFn: getCompanies,
+    enabled: isItAdmin,
+    staleTime: 60_000,
+  });
+
+  const handleSwitchCompany = async (id: number) => {
+    if (id === data?.user.active_company?.id) { setCompanyOpen(false); return; }
+    setSwitchingId(id);
+    try {
+      await switchCompany(id);
+      window.location.reload();
+    } finally {
+      setSwitchingId(null);
+      setCompanyOpen(false);
+    }
+  };
+
   const userRoles = previewEntry ? [previewEntry.name] : realRoles;
   const userPermissions = previewEntry ? previewEntry.permissions : (data?.user.permissions ?? []);
   const hasEmployee = Boolean(data?.user.employee);
@@ -216,7 +249,44 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             {!isCollapsed && (
               <div className="transition-opacity duration-200 min-w-0">
                 <h1 className="text-base font-semibold tracking-tight text-slate-900 truncate">Meatplus HRIS</h1>
-                <p className="mt-0.5 text-xs text-slate-500 truncate max-w-[150px]">{companyName}</p>
+                {isItAdmin && companiesData && companiesData.length > 1 ? (
+                  <div className="relative">
+                    <button
+                      onClick={() => setCompanyOpen((o) => !o)}
+                      className="mt-0.5 flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 truncate max-w-[150px]"
+                    >
+                      <span className="truncate">{companyName}</span>
+                      <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {companyOpen && (
+                      <div className="absolute left-0 top-full z-50 mt-1 w-48 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                        {companiesData.map((c) => (
+                          <button
+                            key={c.id}
+                            onClick={() => handleSwitchCompany(c.id)}
+                            disabled={switchingId !== null}
+                            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-slate-50 ${
+                              c.id === data?.user.active_company?.id ? "font-semibold text-slate-900" : "text-slate-600"
+                            }`}
+                          >
+                            {switchingId === c.id ? (
+                              <span className="h-2 w-2 animate-spin rounded-full border border-slate-400 border-t-transparent" />
+                            ) : c.id === data?.user.active_company?.id ? (
+                              <svg className="h-2 w-2 fill-slate-900" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" /></svg>
+                            ) : (
+                              <span className="h-2 w-2" />
+                            )}
+                            {c.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-0.5 text-xs text-slate-500 truncate max-w-[150px]">{companyName}</p>
+                )}
               </div>
             )}
             <button
