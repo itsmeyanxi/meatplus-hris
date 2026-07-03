@@ -25,6 +25,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'username',
         'password',
         'active_company_id',
         'is_active',
@@ -63,5 +64,13 @@ class User extends Authenticatable
     public function employee(): HasOne
     {
         return $this->hasOne(Employee::class);
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $url = config('app.frontend_url') . '/reset-password?token=' . $token . '&email=' . urlencode($this->email ?? '');
+        \Illuminate\Support\Facades\Mail::to($this->email)->send(
+            new \App\Mail\PasswordResetMail($this->name, $url)
+        );
     }
 }

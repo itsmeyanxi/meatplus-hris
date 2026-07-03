@@ -72,10 +72,16 @@ class EmployeeController extends Controller
     /** Build the employee listing query with all supported filters applied. */
     private function filteredQuery(Request $request): Builder
     {
-        $query = Employee::query()->with([
-            'department:id,name', 'position:id,title', 'employmentType:id,name',
-            'company:id,code,legal_name,trade_name', 'branch:id,name',
-        ]);
+        $query = Employee::query()
+            ->with([
+                'department:id,name', 'position:id,title', 'employmentType:id,name',
+                'company:id,code,legal_name,trade_name', 'branch:id,name', 'user:id',
+            ])
+            ->withExists([
+                'invitations as has_pending_invitation' => fn ($q) => $q
+                    ->whereNull('accepted_at')
+                    ->where('expires_at', '>', now()),
+            ]);
 
         $op = $this->likeOperator();
 

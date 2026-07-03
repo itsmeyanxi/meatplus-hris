@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->api(prepend: [
             EnsureFrontendRequestsAreStateful::class,
+            \App\Http\Middleware\SetPermissionsTeam::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

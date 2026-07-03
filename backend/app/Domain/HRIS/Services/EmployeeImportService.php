@@ -155,6 +155,18 @@ class EmployeeImportService
     /** @return array<int,array<int,string>> */
     private function readRows(string $path, string $ext): array
     {
+        if ($ext === 'csv') {
+            // Detect and convert encoding to UTF-8 (handles Windows-1252/Latin-1 exports from Excel)
+            $raw = file_get_contents($path);
+            $encoding = mb_detect_encoding($raw, ['UTF-8', 'Windows-1252', 'ISO-8859-1', 'UTF-16'], true);
+            if ($encoding && $encoding !== 'UTF-8') {
+                $raw = mb_convert_encoding($raw, 'UTF-8', $encoding);
+                $tmp = tempnam(sys_get_temp_dir(), 'imp_');
+                file_put_contents($tmp, $raw);
+                $path = $tmp;
+            }
+        }
+
         $reader = $ext === 'xlsx' ? new XlsxReader() : new CsvReader();
         $reader->open($path);
 

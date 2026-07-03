@@ -79,7 +79,8 @@ class AdmsIngestionService
 
             $pin = trim($cols[0]);
             $timeStr = trim($cols[1]);
-            $status = isset($cols[2]) ? trim($cols[2]) : '';
+            $verify = isset($cols[2]) ? trim($cols[2]) : '';  // biometric type (0=pw,1=fp,4=face,255=other)
+            $status = isset($cols[3]) ? trim($cols[3]) : $verify; // attendance status (0=in,1=out,…)
             if ($pin === '' || $timeStr === '') {
                 continue;
             }
@@ -108,7 +109,7 @@ class AdmsIngestionService
                     'logged_at' => $ts->toDateTimeString(),
                     'direction' => $direction,
                     'source' => 'biometric',
-                    'metadata' => ['device_id' => $device->id, 'pin' => $pin, 'status' => $status, 'raw' => $line],
+                    'metadata' => ['device_id' => $device->id, 'pin' => $pin, 'verify' => $verify, 'status' => $status, 'raw' => $line],
                 ],
             );
 

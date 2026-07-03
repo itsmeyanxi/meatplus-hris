@@ -15,9 +15,20 @@ class EmployeeListResource extends JsonResource
             'full_name' => $this->full_name,
             'last_name' => $this->last_name,
             'first_name' => $this->first_name,
+            'middle_name' => $this->middle_name,
+            'gender' => $this->gender,
+            'civil_status' => $this->civil_status,
             'email_company' => $this->email_company,
+            'email_personal' => $this->email_personal,
             'date_hired' => $this->date_hired?->toDateString(),
             'is_active' => $this->is_active,
+            'login_status' => $this->user_id
+                ? 'active'
+                : ($this->has_pending_invitation ? 'invited' : 'none'),
+            'branch' => $this->whenLoaded('branch', fn () => [
+                'id' => $this->branch->id,
+                'name' => $this->branch->name,
+            ]),
             'department' => $this->whenLoaded('department', fn () => [
                 'id' => $this->department->id,
                 'name' => $this->department->name,

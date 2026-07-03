@@ -14,12 +14,17 @@ use App\Http\Controllers\Api\V1\Attendance\TimeLogController;
 use App\Http\Controllers\Api\V1\Attendance\UndertimeRequestController;
 use App\Http\Controllers\Api\V1\AccessControl\AccessRequestController;
 use App\Http\Controllers\Api\V1\Attendance\WorkScheduleController;
+use App\Http\Controllers\Api\V1\Admin\AdminStatsController;
+use App\Http\Controllers\Api\V1\Auth\ForgotPasswordController;
+use App\Http\Controllers\Api\V1\Auth\InvitationController;
+use App\Http\Controllers\Api\V1\Auth\ResetPasswordController;
 use App\Http\Controllers\Api\V1\Auth\LoginController;
 use App\Http\Controllers\Api\V1\Auth\LogoutController;
 use App\Http\Controllers\Api\V1\Auth\MeController;
 use App\Http\Controllers\Api\V1\Me\PendingSummaryController;
 use App\Http\Controllers\Api\V1\Me\NotificationController;
 use App\Http\Controllers\Api\V1\Companies\CompanyController;
+use App\Http\Controllers\Api\V1\Reports\ReportController;
 use App\Http\Controllers\Api\V1\Companies\SwitchCompanyController;
 use App\Http\Controllers\Api\V1\Employees\DependentController;
 use App\Http\Controllers\Api\V1\Employees\EducationController;
@@ -36,6 +41,12 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::post('login', LoginController::class);
+    Route::post('forgot-password', ForgotPasswordController::class);
+    Route::post('reset-password', ResetPasswordController::class);
+
+    // Public invitation endpoints — employee sets up username/password without being logged in
+    Route::get('invite/{token}', [InvitationController::class, 'show']);
+    Route::post('invite/{token}/accept', [InvitationController::class, 'accept']);
 
     Route::middleware(['auth:sanctum', SetPermissionsTeam::class])->group(function () {
         Route::get('me', MeController::class);
@@ -58,6 +69,7 @@ Route::prefix('v1')->group(function () {
         Route::get('employees/import/template', [EmployeeImportController::class, 'template']);
         Route::post('employees/import', [EmployeeImportController::class, 'store']);
         Route::get('employees/export', [EmployeeController::class, 'export']);
+        Route::post('employees/bulk-invite', [InvitationController::class, 'bulkSend']);
         Route::apiResource('employees', EmployeeController::class);
         Route::apiResource('employees.dependents', DependentController::class)->scoped();
         Route::apiResource('employees.emergency-contacts', EmergencyContactController::class)
@@ -104,6 +116,11 @@ Route::prefix('v1')->group(function () {
         Route::post('leave-applications/{leaveApplication}/reject', [LeaveApplicationController::class, 'reject']);
         Route::post('leave-applications/{leaveApplication}/cancel', [LeaveApplicationController::class, 'cancel']);
 
+        // Reports (CSV exports)
+        Route::get('reports/dtr', [ReportController::class, 'dtr']);
+        Route::get('reports/leave', [ReportController::class, 'leave']);
+        Route::get('reports/payroll/{payrollRun}', [ReportController::class, 'payroll']);
+
         // Payroll
         Route::get('compensations', [\App\Http\Controllers\Api\V1\Payroll\CompensationController::class, 'index']);
         Route::post('compensations', [\App\Http\Controllers\Api\V1\Payroll\CompensationController::class, 'store']);
@@ -131,6 +148,8 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('users', UserController::class);
         Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
         Route::post('employees/{employee}/provision-login', [UserController::class, 'provisionForEmployee']);
+        Route::post('employees/{employee}/invite', [InvitationController::class, 'send']);
+        Route::get('admin/stats', AdminStatsController::class);
 
         foreach ([
             ['overtime-requests', OvertimeRequestController::class, 'overtimeRequest'],

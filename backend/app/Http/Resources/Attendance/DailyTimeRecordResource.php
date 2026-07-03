@@ -12,6 +12,11 @@ class DailyTimeRecordResource extends JsonResource
         return [
             'id' => $this->id,
             'employee_id' => $this->employee_id,
+            'employee' => $this->whenLoaded('employee', fn () => [
+                'id' => $this->employee->id,
+                'employee_no' => $this->employee->employee_no,
+                'full_name' => trim("{$this->employee->first_name} {$this->employee->last_name}"),
+            ]),
             'work_date' => $this->work_date?->toDateString(),
             'scheduled_in' => $this->scheduled_in,
             'scheduled_out' => $this->scheduled_out,

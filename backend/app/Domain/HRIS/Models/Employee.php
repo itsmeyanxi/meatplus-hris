@@ -94,6 +94,11 @@ class Employee extends Model
         return $this->hasMany(Employee::class, 'manager_employee_id');
     }
 
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(\App\Models\Invitation::class);
+    }
+
     public function governmentIds(): HasOne
     {
         return $this->hasOne(EmployeeGovernmentId::class);

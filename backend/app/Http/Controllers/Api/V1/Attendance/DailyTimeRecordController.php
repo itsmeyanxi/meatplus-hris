@@ -20,12 +20,16 @@ class DailyTimeRecordController extends Controller
         $user = $request->user();
         abort_unless($user->can('attendance.view'), 403);
 
-        $q = DailyTimeRecord::query();
+        $q = DailyTimeRecord::query()->with('employee:id,employee_no,first_name,last_name,department_id');
 
         // HR (attendance.view.any) sees everyone; everyone else is locked to their own record.
         if ($user->can('attendance.view.any')) {
             if ($eid = $request->query('employee_id')) {
                 $q->where('employee_id', $eid);
+            }
+            // Department filter for the matrix view.
+            if ($did = $request->query('department_id')) {
+                $q->whereHas('employee', fn ($eq) => $eq->where('department_id', $did));
             }
         } else {
             $employee = $user->employee;
@@ -40,9 +44,11 @@ class DailyTimeRecordController extends Controller
             $q->where('work_date', '<=', $to);
         }
 
-        // Cap on the most recent rows (DESC + limit), then present chronologically
-        // so a wide range never silently drops the latest days.
-        $records = $q->orderBy('work_date', 'desc')->limit(500)->get()
+        // For the matrix view (no specific employee) allow up to one month × all employees.
+        // Per-employee queries keep the tighter cap so the API stays snappy.
+        $limit = $request->query('employee_id') ? 500 : 5000;
+
+        $records = $q->orderBy('work_date', 'desc')->limit($limit)->get()
             ->sortBy('work_date')->values();
 
         return DailyTimeRecordResource::collection($records);
