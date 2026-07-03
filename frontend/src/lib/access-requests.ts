@@ -111,6 +111,13 @@ export async function getAccessRequestStats(): Promise<AccessRequestStats> {
   return data;
 }
 
+export async function getAccessRequest(id: number): Promise<AccessRequest> {
+  const { data } = await api.get<{ data: AccessRequest }>(
+    `/api/v1/access-requests/${id}`,
+  );
+  return data.data;
+}
+
 export async function decideAccessRequest(
   id: number,
   decision: "approve" | "reject",
