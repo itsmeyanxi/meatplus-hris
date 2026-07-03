@@ -9,7 +9,7 @@ import {
   type DayStatus,
 } from "@/lib/attendance";
 import { AppCard, PageHeader } from "@/components/ui";
-import { MyAttendanceRequests } from "@/components/attendance/MyAttendanceRequests";
+import { MyAttendanceRequests, type PrefillRequest } from "@/components/attendance/MyAttendanceRequests";
 import { MyAttendanceSummary } from "@/components/attendance/MyAttendanceSummary";
 
 const STATUS_STYLE: Record<DayStatus, { dot: string; cell: string; label: string }> = {
@@ -71,6 +71,13 @@ export default function MyAttendancePage() {
 
   const [tab, setTab] = useState<"calendar" | "summary" | "requests">("calendar");
   const [detailDay, setDetailDay] = useState<DailyTimeRecord | null>(null);
+  const [prefillRequest, setPrefillRequest] = useState<PrefillRequest | null>(null);
+
+  const handleFileRequest = (type: PrefillRequest["type"], date: string) => {
+    setDetailDay(null);
+    setPrefillRequest({ type, date });
+    setTab("requests");
+  };
 
   const monthLabel = new Date(cur.year, cur.month, 1).toLocaleDateString(undefined, {
     month: "long",
@@ -143,7 +150,7 @@ export default function MyAttendancePage() {
       </div>
 
       {tab === "requests" ? (
-        <MyAttendanceRequests />
+        <MyAttendanceRequests prefill={prefillRequest} onPrefillUsed={() => setPrefillRequest(null)} />
       ) : tab === "summary" ? (
         <MyAttendanceSummary employeeName={me?.user.employee?.full_name ?? "—"} />
       ) : (
@@ -246,18 +253,31 @@ export default function MyAttendancePage() {
         {isLoading && (
           <p className="mt-4 text-sm text-slate-500">Loading attendance…</p>
         )}
+        {!isLoading && cells.every((c) => c === "blank" || c === null) && (
+          <p className="mt-4 text-center text-sm text-slate-400">
+            No attendance records for this month. Use ← to go back to a previous month.
+          </p>
+        )}
       </div>
       </>
       )}
 
       {detailDay && (
-        <DayDetailDrawer record={detailDay} onClose={() => setDetailDay(null)} />
+        <DayDetailDrawer record={detailDay} onClose={() => setDetailDay(null)} onFileRequest={handleFileRequest} />
       )}
     </div>
   );
 }
 
-function DayDetailDrawer({ record, onClose }: { record: DailyTimeRecord; onClose: () => void }) {
+function DayDetailDrawer({
+  record,
+  onClose,
+  onFileRequest,
+}: {
+  record: DailyTimeRecord;
+  onClose: () => void;
+  onFileRequest: (type: "overtime" | "undertime" | "correction" | "official_business", date: string) => void;
+}) {
   const status: DayStatus = record.day_status ?? "no_record";
   const style = STATUS_STYLE[status];
   const heading =
@@ -300,6 +320,32 @@ function DayDetailDrawer({ record, onClose }: { record: DailyTimeRecord; onClose
               <Detail label="Remarks">{record.remarks}</Detail>
             </div>
           )}
+        </div>
+
+        {/* Quick-file actions */}
+        <div className="mt-6 border-t border-slate-100 pt-5">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            File a request for this day
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                { type: "correction", label: "Correction" },
+                { type: "overtime", label: "Overtime" },
+                { type: "undertime", label: "Undertime" },
+                { type: "official_business", label: "Off. Business" },
+              ] as const
+            ).map((action) => (
+              <button
+                key={action.type}
+                type="button"
+                onClick={() => onFileRequest(action.type, record.work_date)}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-100 hover:border-slate-300"
+              >
+                + {action.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </>

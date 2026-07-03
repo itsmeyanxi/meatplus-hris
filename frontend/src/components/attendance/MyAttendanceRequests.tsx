@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StatusPill } from "@/components/approvals/StatusPill";
 import { AppButton } from "@/components/ui";
 import {
@@ -24,7 +24,11 @@ const TYPES = [
 ] as const;
 type ReqType = (typeof TYPES)[number]["key"];
 
-// Common shape across the five request types, so the type-keyed map is callable.
+export type PrefillRequest = {
+  type: "overtime" | "undertime" | "correction" | "official_business";
+  date: string;
+};
+
 type AnyReq = { id: number; status: RequestStatus; decision_remarks: string | null } & Record<string, unknown>;
 type ReqApi = {
   list: (params?: ListFilters) => Promise<AnyReq[]>;
@@ -38,16 +42,41 @@ const API = {
   correction: correctionsApi,
 } as unknown as Record<ReqType, ReqApi>;
 
-// A single loosely-typed form bag; the typed payload is assembled at submit.
 type FormBag = Record<string, string>;
 const EMPTY: FormBag = {};
 
-export function MyAttendanceRequests() {
+const CORRECTION_FIELDS = [
+  { value: "actual_in",   label: "Actual time in" },
+  { value: "actual_out",  label: "Actual time out" },
+  { value: "hours_worked",label: "Hours worked" },
+  { value: "is_absent",   label: "Absent flag" },
+  { value: "is_rest_day", label: "Rest day flag" },
+  { value: "remarks",     label: "Remarks" },
+];
+
+export function MyAttendanceRequests({
+  prefill,
+  onPrefillUsed,
+}: {
+  prefill?: PrefillRequest | null;
+  onPrefillUsed?: () => void;
+}) {
   const qc = useQueryClient();
   const [type, setType] = useState<ReqType>("overtime");
   const [isAdding, setIsAdding] = useState(false);
   const [form, setForm] = useState<FormBag>(EMPTY);
   const [error, setError] = useState<string | null>(null);
+
+  // When a prefill arrives, switch type + open form with date pre-filled.
+  useEffect(() => {
+    if (!prefill) return;
+    setType(prefill.type as ReqType);
+    const dateKey = prefill.type === "correction" ? "work_date" : "date";
+    setForm({ [dateKey]: prefill.date });
+    setIsAdding(true);
+    onPrefillUsed?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
 
   const listKey = ["my-attendance-requests", type];
   const { data: items = [] } = useQuery({
@@ -109,10 +138,7 @@ export function MyAttendanceRequests() {
 
       {isAdding && (
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            create.mutate();
-          }}
+          onSubmit={(e) => { e.preventDefault(); create.mutate(); }}
           className="grid grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-2"
         >
           <RequestFields type={type} form={form} set={set} />
@@ -165,7 +191,6 @@ export function MyAttendanceRequests() {
 }
 
 function RequestFields({ type, form, set }: { type: ReqType; form: FormBag; set: (k: string, v: string) => void }) {
-  // Invoked as plain functions (not <Components/>) so inputs keep focus across keystrokes.
   const field = (label: string, k: string, t = "text", required = true, full = false) => (
     <div key={k} className={full ? "sm:col-span-2" : ""}>
       <label className={labelCls}>{label}{required && " *"}</label>
@@ -223,7 +248,15 @@ function RequestFields({ type, form, set }: { type: ReqType; form: FormBag; set:
       return (
         <>
           {field("Work date", "work_date", "date")}
-          {field("Field to correct", "field_to_correct")}
+          <div>
+            <label className={labelCls}>Field to correct *</label>
+            <select className={inputCls} value={form.field_to_correct ?? ""} onChange={(e) => set("field_to_correct", e.target.value)} required>
+              <option value="">Select field…</option>
+              {CORRECTION_FIELDS.map((f) => (
+                <option key={f.value} value={f.value}>{f.label}</option>
+              ))}
+            </select>
+          </div>
           {field("Correct value", "new_value", "text", true, true)}
           {reason()}
         </>

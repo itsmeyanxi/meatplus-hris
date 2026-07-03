@@ -1,21 +1,56 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { StatusPill } from "@/components/approvals/StatusPill";
 import { AppCard, PageHeader } from "@/components/ui";
+import { getMe } from "@/lib/auth";
 import { leaveAppsApi } from "@/lib/leaves";
+import { inputCls, labelCls } from "@/lib/form-classes";
 
 export default function LeaveDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const qc = useQueryClient();
   const id = Number(params.id);
+
+  const [rejectRemarks, setRejectRemarks] = useState("");
+  const [approveRemarks, setApproveRemarks] = useState("");
+  const [showRejectForm, setShowRejectForm] = useState(false);
+
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const canApprove =
+    (me?.user.permissions.includes("leave.approve.any") ||
+      me?.user.permissions.includes("leave.approve.self_dept")) ??
+    false;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["leave-app", id],
     queryFn: () => leaveAppsApi.get(id),
     enabled: Number.isFinite(id),
+  });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["leave-app", id] });
+    qc.invalidateQueries({ queryKey: ["leave-apps"] });
+    qc.invalidateQueries({ queryKey: ["leave-balances"] });
+  };
+
+  const approve = useMutation({
+    mutationFn: () => leaveAppsApi.approve(id, approveRemarks || undefined),
+    onSuccess: invalidate,
+  });
+
+  const reject = useMutation({
+    mutationFn: () => leaveAppsApi.reject(id, rejectRemarks || undefined),
+    onSuccess: () => { invalidate(); setShowRejectForm(false); },
+  });
+
+  const cancel = useMutation({
+    mutationFn: () => leaveAppsApi.cancel(id),
+    onSuccess: () => { invalidate(); router.back(); },
   });
 
   if (isLoading) {
@@ -33,6 +68,10 @@ export default function LeaveDetailPage() {
       </div>
     );
   }
+
+  const isPending = data.status === "pending";
+  const canCancel = data.status === "pending" || data.status === "approved";
+  const showApprovalActions = canApprove && isPending;
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -77,7 +116,104 @@ export default function LeaveDetailPage() {
         </div>
       </AppCard>
 
-      <AppCard title="Decision">
+      {/* Approval actions — only shown to approvers when leave is pending */}
+      {showApprovalActions && (
+        <AppCard title="Decision">
+          {!showRejectForm ? (
+            <div className="space-y-4">
+              <div>
+                <label className={labelCls}>Approval remarks (optional)</label>
+                <textarea
+                  className={`${inputCls} resize-y`}
+                  rows={2}
+                  placeholder="Any notes for the employee…"
+                  value={approveRemarks}
+                  onChange={(e) => setApproveRemarks(e.target.value)}
+                />
+              </div>
+              {approve.isError && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {(approve.error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Failed to approve."}
+                </p>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => approve.mutate()}
+                  disabled={approve.isPending}
+                  className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {approve.isPending ? "Approving…" : "Approve"}
+                </button>
+                <button
+                  onClick={() => setShowRejectForm(true)}
+                  className="rounded-xl border border-red-200 bg-red-50 px-5 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                >
+                  Reject
+                </button>
+                {canCancel && (
+                  <button
+                    onClick={() => cancel.mutate()}
+                    disabled={cancel.isPending}
+                    className="ml-auto rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    {cancel.isPending ? "Cancelling…" : "Cancel leave"}
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className={labelCls}>Rejection reason *</label>
+                <textarea
+                  className={`${inputCls} resize-y`}
+                  rows={3}
+                  placeholder="Explain the reason for rejection…"
+                  value={rejectRemarks}
+                  onChange={(e) => setRejectRemarks(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+              {reject.isError && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {(reject.error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Failed to reject."}
+                </p>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => reject.mutate()}
+                  disabled={reject.isPending || !rejectRemarks.trim()}
+                  className="rounded-xl bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+                >
+                  {reject.isPending ? "Rejecting…" : "Confirm rejection"}
+                </button>
+                <button
+                  onClick={() => setShowRejectForm(false)}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </AppCard>
+      )}
+
+      {/* Cancel action for non-approvers (employee cancelling their own) */}
+      {!showApprovalActions && canCancel && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => cancel.mutate()}
+            disabled={cancel.isPending}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+          >
+            {cancel.isPending ? "Cancelling…" : "Cancel this leave"}
+          </button>
+        </div>
+      )}
+
+      <AppCard title="Decision record">
         <div className="space-y-4">
           <Detail label="Decided by">{data.approved_by?.name ?? "—"}</Detail>
           <Detail label="Decided at">

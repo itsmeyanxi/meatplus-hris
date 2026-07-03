@@ -39,3 +39,16 @@ export async function getMe(): Promise<Me> {
 export async function switchCompany(companyId: number): Promise<void> {
   await api.post("/api/v1/companies/switch", { company_id: companyId });
 }
+
+export async function forgotPassword(email: string): Promise<void> {
+  await api.post("/api/v1/forgot-password", { email });
+}
+
+export async function resetPassword(
+  token: string,
+  email: string,
+  password: string,
+  password_confirmation: string,
+): Promise<void> {
+  await api.post("/api/v1/reset-password", { token, email, password, password_confirmation });
+}

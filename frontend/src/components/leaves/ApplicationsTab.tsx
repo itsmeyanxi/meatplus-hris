@@ -34,6 +34,8 @@ export function ApplicationsTab() {
   });
 
   const [status, setStatus] = useState<LeaveStatus | "">("");
+  const [rejectingId, setRejectingId] = useState<number | null>(null);
+  const [rejectRemarks, setRejectRemarks] = useState("");
   const { data: items = [] } = useQuery({
     queryKey: ["leave-apps", { status }],
     queryFn: () => leaveAppsApi.list({ status: status || undefined }),
@@ -69,8 +71,13 @@ export function ApplicationsTab() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave-apps"] }); qc.invalidateQueries({ queryKey: ["leave-balances"] }); },
   });
   const reject = useMutation({
-    mutationFn: (id: number) => leaveAppsApi.reject(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["leave-apps"] }),
+    mutationFn: ({ id, remarks }: { id: number; remarks: string }) =>
+      leaveAppsApi.reject(id, remarks || undefined),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leave-apps"] });
+      setRejectingId(null);
+      setRejectRemarks("");
+    },
   });
   const cancel = useMutation({
     mutationFn: (id: number) => leaveAppsApi.cancel(id),
@@ -170,33 +177,81 @@ export function ApplicationsTab() {
               </tr>
             )}
             {items.map((r) => (
-              <tr key={r.id} className="border-t border-slate-100 transition hover:bg-slate-50/70">
-                <td className="px-4 py-3"><StatusPill status={r.status} /></td>
-                {canManage && (
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-800">{r.employee?.full_name}</div>
-                    <div className="font-mono text-xs text-slate-400">{r.employee?.employee_no}</div>
+              <>
+                <tr key={r.id} className="border-t border-slate-100 transition hover:bg-slate-50/70">
+                  <td className="px-4 py-3"><StatusPill status={r.status} /></td>
+                  {canManage && (
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-slate-800">{r.employee?.full_name}</div>
+                      <div className="font-mono text-xs text-slate-400">{r.employee?.employee_no}</div>
+                    </td>
+                  )}
+                  <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.leave_type.code}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.date_from} → {r.date_to}</td>
+                  <td className="px-4 py-3 font-medium text-slate-800">{r.days_count}</td>
+                  <td className="max-w-xs px-4 py-3 text-slate-600">{r.reason}</td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex justify-end gap-2">
+                      <Link href={`/leaves/${r.id}`} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50">View</Link>
+                      {r.status === "pending" && canApprove && (
+                        <>
+                          <button
+                            onClick={() => approve.mutate(r.id)}
+                            disabled={approve.isPending}
+                            className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => {
+                              setRejectingId(rejectingId === r.id ? null : r.id);
+                              setRejectRemarks("");
+                            }}
+                            className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
+                      {(r.status === "pending" || r.status === "approved") && (
+                        <button onClick={() => cancel.mutate(r.id)} disabled={cancel.isPending} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-60">Cancel</button>
+                      )}
+                    </div>
                   </td>
+                </tr>
+                {rejectingId === r.id && (
+                  <tr key={`${r.id}-reject`} className="border-t border-red-100 bg-red-50/50">
+                    <td colSpan={colSpan} className="px-4 py-3">
+                      <div className="flex items-end gap-3">
+                        <div className="flex-1">
+                          <label className="mb-1 block text-xs font-medium text-red-700">Rejection reason</label>
+                          <input
+                            type="text"
+                            className="w-full rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-red-400"
+                            placeholder="Optional remarks for the employee…"
+                            value={rejectRemarks}
+                            onChange={(e) => setRejectRemarks(e.target.value)}
+                            autoFocus
+                          />
+                        </div>
+                        <button
+                          onClick={() => reject.mutate({ id: r.id, remarks: rejectRemarks })}
+                          disabled={reject.isPending}
+                          className="rounded-lg bg-red-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700 disabled:opacity-60 whitespace-nowrap"
+                        >
+                          {reject.isPending ? "Rejecting…" : "Confirm reject"}
+                        </button>
+                        <button
+                          onClick={() => setRejectingId(null)}
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
                 )}
-                <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.leave_type.code}</td>
-                <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.date_from} → {r.date_to}</td>
-                <td className="px-4 py-3 font-medium text-slate-800">{r.days_count}</td>
-                <td className="max-w-xs px-4 py-3 text-slate-600">{r.reason}</td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex justify-end gap-2">
-                    <Link href={`/leaves/${r.id}`} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50">View</Link>
-                    {r.status === "pending" && canApprove && (
-                      <>
-                        <button onClick={() => approve.mutate(r.id)} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100">Approve</button>
-                        <button onClick={() => reject.mutate(r.id)} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100">Reject</button>
-                      </>
-                    )}
-                    {(r.status === "pending" || r.status === "approved") && (
-                      <button onClick={() => cancel.mutate(r.id)} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50">Cancel</button>
-                    )}
-                  </div>
-                </td>
-              </tr>
+              </>
             ))}
           </tbody>
         </table>

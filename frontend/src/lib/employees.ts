@@ -6,10 +6,16 @@ export type EmployeeListItem = {
   full_name: string;
   last_name: string;
   first_name: string;
+  middle_name: string | null;
+  gender: string | null;
+  civil_status: string | null;
   email_company: string | null;
+  email_personal: string | null;
   date_hired: string | null;
   is_active: boolean;
+  login_status: "active" | "invited" | "none";
   department?: { id: number; name: string };
+  branch?: { id: number; name: string };
   position?: { id: number; title: string };
   employment_type?: { id: number; name: string };
   company?: { id: number; code: string; name: string };

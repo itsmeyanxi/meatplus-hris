@@ -64,6 +64,7 @@ export type DayStatus =
 export type DailyTimeRecord = {
   id: number;
   employee_id: number;
+  employee?: { id: number; employee_no: string; full_name: string };
   work_date: string;
   scheduled_in: string | null;
   scheduled_out: string | null;
@@ -165,7 +166,7 @@ export const timeLogsApi = {
 };
 
 export const dtrApi = {
-  list: async (params: { employee_id?: number; from?: string; to?: string } = {}): Promise<DailyTimeRecord[]> => {
+  list: async (params: { employee_id?: number; department_id?: number; from?: string; to?: string } = {}): Promise<DailyTimeRecord[]> => {
     const { data } = await api.get<Listed<DailyTimeRecord>>("/api/v1/daily-time-records", { params });
     return data.data;
   },
