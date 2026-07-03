@@ -12,9 +12,41 @@ import {
   employeeImportTemplateUrl,
   employeeExportUrl,
   type ImportResult,
+  type EmployeeListItem,
 } from "@/lib/employees";
+import { invitationsApi } from "@/lib/invitations";
+import { getAdminStats } from "@/lib/dashboard";
 import { AppButton, AppInput, PageHeader, StatusBadge, TableShell } from "@/components/ui";
 import { inputCls, labelCls } from "@/lib/form-classes";
+
+// ── Access status badge ───────────────────────────────────────────────────────
+
+function AccessBadge({ status }: { status: EmployeeListItem["login_status"] }) {
+  if (status === "active") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        Active
+      </span>
+    );
+  }
+  if (status === "invited") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+        Invited
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
+      <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+      No access
+    </span>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function EmployeesPage() {
   const router = useRouter();
@@ -27,9 +59,12 @@ export default function EmployeesPage() {
   const [debEmpNo, setDebEmpNo] = useState("");
   const [debName, setDebName] = useState("");
   const [page, setPage] = useState(1);
-  const [previewEmployee, setPreviewEmployee] = useState<any | null>(null);
+  const [previewEmployee, setPreviewEmployee] = useState<EmployeeListItem | null>(null);
 
-  // Debounce the free-text filters; the company dropdown applies immediately.
+  // Bulk-select state
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkResult, setBulkResult] = useState<{ sent: number; skipped: number; errors: string[] } | null>(null);
+
   useEffect(() => {
     const t = setTimeout(() => {
       setDebEmpNo(empNo);
@@ -39,7 +74,18 @@ export default function EmployeesPage() {
     return () => clearTimeout(t);
   }, [empNo, name]);
 
+  // Clear selection when page / filters change
+  useEffect(() => { setSelected(new Set()); }, [debEmpNo, debName, departmentId, companyId, page]);
+
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const canManageUsers = me?.user.permissions?.includes("user.manage") ?? false;
+
+  const { data: adminStats } = useQuery({
+    queryKey: ["admin-stats"],
+    queryFn: getAdminStats,
+    enabled: !!me,
+    staleTime: 2 * 60_000,
+  });
 
   const { data: companies } = useQuery({
     queryKey: ["lookup-companies"],
@@ -57,9 +103,41 @@ export default function EmployeesPage() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["employees", { empNo: debEmpNo, name: debName, departmentId, companyId, page }],
-    queryFn: () => listEmployees({ employeeNo: debEmpNo, name: debName, departmentId, companyId, page, perPage: 25 }),
+    queryFn: () => listEmployees({ employeeNo: debEmpNo, name: debName, departmentId, companyId, page, perPage: 50 }),
     enabled: !!me,
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
+    placeholderData: (prev) => prev,
+  });
+
+  const rows = data?.data ?? [];
+
+  // Employees on this page that can still be invited (no active account yet)
+  const invitableIds = rows.filter((e) => e.login_status !== "active").map((e) => e.id);
+  const allInvitableSelected = invitableIds.length > 0 && invitableIds.every((id) => selected.has(id));
+
+  const toggleAll = () => {
+    if (allInvitableSelected) {
+      setSelected((s) => { const n = new Set(s); invitableIds.forEach((id) => n.delete(id)); return n; });
+    } else {
+      setSelected((s) => new Set([...s, ...invitableIds]));
+    }
+  };
+
+  const toggleOne = (id: number) => {
+    setSelected((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  };
+
+  const bulkInvite = useMutation({
+    mutationFn: () => invitationsApi.bulkSend(Array.from(selected)),
+    onSuccess: (res) => {
+      setBulkResult(res);
+      setSelected(new Set());
+      qc.invalidateQueries({ queryKey: ["employees"] });
+    },
   });
 
   const onExport = () => {
@@ -73,114 +151,95 @@ export default function EmployeesPage() {
 
   const hasFilters = empNo !== "" || name !== "" || departmentId !== "" || companyId !== "";
   const clearFilters = () => {
-    setEmpNo("");
-    setName("");
-    setDepartmentId("");
-    setCompanyId("");
-    setPage(1);
+    setEmpNo(""); setName(""); setDepartmentId(""); setCompanyId(""); setPage(1);
   };
+
+  const COLS = 12; // checkbox + 10 data cols + access
 
   return (
     <div className="relative space-y-4">
       <PageHeader
         title="Employees"
-        description={data ? `${data.meta.total} total employees` : "Loading employees…"}
         actions={
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setShowImport(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
+            <button type="button" onClick={() => setShowImport(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
               Import
             </button>
-            <button
-              type="button"
-              onClick={onExport}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
+            <button type="button" onClick={onExport}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
               Export
             </button>
-            <Link
-              href="/employees/new"
-              className="inline-flex items-center rounded-xl border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
-            >
+            <Link href="/employees/new"
+              className="inline-flex items-center rounded-xl border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800">
               + New employee
             </Link>
           </div>
         }
       />
 
+      {/* Stats strip */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <EmpStat
+          label={hasFilters ? "Matching filter" : "Total employees"}
+          value={data?.meta.total ?? adminStats?.headcount ?? null}
+          color="slate"
+        />
+        <EmpStat
+          label="No portal access"
+          value={adminStats?.no_access ?? null}
+          color="amber"
+        />
+        <EmpStat
+          label="Present today"
+          value={adminStats?.today_present ?? null}
+          color="emerald"
+        />
+        <EmpStat
+          label="Pending leaves"
+          value={adminStats?.pending_leaves ?? null}
+          color="sky"
+        />
+      </div>
+
+      {/* Filters */}
       <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className={labelCls}>Employee ID</label>
-            <AppInput
-              type="search"
-              placeholder="e.g. EMP-0002"
-              value={empNo}
-              onChange={(e) => setEmpNo(e.target.value)}
-            />
+            <AppInput type="search" placeholder="e.g. 00294" value={empNo} onChange={(e) => setEmpNo(e.target.value)} />
           </div>
           <div>
             <label className={labelCls}>Employee Name</label>
-            <AppInput
-              type="search"
-              placeholder="Search name…"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+            <AppInput type="search" placeholder="Search name…" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div>
             <label className={labelCls}>Department</label>
-            <select
-              className={inputCls}
-              value={departmentId}
-              onChange={(e) => {
-                setDepartmentId(e.target.value === "" ? "" : Number(e.target.value));
-                setPage(1);
-              }}
-            >
+            <select className={inputCls} value={departmentId}
+              onChange={(e) => { setDepartmentId(e.target.value === "" ? "" : Number(e.target.value)); setPage(1); }}>
               <option value="">All departments</option>
-              {departments?.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
+              {departments?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </div>
           <div>
             <label className={labelCls}>Company</label>
-            <select
-              className={inputCls}
-              value={companyId}
-              onChange={(e) => {
-                setCompanyId(e.target.value === "" ? "" : Number(e.target.value));
-                setPage(1);
-              }}
-            >
+            <select className={inputCls} value={companyId}
+              onChange={(e) => { setCompanyId(e.target.value === "" ? "" : Number(e.target.value)); setPage(1); }}>
               <option value="">All companies</option>
-              {companies?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code ? `${c.code} — ${c.name}` : c.name}
-                </option>
-              ))}
+              {companies?.map((c) => <option key={c.id} value={c.id}>{c.code ? `${c.code} — ${c.name}` : c.name}</option>)}
             </select>
           </div>
         </div>
         {hasFilters && (
           <div className="mt-2 flex justify-end">
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="text-xs font-medium text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline"
-            >
+            <button type="button" onClick={clearFilters}
+              className="text-xs font-medium text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline">
               Clear filters
             </button>
           </div>
@@ -191,218 +250,246 @@ export default function EmployeesPage() {
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500">
             <tr>
+              {canManageUsers && (
+                <th className="w-10 px-3 py-3">
+                  <input
+                    type="checkbox"
+                    checked={allInvitableSelected}
+                    onChange={toggleAll}
+                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                    title="Select all invitable employees on this page"
+                  />
+                </th>
+              )}
               <Th>Employee #</Th>
-              <Th>Name</Th>
-              <Th>Company</Th>
+              <Th>Last Name</Th>
+              <Th>First Name</Th>
               <Th>Department</Th>
+              <Th>Location</Th>
+              <Th>Email</Th>
               <Th>Position</Th>
               <Th>Type</Th>
               <Th>Hired</Th>
               <Th>Status</Th>
+              <Th>Access</Th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {isLoading && (
-              <>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={i} className="animate-pulse">
-                    <Td><div className="h-4 w-20 rounded bg-slate-200" /></Td>
-                    <Td><div className="h-4 w-40 rounded bg-slate-200" /></Td>
-                    <Td><div className="h-4 w-24 rounded bg-slate-200" /></Td>
-                    <Td><div className="h-4 w-32 rounded bg-slate-200" /></Td>
-                    <Td><div className="h-4 w-32 rounded bg-slate-200" /></Td>
-                    <Td><div className="h-4 w-20 rounded bg-slate-200" /></Td>
-                    <Td><div className="h-4 w-20 rounded bg-slate-200" /></Td>
-                    <Td><div className="h-4 w-20 rounded bg-slate-200" /></Td>
-                  </tr>
+            {isLoading && Array.from({ length: 6 }).map((_, i) => (
+              <tr key={i} className="animate-pulse">
+                {Array.from({ length: COLS }).map((_, j) => (
+                  <Td key={j}><div className="h-4 w-20 rounded bg-slate-200" /></Td>
                 ))}
-              </>
-            )}
-            {isError && (
-              <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-red-600">
-                  Could not load employees (check you are signed in and have employee.view permission). Refresh the page.
-                </td>
-              </tr>
-            )}
-            {!isLoading && !isError && data?.data.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-slate-500">
-                  No employees yet.{" "}
-                  <Link href="/employees/new" className="text-slate-900 underline">
-                    Add the first one
-                  </Link>
-                  .
-                </td>
-              </tr>
-            )}
-            {data?.data.map((emp) => (
-              <tr 
-                key={emp.id} 
-                onClick={() => setPreviewEmployee(emp)}
-                // Accessibility keyboard additions
-                tabIndex={0}
-                aria-label={`View details for ${emp.full_name}`}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setPreviewEmployee(emp);
-                  }
-                }}
-                className="hover:bg-slate-50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:bg-slate-100 focus-visible:ring-2 focus-visible:ring-slate-900"
-              >
-                <Td>
-                  <span className="font-mono text-slate-900 font-medium">
-                    {emp.employee_no}
-                  </span>
-                </Td>
-                <Td>
-                  <span className="font-medium text-slate-900">
-                    {emp.full_name}
-                  </span>
-                </Td>
-                <Td>{emp.company?.name ?? "—"}</Td>
-                <Td>{emp.department?.name ?? "—"}</Td>
-                <Td>{emp.position?.title ?? "—"}</Td>
-                <Td>{emp.employment_type?.name ?? "—"}</Td>
-                <Td>{emp.date_hired ?? "—"}</Td>
-                <Td>
-                  <StatusBadge active={emp.is_active}>
-                    {emp.is_active ? "Active" : "Inactive"}
-                  </StatusBadge>
-                </Td>
               </tr>
             ))}
+            {isError && (
+              <tr>
+                <td colSpan={COLS} className="px-4 py-6 text-center text-red-600">
+                  Could not load employees. Refresh the page.
+                </td>
+              </tr>
+            )}
+            {!isLoading && !isError && rows.length === 0 && (
+              <tr>
+                <td colSpan={COLS} className="px-4 py-6 text-center text-slate-500">
+                  No employees yet.{" "}
+                  <Link href="/employees/new" className="text-slate-900 underline">Add the first one</Link>.
+                </td>
+              </tr>
+            )}
+            {rows.map((emp) => {
+              const isSelected = selected.has(emp.id);
+              const canSelect = emp.login_status !== "active";
+              return (
+                <tr
+                  key={emp.id}
+                  onClick={() => setPreviewEmployee(emp)}
+                  tabIndex={0}
+                  aria-label={`View details for ${emp.full_name}`}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPreviewEmployee(emp); } }}
+                  className={`cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 ${isSelected ? "bg-slate-50" : "hover:bg-slate-50"}`}
+                >
+                  {canManageUsers && (
+                    <Td>
+                      <span onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          disabled={!canSelect}
+                          onChange={() => toggleOne(emp.id)}
+                          className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 disabled:opacity-30"
+                        />
+                      </span>
+                    </Td>
+                  )}
+                  <Td><span className="font-mono text-slate-900 font-medium">{emp.employee_no}</span></Td>
+                  <Td><span className="font-medium text-slate-900">{emp.last_name ?? "—"}</span></Td>
+                  <Td><span className="font-medium text-slate-900">{emp.first_name ?? "—"}</span></Td>
+                  <Td>{emp.department?.name ?? "—"}</Td>
+                  <Td>{emp.branch?.name ?? "—"}</Td>
+                  <Td>{emp.email_company ?? emp.email_personal ?? "—"}</Td>
+                  <Td>{emp.position?.title ?? "—"}</Td>
+                  <Td>{emp.employment_type?.name ?? "—"}</Td>
+                  <Td>{emp.date_hired ?? "—"}</Td>
+                  <Td>
+                    <StatusBadge active={emp.is_active}>{emp.is_active ? "Active" : "Inactive"}</StatusBadge>
+                  </Td>
+                  <Td><AccessBadge status={emp.login_status} /></Td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </TableShell>
 
       {data && data.meta.last_page > 1 && (
         <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-500">
-            Page {data.meta.current_page} of {data.meta.last_page}
-          </span>
+          <span className="text-slate-500">Page {data.meta.current_page} of {data.meta.last_page}</span>
           <div className="flex gap-2">
-            <AppButton
-              variant="secondary"
-              disabled={!data.links.prev}
-              onClick={() => setPage((p) => p - 1)}
+            <AppButton variant="secondary" disabled={!data.links.prev} onClick={() => setPage((p) => p - 1)}>Previous</AppButton>
+            <AppButton variant="secondary" disabled={!data.links.next} onClick={() => setPage((p) => p + 1)}>Next</AppButton>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk invite action bar */}
+      {canManageUsers && selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
+          <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-xl">
+            <span className="text-sm font-medium text-slate-700">
+              {selected.size} employee{selected.size !== 1 ? "s" : ""} selected
+            </span>
+            <button
+              onClick={() => { setBulkResult(null); bulkInvite.mutate(); }}
+              disabled={bulkInvite.isPending}
+              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
             >
-              Previous
-            </AppButton>
-            <AppButton
-              variant="secondary"
-              disabled={!data.links.next}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </AppButton>
+              {bulkInvite.isPending ? "Sending…" : "Send invitations"}
+            </button>
+            <button onClick={() => setSelected(new Set())} className="text-sm text-slate-400 hover:text-slate-700">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk invite result toast */}
+      {bulkResult && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
+          <div className="flex items-center gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 shadow-xl">
+            <span className="text-sm font-medium text-emerald-800">
+              Sent {bulkResult.sent} invitation{bulkResult.sent !== 1 ? "s" : ""}
+              {bulkResult.skipped > 0 ? `, ${bulkResult.skipped} skipped` : ""}
+              {bulkResult.errors.length > 0 ? `, ${bulkResult.errors.length} failed` : ""}
+            </span>
+            <button onClick={() => setBulkResult(null)} className="text-sm text-emerald-600 hover:text-emerald-800">
+              Dismiss
+            </button>
           </div>
         </div>
       )}
 
       {showImport && (
-        <ImportModal
-          onClose={() => setShowImport(false)}
-          onDone={() => qc.invalidateQueries({ queryKey: ["employees"] })}
-        />
+        <ImportModal onClose={() => setShowImport(false)} onDone={() => qc.invalidateQueries({ queryKey: ["employees"] })} />
       )}
 
-      {/* RECORD PREVIEW DRAWER OVERLAY */}
+      {/* Record preview drawer */}
       {previewEmployee && (
         <>
-          {/* Backdrop Blur blur-shield */}
-          <div 
-            className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm transition-opacity"
-            onClick={() => setPreviewEmployee(null)}
-          />
-
-          {/* Drawer Body panel */}
+          <div className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm transition-opacity" onClick={() => setPreviewEmployee(null)} />
           <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l border-slate-200 bg-white p-6 shadow-2xl flex flex-col justify-between transform transition-transform animate-in slide-in-from-right duration-200">
             <div>
-              {/* Header */}
               <div className="flex items-start justify-between border-b border-slate-100 pb-4">
                 <div>
                   <p className="font-mono text-xs font-semibold tracking-wider text-slate-400 uppercase">Employee Details</p>
                   <h2 className="text-xl font-bold text-slate-900 mt-0.5">{previewEmployee.full_name}</h2>
                   <p className="text-sm font-mono text-slate-500 mt-0.5">ID: {previewEmployee.employee_no}</p>
                 </div>
-                <button 
-                  onClick={() => setPreviewEmployee(null)}
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
-                  aria-label="Close drawer"
-                >
+                <button onClick={() => setPreviewEmployee(null)}
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition" aria-label="Close">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
-
-              {/* Data Content Fields */}
               <div className="mt-6 space-y-5">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Status</label>
                     <div className="mt-1">
-                      <StatusBadge active={previewEmployee.is_active}>
-                        {previewEmployee.is_active ? "Active" : "Inactive"}
-                      </StatusBadge>
+                      <StatusBadge active={previewEmployee.is_active}>{previewEmployee.is_active ? "Active" : "Inactive"}</StatusBadge>
                     </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Access</label>
+                    <div className="mt-1"><AccessBadge status={previewEmployee.login_status} /></div>
                   </div>
                   <div>
                     <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Date Hired</label>
                     <p className="mt-1 text-sm font-medium text-slate-800">{previewEmployee.date_hired ?? "—"}</p>
                   </div>
                 </div>
-
                 <div className="border-t border-slate-50 pt-4">
                   <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Department</label>
                   <p className="mt-1 text-base font-semibold text-slate-900">{previewEmployee.department?.name ?? "—"}</p>
                 </div>
-
                 <div className="border-t border-slate-50 pt-4">
                   <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Job Position</label>
                   <p className="mt-1 text-base font-medium text-slate-800">{previewEmployee.position?.title ?? "—"}</p>
                 </div>
-
                 <div className="border-t border-slate-50 pt-4">
                   <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Employment Type</label>
                   <p className="mt-1 text-sm font-medium text-slate-800">{previewEmployee.employment_type?.name ?? "—"}</p>
                 </div>
               </div>
             </div>
-
-            {/* Footer Actions */}
             <div className="border-t border-slate-100 pt-4 flex gap-2">
-              <Link 
-                href={`/employees/${previewEmployee.id}`}
-                className="flex-1 inline-flex items-center justify-center rounded-xl border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 text-center"
-              >
+              <Link href={`/employees/${previewEmployee.id}`}
+                className="flex-1 inline-flex items-center justify-center rounded-xl border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 text-center">
                 View Profile
               </Link>
-              
-              <AppButton
-                variant="secondary"
-                onClick={() => router.push(`/employees/${previewEmployee.id}/edit`)}
-                className="flex items-center gap-1.5"
-                aria-label={`Edit profile for ${previewEmployee.full_name}`}
-              >
+              <AppButton variant="secondary" onClick={() => router.push(`/employees/${previewEmployee.id}/edit`)}
+                className="flex items-center gap-1.5">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
                 Edit
               </AppButton>
-
-              <button 
-                onClick={() => setPreviewEmployee(null)}
-                className="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-xl transition"
-              >
+              <button onClick={() => setPreviewEmployee(null)}
+                className="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-xl transition">
                 Close
               </button>
             </div>
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+const EMP_STAT_COLORS = {
+  slate:   { card: "bg-slate-50 border-slate-200",     num: "text-slate-900",   label: "text-slate-500" },
+  amber:   { card: "bg-amber-50 border-amber-200",     num: "text-amber-800",   label: "text-amber-600" },
+  emerald: { card: "bg-emerald-50 border-emerald-200", num: "text-emerald-800", label: "text-emerald-600" },
+  sky:     { card: "bg-sky-50 border-sky-200",         num: "text-sky-800",     label: "text-sky-600" },
+} as const;
+
+function EmpStat({
+  label, value, color,
+}: {
+  label: string; value: number | null; color: keyof typeof EMP_STAT_COLORS;
+}) {
+  const c = EMP_STAT_COLORS[color];
+  return (
+    <div className={`flex flex-col rounded-xl border p-4 ${c.card}`}>
+      <span className={`text-xs font-medium uppercase tracking-wide ${c.label}`}>{label}</span>
+      <span className={`mt-1.5 text-3xl font-bold tabular-nums ${c.num}`}>
+        {value === null ? (
+          <span className="inline-block h-8 w-14 animate-pulse rounded bg-current opacity-20" />
+        ) : (
+          value
+        )}
+      </span>
     </div>
   );
 }
@@ -438,30 +525,21 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
           departments, locations, positions and employment types are created automatically. Existing employee IDs are
           updated (blank cells never overwrite existing data); new IDs are created.
         </p>
-
-        <a
-          href={employeeImportTemplateUrl}
-          className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 underline-offset-2 hover:underline"
-        >
+        <a href={employeeImportTemplateUrl}
+          className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 underline-offset-2 hover:underline">
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5l5 5v9a2 2 0 01-2 2z" />
           </svg>
           Download template
         </a>
-
         {!result && (
           <div className="mt-4">
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv,.xlsx,text/csv"
+            <input ref={fileRef} type="file" accept=".csv,.xlsx,text/csv"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800"
-            />
+              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800" />
             {file && <p className="mt-2 text-xs text-slate-500">Selected: {file.name}</p>}
           </div>
         )}
-
         {result && (
           <div className="mt-4 space-y-3">
             <div className="flex gap-3">
@@ -472,17 +550,12 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
             </div>
             {result.errors.length > 0 && (
               <div className="max-h-40 overflow-y-auto rounded-lg border border-red-100 bg-red-50/50 p-3 text-xs text-red-700">
-                {result.errors.map((e, i) => (
-                  <div key={i}>Row {e.row}: {e.message}</div>
-                ))}
+                {result.errors.map((e, i) => <div key={i}>Row {e.row}: {e.message}</div>)}
               </div>
             )}
-            <p className="text-xs text-slate-500">
-              Any columns left blank can be completed later in each profile (or in a follow-up import).
-            </p>
+            <p className="text-xs text-slate-500">Any columns left blank can be completed later in each profile (or in a follow-up import).</p>
           </div>
         )}
-
         <div className="mt-5 flex justify-end gap-2">
           {result ? (
             <AppButton onClick={onClose}>Done</AppButton>
@@ -501,12 +574,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
 }
 
 function Stat({ label, value, tone }: { label: string; value: number; tone: "emerald" | "sky" | "amber" | "red" }) {
-  const tones = {
-    emerald: "bg-emerald-50 text-emerald-700",
-    sky: "bg-sky-50 text-sky-700",
-    amber: "bg-amber-50 text-amber-700",
-    red: "bg-red-50 text-red-700",
-  };
+  const tones = { emerald: "bg-emerald-50 text-emerald-700", sky: "bg-sky-50 text-sky-700", amber: "bg-amber-50 text-amber-700", red: "bg-red-50 text-red-700" };
   return (
     <div className={`flex-1 rounded-lg px-3 py-2 text-center ${tones[tone]}`}>
       <div className="text-lg font-bold tabular-nums">{value}</div>

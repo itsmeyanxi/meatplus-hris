@@ -11,3 +11,15 @@ export async function getPendingSummary(): Promise<PendingSummary> {
   const { data } = await api.get<PendingSummary>("/api/v1/my/pending-summary");
   return data;
 }
+
+export type AdminStats = {
+  headcount: number;
+  no_access: number;
+  pending_leaves: number;
+  today_present: number;
+};
+
+export async function getAdminStats(): Promise<AdminStats> {
+  const { data } = await api.get<AdminStats>("/api/v1/admin/stats");
+  return data;
+}
