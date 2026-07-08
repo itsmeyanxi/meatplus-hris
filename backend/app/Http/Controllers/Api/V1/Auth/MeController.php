@@ -23,7 +23,9 @@ class MeController extends Controller
         $user->load([
             'activeCompany:id,code,legal_name',
             'companies:id,code,legal_name',
-            'employee:id,user_id,employee_no,first_name,last_name',
+            'employee:id,user_id,employee_no,first_name,last_name,department_id,position_id,date_hired',
+            'employee.department:id,name',
+            'employee.position:id,title',
         ]);
 
         return response()->json([
@@ -34,13 +36,17 @@ class MeController extends Controller
                 'is_active' => $user->is_active,
                 'last_login_at' => $user->last_login_at,
                 'active_company' => $user->activeCompany,
+                'original_company_id' => $user->original_company_id,
                 'companies' => $user->companies,
                 'roles' => $user->getRoleNames()->values()->all(),
                 'permissions' => $user->getAllPermissions()->pluck('name')->unique()->values()->all(),
                 'employee' => $user->employee ? [
-                    'id' => $user->employee->id,
+                    'id'          => $user->employee->id,
                     'employee_no' => $user->employee->employee_no,
-                    'full_name' => $user->employee->full_name,
+                    'full_name'   => $user->employee->full_name,
+                    'department'  => $user->employee->department?->name,
+                    'position'    => $user->employee->position?->title,
+                    'date_hired'  => $user->employee->date_hired?->format('Y-m-d'),
                 ] : null,
             ],
         ]);

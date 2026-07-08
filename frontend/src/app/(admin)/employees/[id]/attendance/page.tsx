@@ -339,7 +339,11 @@ export default function EmployeeAttendanceTab() {
               onChange={(e) => setTo(e.target.value)}
             />
             <button
-              onClick={() => compute.mutate()}
+              onClick={() => {
+                if (window.confirm("This will re-compute DTR for the selected date range, overwriting existing records. Continue?")) {
+                  compute.mutate();
+                }
+              }}
               disabled={compute.isPending}
               className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
             >

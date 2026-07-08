@@ -22,6 +22,7 @@ class OvertimeRequestResource extends JsonResource
             'end_time' => $this->end_time,
             'requested_hours' => $this->requested_hours,
             'reason' => $this->reason,
+            'attachment_path' => $this->attachment_path,
             'status' => $this->status,
             'approved_by' => $this->whenLoaded('approver', fn () => $this->approver ? [
                 'id' => $this->approver->id,

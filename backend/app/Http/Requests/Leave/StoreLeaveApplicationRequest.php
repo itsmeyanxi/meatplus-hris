@@ -28,8 +28,9 @@ class StoreLeaveApplicationRequest extends FormRequest
                 Rule::exists('leave_types', 'id')->where('company_id', $companyId)],
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
-            'half_day' => ['nullable', 'string', 'in:am,pm'],
-            'reason' => ['required', 'string', 'max:1000'],
+            'half_day'   => ['nullable', 'string', 'in:am,pm'],
+            'reason'     => ['required', 'string', 'max:1000'],
+            'attachment' => ['nullable', 'file', 'max:5120', 'mimes:jpg,jpeg,png,pdf,doc,docx'],
         ];
     }
 }

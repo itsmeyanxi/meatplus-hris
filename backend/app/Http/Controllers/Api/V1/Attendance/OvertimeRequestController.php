@@ -13,6 +13,8 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OvertimeRequestController extends Controller
 {
@@ -47,6 +49,11 @@ class OvertimeRequestController extends Controller
         $data['employee_id'] = $this->resolveEmployeeIdForStore($request, $data);
         $data['filed_by_user_id'] = $request->user()->id;
         $data['status'] = 'pending';
+
+        if ($request->hasFile('attachment')) {
+            $data['attachment_path'] = $request->file('attachment')->store('ot-attachments', 'local');
+        }
+        unset($data['attachment']);
 
         $req = OvertimeRequest::create($data);
         $req->load(['employee:id,employee_no,first_name,last_name']);
@@ -102,6 +109,17 @@ class OvertimeRequestController extends Controller
         $this->recomputeDay($dtr, $overtimeRequest);
 
         return new OvertimeRequestResource($overtimeRequest->load(['employee']));
+    }
+
+    public function attachment(Request $request, OvertimeRequest $overtimeRequest): StreamedResponse
+    {
+        $this->assertCanView($request, $overtimeRequest);
+        abort_unless(
+            $overtimeRequest->attachment_path && Storage::disk('local')->exists($overtimeRequest->attachment_path),
+            404,
+        );
+
+        return Storage::disk('local')->download($overtimeRequest->attachment_path);
     }
 
     /** Recompute the OT date's daily record so the approved/cancelled OT is reflected. */

@@ -25,11 +25,19 @@ export function downloadDtrReport(params: { date_from: string; date_to: string; 
   }, `dtr_${params.date_from}_to_${params.date_to}.csv`);
 }
 
-export function downloadLeaveReport(params: { date_from?: string; date_to?: string; status?: string }) {
+export function downloadLeaveReport(params: {
+  date_from?: string;
+  date_to?: string;
+  status?: string;
+  employee_id?: number | "";
+  department_id?: number | "";
+}) {
   return downloadCsv("/api/v1/reports/leave", {
     date_from: params.date_from || undefined,
     date_to: params.date_to || undefined,
     status: params.status || undefined,
+    employee_id: params.employee_id || undefined,
+    department_id: params.department_id || undefined,
   }, "leave_report.csv");
 }
 

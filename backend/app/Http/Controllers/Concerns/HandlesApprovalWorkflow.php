@@ -27,18 +27,38 @@ use Illuminate\Validation\ValidationException;
 trait HandlesApprovalWorkflow
 {
     /**
-     * Apply ownership scope to listing queries for non-viewers.
-     * Returns the (possibly-scoped) query.
+     * Apply ownership scope to listing queries.
+     *
+     * - attendance.view.any / attendance.manage → HR/IT: see all company requests
+     * - attendance.approve.*                    → Dept heads: see own + direct reports + dept members
+     * - otherwise                               → Employees: own requests only
      */
     protected function applyListingScope(Builder $query, Request $request): Builder
     {
-        if ($request->user()->can('attendance.view')) {
-            return $query; // CompanyScope handles tenant; nothing more to apply
+        $user = $request->user();
+
+        if ($user->can('attendance.view.any') || $user->can('attendance.manage')) {
+            return $query;
         }
 
-        $employee = $request->user()->employee;
+        $employee = $user->employee;
         if (! $employee) {
             abort(403, 'You are not linked to an employee record.');
+        }
+
+        // Dept heads / approvers see requests within their department scope.
+        if ($user->can('attendance.approve.self_dept') || $user->can('attendance.approve.any')) {
+            $approverEmpId = $employee->id;
+
+            return $query->where(function (Builder $q) use ($approverEmpId) {
+                $q->where('employee_id', $approverEmpId)
+                  ->orWhereHas('employee', function (Builder $eq) use ($approverEmpId) {
+                      $eq->where('manager_employee_id', $approverEmpId)
+                         ->orWhereHas('department', function (Builder $dq) use ($approverEmpId) {
+                             $dq->where('head_employee_id', $approverEmpId);
+                         });
+                  });
+            });
         }
 
         return $query->where('employee_id', $employee->id);
@@ -46,19 +66,31 @@ trait HandlesApprovalWorkflow
 
     /**
      * Throw 403 if the current user may not VIEW this single request.
-     * Mirrors applyListingScope: viewers see any company request; everyone else
-     * may only see their own. Prevents reading a colleague's request by ID.
+     *
+     * - HR/IT: allowed for any company record
+     * - Dept heads: allowed for their own or within their approval scope
+     * - Everyone else: own record only
      */
     protected function assertCanView(Request $request, Model $model): void
     {
-        if ($request->user()->can('attendance.view')) {
-            return; // CompanyScope already constrained the binding to the tenant
+        $user = $request->user();
+
+        if ($user->can('attendance.view.any') || $user->can('attendance.manage')) {
+            return;
         }
 
-        $employee = $request->user()->employee;
-        if (! $employee || $model->employee_id !== $employee->id) {
-            abort(403, 'You do not have permission to view this request.');
+        $employee = $user->employee;
+
+        if ($employee && $model->employee_id === $employee->id) {
+            return;
         }
+
+        if (($user->can('attendance.approve.self_dept') || $user->can('attendance.approve.any'))
+            && $this->isWithinApproverScope($user, $model)) {
+            return;
+        }
+
+        abort(403, 'You do not have permission to view this request.');
     }
 
     /**

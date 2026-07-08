@@ -12,6 +12,26 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class LeaveBalanceController extends Controller
 {
+    public function adjust(Request $request, LeaveBalance $leaveBalance): LeaveBalanceResource
+    {
+        abort_unless($request->user()->can('leave.approve.any'), 403);
+        abort_unless(
+            $leaveBalance->employee->company_id === $request->user()->active_company_id,
+            403,
+        );
+
+        $validated = $request->validate([
+            'adjustment' => ['required', 'numeric'],
+            'note'       => ['required', 'string', 'max:500'],
+        ]);
+
+        $leaveBalance->increment('granted_adhoc', (float) $validated['adjustment']);
+        $leaveBalance->refresh();
+        $leaveBalance->load(['employee:id,employee_no,first_name,last_name,company_id', 'leaveType:id,code,name']);
+
+        return new LeaveBalanceResource($leaveBalance);
+    }
+
     public function index(Request $request, LeaveBalanceService $service): AnonymousResourceCollection
     {
         $user = $request->user();

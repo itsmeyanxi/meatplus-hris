@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -8,6 +9,7 @@ import { PageHeader, AppButton, TableShell } from "@/components/ui";
 import { TableSkeleton } from "@/components/feedback";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { payrollApi, peso, type RunStatus } from "@/lib/payroll";
+import { downloadPayrollReport } from "@/lib/reports";
 
 const STATUS_STYLES: Record<RunStatus, string> = {
   draft: "bg-slate-100 text-slate-600",
@@ -22,6 +24,7 @@ export default function PayrollRunPage() {
   const router = useRouter();
   const qc = useQueryClient();
   const { confirm, dialog } = useConfirm();
+  const [isExporting, setIsExporting] = useState(false);
 
   const { data: run, isLoading } = useQuery({
     queryKey: ["payroll-run", id],
@@ -45,6 +48,16 @@ export default function PayrollRunPage() {
     onSuccess: () => { toast.success("Run deleted."); qc.invalidateQueries({ queryKey: ["payroll-runs"] }); router.push("/payroll"); },
   });
 
+  const handleExport = async () => {
+    if (!run) return;
+    setIsExporting(true);
+    try {
+      await downloadPayrollReport(id, run.name);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (isLoading || !run) return <div className="space-y-4"><TableShell><TableSkeleton rows={6} cols={7} /></TableShell></div>;
 
   const slips = run.payslips ?? [];
@@ -65,8 +78,22 @@ export default function PayrollRunPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${STATUS_STYLES[run.status]}`}>{run.status}</span>
+            {slips.length > 0 && (
+              <AppButton variant="secondary" onClick={handleExport} disabled={isExporting || busy}>
+                {isExporting ? "Exporting…" : "Export CSV"}
+              </AppButton>
+            )}
             {(run.status === "draft" || run.status === "computed") && (
-              <AppButton onClick={() => compute.mutate()} disabled={busy}>{compute.isPending ? "Computing…" : "Compute"}</AppButton>
+              <AppButton
+                onClick={() => {
+                  if (window.confirm("Re-computing will overwrite all existing payslips for this run. Continue?")) {
+                    compute.mutate();
+                  }
+                }}
+                disabled={busy}
+              >
+                {compute.isPending ? "Computing…" : "Compute"}
+              </AppButton>
             )}
             {run.status === "computed" && (
               <AppButton onClick={() => approve.mutate()} disabled={busy}>Approve</AppButton>
@@ -120,7 +147,11 @@ export default function PayrollRunPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {slips.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50/60">
+                  <tr
+                    key={s.id}
+                    className="cursor-pointer hover:bg-slate-50"
+                    onClick={() => router.push(`/payroll/${id}/payslips/${s.id}`)}
+                  >
                     <td className="px-3 py-2.5">
                       <div className="font-medium text-slate-800">{s.employee.name}</div>
                       <div className="font-mono text-xs text-slate-400">{s.employee.employee_no}</div>

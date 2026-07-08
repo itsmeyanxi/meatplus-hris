@@ -14,7 +14,8 @@ class OvertimeRequest extends Model
 
     protected $fillable = [
         'company_id', 'employee_id', 'date', 'start_time', 'end_time',
-        'requested_hours', 'reason',
+        'requested_hours', 'reason', 'classification', 'ticket_number',
+        'attachment_path',
         'status', 'approved_by_user_id', 'decided_at', 'decision_remarks',
         'filed_by_user_id',
     ];

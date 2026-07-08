@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { StatusPill } from "@/components/approvals/StatusPill";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { useAttendancePerms } from "@/lib/permissions";
-import type { RequestStatus } from "@/lib/approvals";
+import type { PaginatedList, PaginationMeta, RequestStatus } from "@/lib/approvals";
 
 type BaseRow = {
   id: number;
@@ -19,7 +19,7 @@ type BaseRow = {
 };
 
 type ReqApi<T> = {
-  list: (params?: { status?: RequestStatus }) => Promise<T[]>;
+  list: (params?: { status?: RequestStatus; page?: number }) => Promise<PaginatedList<T>>;
   approve: (id: number) => Promise<T>;
   reject: (id: number) => Promise<T>;
   cancel: (id: number) => Promise<T>;
@@ -51,11 +51,21 @@ export function RequestTable<T extends BaseRow>({
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [errorRowId, setErrorRowId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
 
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: [slug, { status }],
-    queryFn: () => api.list({ status: status || undefined }),
+  // Reset page when status filter changes
+  const handleStatusChange = (s: RequestStatus | "") => {
+    setStatus(s);
+    setPage(1);
+  };
+
+  const { data: result, isLoading } = useQuery({
+    queryKey: [slug, { status, page }],
+    queryFn: () => api.list({ status: status || undefined, page }),
   });
+  const rows = result?.data ?? [];
+  const meta: PaginationMeta | undefined = result?.meta;
 
   const filtered = useMemo(
     () =>
@@ -80,7 +90,8 @@ export function RequestTable<T extends BaseRow>({
   const act = useMutation({
     mutationFn: ({ id, action }: { id: number; action: "approve" | "reject" | "cancel" }) =>
       api[action](id),
-    onSuccess: invalidate,
+    onSuccess: () => { invalidate(); setErrorRowId(null); },
+    onError: (_err, variables) => setErrorRowId(variables.id),
   });
 
   const bulk = useMutation({
@@ -118,7 +129,7 @@ export function RequestTable<T extends BaseRow>({
               {STATUSES.map((s) => (
                 <button
                   key={s || "all"}
-                  onClick={() => setStatus(s)}
+                  onClick={() => handleStatusChange(s)}
                   className={
                     status === s
                       ? "rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium capitalize text-white"
@@ -288,6 +299,9 @@ export function RequestTable<T extends BaseRow>({
                         </>
                       )}
                     </div>
+                    {act.isError && errorRowId === r.id && (
+                      <p className="text-xs text-red-600 mt-1">Failed. Please try again.</p>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -296,10 +310,32 @@ export function RequestTable<T extends BaseRow>({
         )}
       </div>
 
-      <p className="text-xs text-slate-400">
-        Showing {filtered.length}
-        {rows.length >= 500 ? " (first 500 — narrow with filters to see more)" : ""}.
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-slate-400">
+          {meta
+            ? `Showing ${filtered.length} of ${meta.total} total (page ${meta.current_page} of ${meta.last_page})`
+            : `Showing ${filtered.length}`}
+        </p>
+        {meta && meta.last_page > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium hover:bg-slate-100 disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <span className="text-xs text-slate-500">{page} / {meta.last_page}</span>
+            <button
+              disabled={page >= meta.last_page}
+              onClick={() => setPage((p) => p + 1)}
+              className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium hover:bg-slate-100 disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

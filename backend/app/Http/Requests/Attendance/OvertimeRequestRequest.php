@@ -28,7 +28,10 @@ class OvertimeRequestRequest extends FormRequest
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
             'requested_hours' => ['required', 'numeric', 'min:0.25', 'max:24'],
-            'reason' => ['required', 'string', 'max:1000'],
+            'reason'         => ['required', 'string', 'max:1000'],
+            'classification' => ['required', Rule::in(['early', 'normal'])],
+            'ticket_number'  => ['nullable', 'string', 'max:100'],
+            'attachment'     => ['nullable', 'file', 'max:5120', 'mimes:jpg,jpeg,png,pdf,doc,docx'],
         ];
     }
 }

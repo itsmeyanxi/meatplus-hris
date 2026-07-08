@@ -28,6 +28,7 @@ class User extends Authenticatable
         'username',
         'password',
         'active_company_id',
+        'original_company_id',
         'is_active',
         'last_login_at',
     ];
@@ -52,6 +53,18 @@ class User extends Authenticatable
     public function activeCompany(): BelongsTo
     {
         return $this->belongsTo(Company::class, 'active_company_id');
+    }
+
+    public function originalCompany(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'original_company_id');
+    }
+
+    /** True when the user is still in the company they started in (never switched away). */
+    public function isAtHomeCompany(): bool
+    {
+        return $this->original_company_id === null
+            || $this->active_company_id === $this->original_company_id;
     }
 
     public function companies(): BelongsToMany

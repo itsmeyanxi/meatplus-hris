@@ -81,18 +81,18 @@ class UserController extends Controller
     {
         $this->ensureSameCompany($request, $user);
 
-        $data = $request->validated();
-        $role = $data['role'] ?? null;
-        unset($data['role']);
+        $data  = $request->validated();
+        $roles = $data['roles'] ?? null;
+        unset($data['roles']);
 
         if (! empty($data)) {
             $user->update($data);
         }
 
-        if ($role) {
+        if ($roles) {
             $companyId = $request->user()->active_company_id;
             setPermissionsTeamId($companyId);
-            $user->syncRoles([$role]);
+            $user->syncRoles($roles);
         }
 
         return new UserResource($user->fresh(['employee']));
@@ -112,7 +112,7 @@ class UserController extends Controller
         ]);
     }
 
-    public function destroy(Request $request, User $user): JsonResponse
+    public function deactivate(Request $request, User $user): JsonResponse
     {
         abort_unless($request->user()->can('user.manage'), 403);
         $this->ensureSameCompany($request, $user);
@@ -122,9 +122,32 @@ class UserController extends Controller
         }
 
         $user->update(['is_active' => false]);
+
+        return response()->json(['data' => UserResource::make($user->fresh(['employee']))]);
+    }
+
+    public function activate(Request $request, User $user): JsonResponse
+    {
+        abort_unless($request->user()->can('user.manage'), 403);
+        $this->ensureSameCompany($request, $user);
+
+        $user->update(['is_active' => true]);
+
+        return response()->json(['data' => UserResource::make($user->fresh(['employee']))]);
+    }
+
+    public function destroy(Request $request, User $user): JsonResponse
+    {
+        abort_unless($request->user()->can('user.manage'), 403);
+        $this->ensureSameCompany($request, $user);
+
+        if ($user->id === $request->user()->id) {
+            throw ValidationException::withMessages(['user' => 'You cannot delete yourself.']);
+        }
+
         $user->delete(); // soft delete
 
-        return response()->json(['message' => 'User deactivated.']);
+        return response()->json(['message' => 'User deleted.']);
     }
 
     /**

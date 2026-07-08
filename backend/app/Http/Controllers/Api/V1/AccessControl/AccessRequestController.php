@@ -10,7 +10,9 @@ use App\Http\Requests\AccessControl\StoreAccessRequestRequest;
 use App\Http\Resources\AccessControl\AccessRequestResource;
 use App\Models\User;
 use App\Notifications\AccessRequestAwaitingApproval;
+use App\Notifications\AccessRequestCreated;
 use App\Notifications\AccessRequestDecided;
+use App\Notifications\AccessRequestStageAdvanced;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -58,7 +60,9 @@ class AccessRequestController extends Controller
             ->whereIn('current_stage', $stages)
             ->latest('id');
 
-        return AccessRequestResource::collection($q->limit(500)->get());
+        $perPage = min((int) $request->query('per_page', 50), 200);
+
+        return AccessRequestResource::collection($q->paginate($perPage));
     }
 
     /** Self-service: the authenticated user's own submitted access requests. */
@@ -123,7 +127,6 @@ class AccessRequestController extends Controller
                 'requested_by_user_id' => $user->id,
                 'request_type' => $data['request_type'],
                 'effective_date' => $data['effective_date'],
-                'ticket_number' => $data['ticket_number'] ?? null,
                 'employee_name' => $data['employee_name'],
                 'employee_id_number' => $data['employee_id_number'],
                 'position' => $data['position'],
@@ -136,6 +139,11 @@ class AccessRequestController extends Controller
                 'status' => 'pending',
                 'current_stage' => 'supervisor',
                 'submitted_at' => now(),
+            ]);
+
+            // Auto-generate a unique ticket number using the record ID so there are no race conditions.
+            $accessRequest->update([
+                'ticket_number' => 'AR-' . now()->format('Y') . '-' . str_pad($accessRequest->id, 4, '0', STR_PAD_LEFT),
             ]);
 
             foreach (($data['modules'] ?? []) as $module => $levels) {
@@ -163,6 +171,9 @@ class AccessRequestController extends Controller
         });
 
         $accessRequest->load(['requester:id,name,email', 'modules', 'approvals']);
+
+        // Notify the requester with their ticket number confirmation.
+        $this->notifyRequesterCreated($accessRequest);
 
         // Alert the first-stage approvers that a request is waiting.
         $this->notifyStageApprovers($accessRequest);
@@ -251,8 +262,9 @@ class AccessRequestController extends Controller
             app(AccessProvisioner::class)->apply($accessRequest);
             $this->notifyRequester($accessRequest, 'approved');
         } else {
-            // Moved to the next stage — alert that stage's approvers.
+            // Moved to the next stage — alert that stage's approvers and the requester.
             $this->notifyStageApprovers($accessRequest);
+            $this->notifyRequesterStageAdvanced($accessRequest, $stage, $accessRequest->current_stage);
         }
 
         return new AccessRequestResource(
@@ -312,11 +324,49 @@ class AccessRequestController extends Controller
         }
     }
 
+    private function notifyRequesterCreated(AccessRequest $accessRequest): void
+    {
+        $notification   = new AccessRequestCreated($accessRequest);
+        $requesterEmail = $accessRequest->requester?->email;
+
+        if ($accessRequest->requester) {
+            $accessRequest->requester->notify($notification);
+        }
+
+        $companyEmail = $accessRequest->company_email;
+        if ($companyEmail && $companyEmail !== $requesterEmail) {
+            Notification::route('mail', $companyEmail)->notify($notification);
+        }
+    }
+
     private function notifyRequester(AccessRequest $accessRequest, string $outcome, ?string $remarks = null): void
     {
-        $requester = $accessRequest->requester;
-        if ($requester) {
-            $requester->notify(new AccessRequestDecided($accessRequest, $outcome, $remarks));
+        $notification    = new AccessRequestDecided($accessRequest, $outcome, $remarks);
+        $requesterEmail  = $accessRequest->requester?->email;
+
+        if ($accessRequest->requester) {
+            $accessRequest->requester->notify($notification);
+        }
+
+        // Also email the target employee directly if their company_email differs from the submitter.
+        $companyEmail = $accessRequest->company_email;
+        if ($companyEmail && $companyEmail !== $requesterEmail) {
+            Notification::route('mail', $companyEmail)->notify($notification);
+        }
+    }
+
+    private function notifyRequesterStageAdvanced(AccessRequest $accessRequest, string $fromStage, string $toStage): void
+    {
+        $notification   = new AccessRequestStageAdvanced($accessRequest, $fromStage, $toStage);
+        $requesterEmail = $accessRequest->requester?->email;
+
+        if ($accessRequest->requester) {
+            $accessRequest->requester->notify($notification);
+        }
+
+        $companyEmail = $accessRequest->company_email;
+        if ($companyEmail && $companyEmail !== $requesterEmail) {
+            Notification::route('mail', $companyEmail)->notify($notification);
         }
     }
 }

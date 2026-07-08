@@ -13,7 +13,7 @@ class OfficialBusinessRequest extends Model
     use BelongsToCompany;
 
     protected $fillable = [
-        'company_id', 'employee_id', 'date', 'start_time', 'end_time',
+        'company_id', 'employee_id', 'date', 'date_to', 'start_time', 'end_time',
         'location', 'purpose',
         'status', 'approved_by_user_id', 'decided_at', 'decision_remarks',
         'filed_by_user_id',
@@ -22,7 +22,8 @@ class OfficialBusinessRequest extends Model
     protected function casts(): array
     {
         return [
-            'date' => 'date',
+            'date'    => 'date',
+            'date_to' => 'date',
             'decided_at' => 'datetime',
         ];
     }

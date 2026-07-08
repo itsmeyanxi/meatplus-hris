@@ -8,10 +8,18 @@ export type Me = {
     is_active: boolean;
     last_login_at: string | null;
     active_company: { id: number; code: string; legal_name: string } | null;
+    original_company_id: number | null;
     companies: Array<{ id: number; code: string; legal_name: string }>;
     roles: string[];
     permissions: string[];
-    employee: { id: number; employee_no: string; full_name: string } | null;
+    employee: {
+      id: number;
+      employee_no: string;
+      full_name: string;
+      department: string | null;
+      position: string | null;
+      date_hired: string | null;
+    } | null;
   };
 };
 
@@ -38,6 +46,14 @@ export async function getMe(): Promise<Me> {
 
 export async function switchCompany(companyId: number): Promise<void> {
   await api.post("/api/v1/companies/switch", { company_id: companyId });
+}
+
+export async function changePassword(data: {
+  current_password: string;
+  password: string;
+  password_confirmation: string;
+}): Promise<void> {
+  await api.post("/api/v1/my/change-password", data);
 }
 
 export async function forgotPassword(email: string): Promise<void> {

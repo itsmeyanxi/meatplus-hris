@@ -25,6 +25,7 @@ export type Payslip = {
   overtime_minutes: number;
   basic_pay: string | number;
   overtime_pay: string | number;
+  night_diff_pay?: string | number;
   allowance: string | number;
   gross_pay: string | number;
   sss: string | number;

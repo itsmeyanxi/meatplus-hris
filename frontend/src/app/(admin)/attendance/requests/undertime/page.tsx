@@ -26,13 +26,14 @@ export default function UndertimeRequestsPage() {
     end_time: "",
     requested_hours: 0,
     reason: "",
+    classification: "normal",
   });
 
   const create = useMutation({
     mutationFn: () => undertimeApi.create(form),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["undertime-requests"] });
-      setForm({ employee_id: undefined, date: "", start_time: "", end_time: "", requested_hours: 0, reason: "" });
+      setForm({ employee_id: undefined, date: "", start_time: "", end_time: "", requested_hours: 0, reason: "", classification: "normal" });
       setIsAdding(false);
     },
     meta: { successMessage: "Undertime request filed." },

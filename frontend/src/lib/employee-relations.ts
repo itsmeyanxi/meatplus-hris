@@ -129,3 +129,107 @@ export const employmentHistoryApi = {
   destroy: (employeeId: number, id: number) =>
     api.delete(nest(employeeId, `employment-history/${id}`)),
 };
+
+// ── Government IDs (HasOne — single record per employee) ────────────────────
+
+export type GovernmentId = {
+  id: number;
+  employee_id: number;
+  tin: string | null;
+  sss_no: string | null;
+  philhealth_no: string | null;
+  pagibig_no: string | null;
+  prc_no: string | null;
+  prc_expiry: string | null;
+  updated_at: string | null;
+};
+
+export type GovernmentIdInput = {
+  tin?: string | null;
+  sss_no?: string | null;
+  philhealth_no?: string | null;
+  pagibig_no?: string | null;
+  prc_no?: string | null;
+  prc_expiry?: string | null;
+};
+
+export const governmentIdsApi = {
+  get: async (employeeId: number): Promise<GovernmentId | null> => {
+    const { data } = await api.get<{ data: GovernmentId | null }>(nest(employeeId, "government-ids"));
+    return data.data;
+  },
+  save: async (employeeId: number, body: GovernmentIdInput): Promise<GovernmentId> => {
+    const { data } = await api.put<{ data: GovernmentId }>(nest(employeeId, "government-ids"), body);
+    return data.data;
+  },
+};
+
+// ── Bank Accounts ────────────────────────────────────────────────────────────
+
+export type BankAccount = {
+  id: number;
+  employee_id: number;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  is_primary: boolean;
+  purpose: string;
+  created_at: string | null;
+};
+
+export type BankAccountInput = {
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  is_primary?: boolean;
+  purpose?: string;
+};
+
+export const bankAccountsApi = {
+  list: async (employeeId: number): Promise<BankAccount[]> => {
+    const { data } = await api.get<Listed<BankAccount>>(nest(employeeId, "bank-accounts"));
+    return data.data;
+  },
+  create: async (employeeId: number, body: BankAccountInput): Promise<BankAccount> => {
+    const { data } = await api.post<{ data: BankAccount }>(nest(employeeId, "bank-accounts"), body);
+    return data.data;
+  },
+  destroy: (employeeId: number, id: number) =>
+    api.delete(nest(employeeId, `bank-accounts/${id}`)),
+};
+
+// ── Contracts ────────────────────────────────────────────────────────────────
+
+export type Contract = {
+  id: number;
+  employee_id: number;
+  contract_type: string;
+  effective_from: string;
+  effective_to: string | null;
+  position_id: number;
+  position: { id: number; title: string } | null;
+  monthly_rate: string;
+  signed_at: string | null;
+  created_at: string | null;
+};
+
+export type ContractInput = {
+  contract_type: string;
+  effective_from: string;
+  effective_to?: string | null;
+  position_id: number | string;
+  monthly_rate: number | string;
+};
+
+export const contractsApi = {
+  list: async (employeeId: number): Promise<Contract[]> => {
+    const { data } = await api.get<Listed<Contract>>(nest(employeeId, "contracts"));
+    return data.data;
+  },
+  create: async (employeeId: number, body: ContractInput): Promise<Contract> => {
+    const { data } = await api.post<{ data: Contract }>(nest(employeeId, "contracts"), body);
+    return data.data;
+  },
+  destroy: (employeeId: number, id: number) =>
+    api.delete(nest(employeeId, `contracts/${id}`)),
+};

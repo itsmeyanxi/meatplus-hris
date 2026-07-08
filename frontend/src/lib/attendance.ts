@@ -248,3 +248,67 @@ export const shiftAdjustmentsApi = {
   destroy: (employeeId: number, id: number) =>
     api.delete(`/api/v1/employees/${employeeId}/shift-adjustments/${id}`),
 };
+
+// ── Schedule adjustment requests (employee-filed, approval-based) ─────────
+
+export type SchedAdjStatus = "pending" | "approved" | "rejected" | "cancelled" | "resubmitted";
+
+export type ScheduleAdjustmentReq = {
+  id: number;
+  employee_id: number;
+  employee?: { id: number; employee_no: string; full_name: string };
+  from_date: string;
+  to_date: string;
+  shift_start: string;
+  break_start: string | null;
+  break_end: string | null;
+  shift_end: string;
+  reason: string | null;
+  status: SchedAdjStatus;
+  decided_by?: { id: number; name: string } | null;
+  decided_at: string | null;
+  decision_remarks: string | null;
+  filed_by_user_id: number | null;
+  created_at: string;
+};
+
+export type ScheduleAdjustmentReqInput = {
+  employee_id?: number;
+  from_date: string;
+  to_date: string;
+  shift_start: string;
+  break_start?: string | null;
+  break_end?: string | null;
+  shift_end: string;
+  reason?: string | null;
+};
+
+export type SchedAdjPaginationMeta = {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+};
+
+export const schedAdjApi = {
+  list: async (params: { status?: string; employee_id?: number; page?: number } = {}): Promise<{ data: ScheduleAdjustmentReq[]; meta?: SchedAdjPaginationMeta }> => {
+    const { data } = await api.get<{ data: ScheduleAdjustmentReq[]; meta?: SchedAdjPaginationMeta }>("/api/v1/schedule-adjustment-requests", { params });
+    return { data: data.data, meta: data.meta };
+  },
+  create: async (body: ScheduleAdjustmentReqInput): Promise<ScheduleAdjustmentReq> => {
+    const { data } = await api.post<{ data: ScheduleAdjustmentReq }>("/api/v1/schedule-adjustment-requests", body);
+    return data.data;
+  },
+  approve: async (id: number, remarks?: string): Promise<ScheduleAdjustmentReq> => {
+    const { data } = await api.post<{ data: ScheduleAdjustmentReq }>(`/api/v1/schedule-adjustment-requests/${id}/approve`, { decision_remarks: remarks });
+    return data.data;
+  },
+  reject: async (id: number, remarks?: string): Promise<ScheduleAdjustmentReq> => {
+    const { data } = await api.post<{ data: ScheduleAdjustmentReq }>(`/api/v1/schedule-adjustment-requests/${id}/reject`, { decision_remarks: remarks });
+    return data.data;
+  },
+  cancel: async (id: number): Promise<ScheduleAdjustmentReq> => {
+    const { data } = await api.post<{ data: ScheduleAdjustmentReq }>(`/api/v1/schedule-adjustment-requests/${id}/cancel`);
+    return data.data;
+  },
+};

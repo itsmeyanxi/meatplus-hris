@@ -15,7 +15,12 @@ class ShiftAdjustmentController extends Controller
 {
     public function index(Request $request, Employee $employee): JsonResponse
     {
-        abort_unless($request->user()->can('attendance.view'), 403);
+        $user = $request->user();
+
+        // HR/viewers see any employee; employees may only view their own record.
+        if (! $user->can('attendance.view')) {
+            abort_unless($user->employee?->id === $employee->id, 403);
+        }
 
         $items = ShiftAdjustment::query()
             ->where('employee_id', $employee->id)

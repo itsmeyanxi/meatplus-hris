@@ -24,11 +24,12 @@ class OfficialBusinessRequestRequest extends FormRequest
                 'integer',
                 Rule::exists('employees', 'id')->where('company_id', $companyId),
             ],
-            'date' => ['required', 'date'],
+            'date'       => ['required', 'date'],
+            'date_to'    => ['nullable', 'date', 'after_or_equal:date'],
             'start_time' => ['nullable', 'date_format:H:i'],
-            'end_time' => ['nullable', 'date_format:H:i', 'after:start_time'],
-            'location' => ['required', 'string', 'max:200'],
-            'purpose' => ['required', 'string', 'max:1000'],
+            'end_time'   => ['nullable', 'date_format:H:i', 'after:start_time'],
+            'location'   => ['required', 'string', 'max:200'],
+            'purpose'    => ['required', 'string', 'max:1000'],
         ];
     }
 }

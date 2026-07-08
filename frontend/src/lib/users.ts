@@ -36,7 +36,7 @@ export type UpdateUserInput = Partial<{
   name: string;
   email: string;
   is_active: boolean;
-  role: Role;
+  roles: Role[];
 }>;
 
 type Listed<T> = { data: T[] };
@@ -69,6 +69,14 @@ export const usersApi = {
   resetPassword: async (id: number): Promise<{ temporary_password: string }> => {
     const { data } = await api.post<{ temporary_password: string }>(`/api/v1/users/${id}/reset-password`, {});
     return data;
+  },
+  deactivate: async (id: number): Promise<UserItem> => {
+    const { data } = await api.patch<{ data: UserItem }>(`/api/v1/users/${id}/deactivate`);
+    return data.data;
+  },
+  activate: async (id: number): Promise<UserItem> => {
+    const { data } = await api.patch<{ data: UserItem }>(`/api/v1/users/${id}/activate`);
+    return data.data;
   },
   destroy: (id: number) => api.delete(`/api/v1/users/${id}`),
   provisionForEmployee: async (

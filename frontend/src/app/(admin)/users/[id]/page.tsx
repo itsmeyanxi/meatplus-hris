@@ -31,7 +31,7 @@ export default function UserDetailPage() {
   const [hydrated, setHydrated] = useState(false);
   if (user && !hydrated) {
     setHydrated(true);
-    setForm({ name: user.name, email: user.email, role: user.roles[0] ?? "employee", is_active: user.is_active });
+    setForm({ name: user.name, email: user.email, roles: user.roles, is_active: user.is_active });
   }
 
   const update = useMutation({
@@ -52,6 +52,20 @@ export default function UserDetailPage() {
     mutationFn: () => usersApi.resetPassword(userId),
     onSuccess: (d) => setTempPw(d.temporary_password),
   });
+  const deactivate = useMutation({
+    mutationFn: () => usersApi.deactivate(userId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["user", userId] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+  const activate = useMutation({
+    mutationFn: () => usersApi.activate(userId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["user", userId] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
   const destroy = useMutation({
     mutationFn: () => usersApi.destroy(userId),
     onSuccess: () => router.push("/users"),
@@ -64,7 +78,18 @@ export default function UserDetailPage() {
       {dialog}
       <div>
         <Link href="/users" className="text-xs text-slate-500 hover:underline">← Users</Link>
-        <h2 className="mt-1 text-2xl font-semibold">{user.name}</h2>
+        <div className="mt-1 flex items-center gap-3">
+          <h2 className="text-2xl font-semibold">{user.name}</h2>
+          {user.is_active ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Active
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
+              <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />Inactive
+            </span>
+          )}
+        </div>
         <p className="text-sm text-slate-500">
           {user.email}{user.employee && <> · linked to <Link href={`/employees/${user.employee.id}`} className="underline">{user.employee.full_name}</Link></>}
         </p>
@@ -92,10 +117,37 @@ export default function UserDetailPage() {
           <input type="email" className={inputCls} value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">Role</label>
-          <select className={inputCls} value={form.role ?? user.roles[0]} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
-            {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
+          <label className="mb-1 block text-xs font-medium text-slate-600">Roles</label>
+          <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            {(Object.entries(ROLE_LABELS) as [Role, string][]).map(([key, label]) => {
+              const checked = (form.roles ?? user.roles).includes(key);
+              return (
+                <label key={key} className={`flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition ${checked ? "bg-slate-900 text-white" : "bg-white text-slate-700 hover:bg-slate-100"} border border-slate-200`}>
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={checked}
+                    onChange={() => {
+                      const current = form.roles ?? user.roles;
+                      setForm({
+                        ...form,
+                        roles: checked
+                          ? current.filter((r) => r !== key)
+                          : [...current, key],
+                      });
+                    }}
+                  />
+                  <span className={`h-3.5 w-3.5 shrink-0 rounded border ${checked ? "border-white bg-white" : "border-slate-300 bg-white"} flex items-center justify-center`}>
+                    {checked && <svg className="h-2.5 w-2.5 text-slate-900" viewBox="0 0 12 12" fill="currentColor"><path d="M10 3L5 8.5 2 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+                  </span>
+                  {label}
+                </label>
+              );
+            })}
+          </div>
+          {(form.roles ?? user.roles).length === 0 && (
+            <p className="mt-1 text-xs text-red-600">At least one role is required.</p>
+          )}
         </div>
         <div>
           <label className="flex items-center gap-2 text-sm">
@@ -106,7 +158,7 @@ export default function UserDetailPage() {
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         {saved && !error && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">Saved.</p>}
         <div className="flex justify-end">
-          <button type="submit" disabled={update.isPending} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
+          <button type="submit" disabled={update.isPending || (form.roles ?? user.roles).length === 0} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
             {update.isPending ? "Saving…" : "Save changes"}
           </button>
         </div>
@@ -121,11 +173,29 @@ export default function UserDetailPage() {
           >
             Reset password
           </button>
+          {user.is_active ? (
+            <button
+              disabled={deactivate.isPending}
+              onClick={async () => { if (await confirm({ title: "Deactivate user", message: `Deactivate ${user.name}? They will no longer be able to log in.`, confirmLabel: "Deactivate", danger: true })) deactivate.mutate(); }}
+              className="rounded-md border border-amber-300 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+            >
+              {deactivate.isPending ? "Deactivating…" : "Deactivate user"}
+            </button>
+          ) : (
+            <button
+              disabled={activate.isPending}
+              onClick={async () => { if (await confirm({ title: "Re-activate user", message: `Re-activate ${user.name}? They will be able to log in again.`, confirmLabel: "Re-activate" })) activate.mutate(); }}
+              className="rounded-md border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+            >
+              {activate.isPending ? "Activating…" : "Re-activate user"}
+            </button>
+          )}
           <button
-            onClick={async () => { if (await confirm({ title: "Deactivate user", message: `Deactivate ${user.name}? They will no longer be able to log in.`, confirmLabel: "Deactivate", danger: true })) destroy.mutate(); }}
-            className="rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+            disabled={destroy.isPending}
+            onClick={async () => { if (await confirm({ title: "Delete user permanently", message: `Permanently delete ${user.name}? This cannot be undone.`, confirmLabel: "Delete permanently", danger: true })) destroy.mutate(); }}
+            className="rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
           >
-            Deactivate user
+            {destroy.isPending ? "Deleting…" : "Delete permanently"}
           </button>
         </div>
       </section>

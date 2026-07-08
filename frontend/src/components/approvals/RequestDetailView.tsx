@@ -43,7 +43,9 @@ export function RequestDetailView<T extends BaseReq>({
 }) {
   const qc = useQueryClient();
   const detailKey = [slug, id];
-  const [remarks, setRemarks] = useState("");
+  const [approveRemarks, setApproveRemarks] = useState("");
+  const [rejectRemarks, setRejectRemarks] = useState("");
+  const [rejecting, setRejecting] = useState(false);
 
   const { data: item, isLoading, isError } = useQuery({
     queryKey: detailKey,
@@ -56,13 +58,13 @@ export function RequestDetailView<T extends BaseReq>({
   };
 
   const approve = useMutation({
-    mutationFn: () => api.approve(id, remarks || undefined),
+    mutationFn: () => api.approve(id, approveRemarks || undefined),
     onSuccess: invalidate,
     meta: { successMessage: "Request approved." },
   });
   const reject = useMutation({
-    mutationFn: () => api.reject(id, remarks || undefined),
-    onSuccess: invalidate,
+    mutationFn: () => api.reject(id, rejectRemarks || undefined),
+    onSuccess: () => { invalidate(); setRejecting(false); },
     meta: { successMessage: "Request rejected." },
   });
   const cancel = useMutation({
@@ -138,36 +140,71 @@ export function RequestDetailView<T extends BaseReq>({
 
             {item.status === "pending" && (
               <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
-                <textarea
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900/50"
-                  rows={2}
-                  placeholder="Optional remarks for approve/reject"
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => approve.mutate()}
-                    disabled={busy}
-                    className="rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
-                  >
-                    {approve.isPending ? "Approving…" : "Approve"}
-                  </button>
-                  <button
-                    onClick={() => reject.mutate()}
-                    disabled={busy}
-                    className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
-                  >
-                    {reject.isPending ? "Rejecting…" : "Reject"}
-                  </button>
-                  <button
-                    onClick={() => cancel.mutate()}
-                    disabled={busy}
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-60"
-                  >
-                    {cancel.isPending ? "Cancelling…" : "Cancel request"}
-                  </button>
-                </div>
+                {!rejecting ? (
+                  <>
+                    <textarea
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900/50"
+                      rows={2}
+                      placeholder="Remarks (optional)"
+                      value={approveRemarks}
+                      onChange={(e) => setApproveRemarks(e.target.value)}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => approve.mutate()}
+                        disabled={busy}
+                        className="rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
+                      >
+                        {approve.isPending ? "Approving…" : "Approve"}
+                      </button>
+                      <button
+                        onClick={() => setRejecting(true)}
+                        disabled={busy}
+                        className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => cancel.mutate()}
+                        disabled={busy}
+                        className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-60"
+                      >
+                        {cancel.isPending ? "Cancelling…" : "Cancel request"}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <label className="block text-xs font-medium text-slate-600">
+                      Rejection reason *
+                    </label>
+                    <textarea
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900/50"
+                      rows={2}
+                      placeholder="Explain the reason for rejection…"
+                      value={rejectRemarks}
+                      onChange={(e) => setRejectRemarks(e.target.value)}
+                      required
+                      autoFocus
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => reject.mutate()}
+                        disabled={busy || !rejectRemarks.trim()}
+                        className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                      >
+                        {reject.isPending ? "Rejecting…" : "Confirm rejection"}
+                      </button>
+                      <button
+                        onClick={() => setRejecting(false)}
+                        disabled={busy}
+                        className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-60"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </section>

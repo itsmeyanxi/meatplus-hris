@@ -38,7 +38,9 @@ class AttendanceCorrectionController extends Controller
             $q->where('work_date', '<=', $to);
         }
 
-        return AttendanceCorrectionResource::collection($q->limit(500)->get());
+        $perPage = min((int) $request->query('per_page', 50), 200);
+
+        return AttendanceCorrectionResource::collection($q->paginate($perPage));
     }
 
     public function store(AttendanceCorrectionRequest $request): JsonResponse

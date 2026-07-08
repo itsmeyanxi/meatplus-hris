@@ -113,6 +113,23 @@ export default function LeaveDetailPage() {
           <Detail label="Reason">
             <p className="whitespace-pre-wrap text-slate-700">{data.reason || "—"}</p>
           </Detail>
+          <Detail label="Supporting document">
+            {data.attachment_path ? (
+              <a
+                href={leaveAppsApi.attachmentUrl(id)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 transition"
+              >
+                <svg className="h-3.5 w-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                </svg>
+                Download / View file
+              </a>
+            ) : (
+              <span className="text-slate-400">No attachment</span>
+            )}
+          </Detail>
         </div>
       </AppCard>
 
@@ -152,7 +169,11 @@ export default function LeaveDetailPage() {
                 </button>
                 {canCancel && (
                   <button
-                    onClick={() => cancel.mutate()}
+                    onClick={() => {
+                      if (window.confirm("Cancel this leave application? This cannot be undone.")) {
+                        cancel.mutate();
+                      }
+                    }}
                     disabled={cancel.isPending}
                     className="ml-auto rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
                   >
@@ -204,7 +225,11 @@ export default function LeaveDetailPage() {
       {!showApprovalActions && canCancel && (
         <div className="flex justify-end">
           <button
-            onClick={() => cancel.mutate()}
+            onClick={() => {
+              if (window.confirm("Cancel this leave application? This cannot be undone.")) {
+                cancel.mutate();
+              }
+            }}
             disabled={cancel.isPending}
             className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
           >

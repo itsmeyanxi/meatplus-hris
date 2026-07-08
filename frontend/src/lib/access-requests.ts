@@ -1,4 +1,5 @@
 import { api, ensureCsrf } from "./api";
+import type { PaginatedList, PaginationMeta } from "./approvals";
 
 export type AccessRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
 export type ApprovalStage = "supervisor" | "hr" | "it" | "done";
@@ -80,12 +81,13 @@ export async function createAccessRequest(
 export async function getAccessRequests(params?: {
   status?: string;
   stage?: string;
-}): Promise<AccessRequest[]> {
-  const { data } = await api.get<{ data: AccessRequest[] }>(
+  page?: number;
+}): Promise<PaginatedList<AccessRequest>> {
+  const { data } = await api.get<{ data: AccessRequest[]; meta?: PaginationMeta }>(
     "/api/v1/access-requests",
     { params },
   );
-  return data.data;
+  return { data: data.data, meta: data.meta };
 }
 
 export async function getMyAccessRequests(): Promise<AccessRequest[]> {

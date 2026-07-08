@@ -22,13 +22,14 @@ export default function OvertimeRequestsPage() {
     end_time: "",
     requested_hours: 0,
     reason: "",
+    classification: "normal",
   });
 
   const create = useMutation({
     mutationFn: () => overtimeApi.create(form),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["overtime-requests"] });
-      setForm({ employee_id: 0, date: "", start_time: "", end_time: "", requested_hours: 0, reason: "" });
+      setForm({ employee_id: 0, date: "", start_time: "", end_time: "", requested_hours: 0, reason: "", classification: "normal" });
       setIsAdding(false);
     },
     meta: { successMessage: "Overtime request filed." },

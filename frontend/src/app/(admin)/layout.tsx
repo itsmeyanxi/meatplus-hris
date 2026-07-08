@@ -85,11 +85,50 @@ const NAV: NavItem[] = [
   {
     href: "/leaves",
     label: "Leaves",
+    permissions: ["leave.file", "leave.view", "leave.approve.any", "leave.approve.self_dept", "leave.manage_types"],
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.364l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" />
       </svg>
     )
+  },
+  {
+    href: "/overtimes",
+    label: "Overtimes",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/undertimes",
+    label: "Undertimes",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6" />
+      </svg>
+    ),
+  },
+  {
+    href: "/official-businesses",
+    label: "Official Business",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/schedule-adjustments",
+    label: "Schedule Adjustment",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 14l2 2 4-4" />
+      </svg>
+    ),
   },
   {
     href: "/payroll",
@@ -126,7 +165,7 @@ const NAV: NavItem[] = [
   {
     href: "/request-access",
     label: "Request Access",
-    roles: ["dept_head", "hr_admin", "it_admin", "employee"],
+    requiresEmployee: true,
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -150,6 +189,17 @@ const NAV: NavItem[] = [
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+      </svg>
+    )
+  },
+  {
+    href: "/settings",
+    label: "Settings",
+    permissions: ["employee.update", "user.manage"],
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     )
   },
@@ -192,7 +242,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     setPreviewRole(role);
     if (role) localStorage.setItem("previewRole", role);
     else localStorage.removeItem("previewRole");
+    window.dispatchEvent(new CustomEvent("preview-role-change", { detail: role }));
   };
+
+  useEffect(() => {
+    const handler = (e: Event) => setPreviewRole((e as CustomEvent<string | null>).detail);
+    window.addEventListener("preview-role-change", handler);
+    return () => window.removeEventListener("preview-role-change", handler);
+  }, []);
 
   const { data: rolesData } = useQuery({
     queryKey: ["roles-with-perms"],
@@ -215,12 +272,20 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const [companyOpen, setCompanyOpen] = useState(false);
   const [switchingId, setSwitchingId] = useState<number | null>(null);
 
+  // Original company is the home company locked in on first switch — can never return there.
+  const originalCompanyId = data?.user.original_company_id ?? null;
+  // An IT account is either currently it_admin or has previously switched away (has original_company_id).
+  const isItAccount = isItAdmin || originalCompanyId !== null;
+
   const { data: companiesData } = useQuery({
     queryKey: ["companies-list"],
     queryFn: getCompanies,
-    enabled: isItAdmin,
+    enabled: isItAccount,
     staleTime: 60_000,
   });
+
+  // Exclude the home company from the switcher — once you leave, you can't go back.
+  const switchableCompanies = companiesData?.filter((c) => c.id !== originalCompanyId) ?? [];
 
   const handleSwitchCompany = async (id: number) => {
     if (id === data?.user.active_company?.id) { setCompanyOpen(false); return; }
@@ -270,7 +335,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             {!isCollapsed && (
               <div className="transition-opacity duration-200 min-w-0">
                 <h1 className="text-base font-semibold tracking-tight text-slate-900 truncate">Meatplus HRIS</h1>
-                {isItAdmin && companiesData && companiesData.length > 1 ? (
+                {isItAccount && switchableCompanies.length > 1 ? (
                   <div className="relative">
                     <button
                       onClick={() => setCompanyOpen((o) => !o)}
@@ -283,7 +348,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                     </button>
                     {companyOpen && (
                       <div className="absolute left-0 top-full z-50 mt-1 w-48 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-                        {companiesData.map((c) => (
+                        {switchableCompanies.map((c) => (
                           <button
                             key={c.id}
                             onClick={() => handleSwitchCompany(c.id)}
@@ -350,13 +415,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </div>
 
         <div className="mt-auto space-y-2.5">
-          {/* View as role (IT Admin only) */}
-          {isItAdmin && !isCollapsed && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
-              <RolePreviewControl value={previewRole} roles={rolesData ?? []} onChange={changePreview} />
-            </div>
-          )}
-
           {/* User profile & Logout footer info */}
           <div className={`border border-slate-200 bg-slate-50 p-2.5 transition-all ${isCollapsed ? "rounded-xl text-center" : "rounded-xl"}`}>
             {isCollapsed ? (

@@ -13,6 +13,9 @@ const TABS = [
   { slug: "emergency-contacts", label: "Emergency contacts" },
   { slug: "education", label: "Education" },
   { slug: "employment-history", label: "Employment history" },
+  { slug: "government-ids", label: "Gov't IDs" },
+  { slug: "bank-accounts", label: "Bank accounts" },
+  { slug: "contracts", label: "Contracts" },
 ] as const;
 
 export default function EmployeeDetailLayout({ children }: { children: ReactNode }) {

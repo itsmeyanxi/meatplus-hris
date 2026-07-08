@@ -43,9 +43,11 @@ class AccessRequestDecided extends Notification
     {
         $r = $this->accessRequest;
 
+        $name = property_exists($notifiable, 'name') ? $notifiable->name : $r->employee_name;
+
         $mail = (new MailMessage)
             ->subject("Your access request was {$this->outcome}")
-            ->greeting("Hi {$notifiable->name},")
+            ->greeting("Hi {$name},")
             ->line("Your access request for {$r->employee_name} ({$r->department}) was {$this->outcome}.");
 
         if ($this->remarks) {

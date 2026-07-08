@@ -268,9 +268,9 @@ function submitRequest(type: ReqType, f: FormBag): Promise<unknown> {
   const t = (v?: string) => (v ? v : null);
   switch (type) {
     case "overtime":
-      return overtimeApi.create({ date: f.date, start_time: f.start_time, end_time: f.end_time, requested_hours: Number(f.requested_hours), reason: f.reason });
+      return overtimeApi.create({ date: f.date, start_time: f.start_time, end_time: f.end_time, requested_hours: Number(f.requested_hours), reason: f.reason, classification: "normal" });
     case "undertime":
-      return undertimeApi.create({ date: f.date, start_time: f.start_time, end_time: f.end_time, requested_hours: Number(f.requested_hours), reason: f.reason });
+      return undertimeApi.create({ date: f.date, start_time: f.start_time, end_time: f.end_time, requested_hours: Number(f.requested_hours), reason: f.reason, classification: "normal" });
     case "official_business":
       return officialBusinessApi.create({ date: f.date, start_time: t(f.start_time), end_time: t(f.end_time), location: f.location, purpose: f.purpose });
     case "certificate":

@@ -17,6 +17,8 @@ export type AdminStats = {
   no_access: number;
   pending_leaves: number;
   today_present: number;
+  pending_attendance: number;
+  pending_access_requests: number;
 };
 
 export async function getAdminStats(): Promise<AdminStats> {

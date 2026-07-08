@@ -42,7 +42,7 @@ class PermissionsSeeder extends Seeder
             'hr_admin' => [
                 'employee.view', 'employee.create', 'employee.update',
                 'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',
-                'leave.view', 'leave.manage_types',
+                'leave.view', 'leave.file', 'leave.approve.any', 'leave.manage_types',
                 'compensation.view',
                 'user.manage', 'role.manage', 'audit.view',
                 'access_request.view', 'access_request.approve.hr',
@@ -52,6 +52,7 @@ class PermissionsSeeder extends Seeder
             'it_admin' => $permissions,
             'payroll_officer' => [
                 'employee.view', 'attendance.view',
+                'leave.view',
                 'payroll.view', 'payroll.run', 'payroll.approve', 'payroll.post',
                 'compensation.view', 'compensation.manage',
                 'gov_report.view', 'gov_report.generate', 'audit.view',
@@ -78,13 +79,13 @@ class PermissionsSeeder extends Seeder
             'team_lead' => [
                 'employee.view',
                 'attendance.view', 'attendance.approve.self_dept',
-                'leave.view',
+                'leave.view', 'leave.file', 'leave.approve.self_dept',
                 'access_request.view', 'access_request.approve.supervisor',
             ],
             'dept_admin' => [
                 'employee.view', 'employee.update',
                 'attendance.view', 'attendance.view.any', 'attendance.manage',
-                'leave.view',
+                'leave.view', 'leave.file',
             ],
             'transport_access' => [
                 'employee.view',
@@ -96,17 +97,19 @@ class PermissionsSeeder extends Seeder
             ],
             'timekeeper' => [
                 'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',
+                'leave.view', 'leave.file',
             ],
             'hr_coordinator' => [
                 'employee.view',
                 'attendance.view', 'attendance.view.any',
-                'leave.view',
+                'leave.view', 'leave.file', 'leave.approve.any',
                 'access_request.view', 'access_request.approve.hr',
             ],
             'garahe_teamlead' => [
                 'employee.view',
                 'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',
                 'attendance.approve.self_dept',
+                'leave.view', 'leave.file', 'leave.approve.self_dept',
             ],
         ];
 

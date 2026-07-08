@@ -12,15 +12,21 @@ class NotificationController extends Controller
     {
         $user = $request->user();
 
-        $items = $user->notifications()->latest()->limit(30)->get()->map(fn ($n) => [
-            'id' => $n->id,
-            'type' => $n->data['type'] ?? null,
-            'title' => $n->data['title'] ?? 'Notification',
-            'message' => $n->data['message'] ?? '',
-            'url' => $n->data['url'] ?? null,
-            'read_at' => $n->read_at,
-            'created_at' => $n->created_at,
-        ]);
+        $items = $user->notifications()->latest()->limit(30)->get()->map(function ($n) {
+            // Defensive decode: Eloquent's array cast returns an array normally,
+            // but a double-encoded row (or a JSONB-typed column) yields a string.
+            $data = is_array($n->data) ? $n->data : (json_decode($n->data, true) ?? []);
+
+            return [
+                'id'         => $n->id,
+                'type'       => $data['type'] ?? null,
+                'title'      => $data['title'] ?? 'Notification',
+                'message'    => $data['message'] ?? '',
+                'url'        => $data['url'] ?? null,
+                'read_at'    => $n->read_at,
+                'created_at' => $n->created_at,
+            ];
+        });
 
         return response()->json([
             'data' => $items,

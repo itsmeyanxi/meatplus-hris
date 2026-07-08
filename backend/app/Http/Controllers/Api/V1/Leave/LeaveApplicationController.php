@@ -15,8 +15,12 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use App\Notifications\LeaveApplicationApproved;
+use App\Notifications\LeaveApplicationRejected;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class LeaveApplicationController extends Controller
 {
@@ -35,13 +39,21 @@ class LeaveApplicationController extends Controller
             ])
             ->orderByDesc('date_from');
 
-        // Only the leave approver (dept_head) sees the whole company.
-        // Everyone else — employees, HR, IT — sees only their own.
+        // Scope visible applications by permission level.
         if (! $user->can('leave.approve.any')) {
-            if ($user->employee) {
+            if ($user->can('leave.approve.self_dept') && $user->employee) {
+                // Supervisor / dept head: own leaves + direct reports + dept members.
+                $approverEmpId = $user->employee->id;
+                $q->where(function ($sub) use ($approverEmpId) {
+                    $sub->where('employee_id', $approverEmpId)
+                        ->orWhereHas('employee', function ($emp) use ($approverEmpId) {
+                            $emp->where('manager_employee_id', $approverEmpId)
+                                ->orWhereHas('department', fn ($dept) => $dept->where('head_employee_id', $approverEmpId));
+                        });
+                });
+            } elseif ($user->employee) {
                 $q->where('employee_id', $user->employee->id);
             } else {
-                // No employee record means no personal leaves to show.
                 $q->whereRaw('1 = 0');
             }
         }
@@ -123,6 +135,12 @@ class LeaveApplicationController extends Controller
             ]);
         }
 
+        if ($request->hasFile('attachment')) {
+            $data['attachment_path'] = $request->file('attachment')
+                ->store('leave-attachments', 'local');
+        }
+        unset($data['attachment']);
+
         $data['filed_by_user_id'] = $user->id;
         $data['status'] = 'pending';
         $data['submitted_at'] = now();
@@ -171,6 +189,15 @@ class LeaveApplicationController extends Controller
             );
         });
 
+        // Notify the employee
+        $applicantUser = $leaveApplication->employee->user ?? null;
+        if ($applicantUser) {
+            $applicantUser->notify(new LeaveApplicationApproved(
+                $leaveApplication->load('leaveType'),
+                $request->validated('decision_remarks'),
+            ));
+        }
+
         return new LeaveApplicationResource(
             $leaveApplication->load(['employee', 'leaveType', 'approver:id,name']),
         );
@@ -186,6 +213,15 @@ class LeaveApplicationController extends Controller
             'decided_at' => now(),
             'decision_remarks' => $request->validated('decision_remarks'),
         ]);
+
+        // Notify the employee
+        $applicantUser = $leaveApplication->employee->user ?? null;
+        if ($applicantUser) {
+            $applicantUser->notify(new LeaveApplicationRejected(
+                $leaveApplication->load('leaveType'),
+                $request->validated('decision_remarks'),
+            ));
+        }
 
         return new LeaveApplicationResource(
             $leaveApplication->load(['employee', 'leaveType', 'approver:id,name']),
@@ -233,6 +269,14 @@ class LeaveApplicationController extends Controller
         return new LeaveApplicationResource(
             $leaveApplication->load(['employee', 'leaveType']),
         );
+    }
+
+    public function attachment(Request $request, LeaveApplication $leaveApplication): StreamedResponse
+    {
+        $this->ensureCanView($request, $leaveApplication);
+        abort_unless($leaveApplication->attachment_path && Storage::disk('local')->exists($leaveApplication->attachment_path), 404);
+
+        return Storage::disk('local')->download($leaveApplication->attachment_path);
     }
 
     private function ensureCanView(Request $request, LeaveApplication $leave): void
