@@ -225,8 +225,8 @@ class FinalPayController extends Controller
 
         $data = $request->validate([
             'notes'  => 'nullable|string',
-            'status'              => 'nullable|string|in:draft,finalized,cancelled',
-            'cancellation_reason' => 'nullable|string|max:500',
+            'status' => 'nullable|string|in:draft,finalized,cancelled',
+            'notes'  => 'nullable|string',
         ]);
 
         $finalPay->update($data);

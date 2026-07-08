@@ -289,8 +289,8 @@ export default function FinalPayDetailPage() {
       {isCancelled && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-3">
           <p className="text-sm font-semibold text-red-700">This record has been cancelled.</p>
-          {fp.cancellation_reason && (
-            <p className="mt-0.5 text-sm text-red-600">Reason: {fp.cancellation_reason}</p>
+          {fp.notes && (
+            <p className="mt-0.5 text-sm text-red-600">Reason: {fp.notes}</p>
           )}
         </div>
       )}
@@ -321,14 +321,10 @@ export default function FinalPayDetailPage() {
           />
           {fp.notes && (
             <div className="border-b border-slate-100 px-5 py-2.5 last:border-0">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Notes</span>
-              <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{fp.notes}</p>
-            </div>
-          )}
-          {fp.cancellation_reason && (
-            <div className="border-b border-slate-100 px-5 py-2.5 last:border-0">
-              <span className="text-xs font-semibold text-red-500 uppercase tracking-wide">Cancellation Reason</span>
-              <p className="mt-1 text-sm text-red-700 whitespace-pre-wrap">{fp.cancellation_reason}</p>
+              <span className={`text-xs font-semibold uppercase tracking-wide ${isCancelled ? "text-red-500" : "text-slate-500"}`}>
+                {isCancelled ? "Cancellation Reason" : "Notes"}
+              </span>
+              <p className={`mt-1 text-sm whitespace-pre-wrap ${isCancelled ? "text-red-700" : "text-slate-700"}`}>{fp.notes}</p>
             </div>
           )}
         </Section>
