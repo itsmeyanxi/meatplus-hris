@@ -21,7 +21,7 @@ class FinalPay extends Model
         'sss_deduction', 'philhealth_deduction', 'pagibig_deduction',
         'tax_deduction', 'other_deductions', 'other_deductions_note',
         'total_gross', 'total_deductions_amount', 'net_final_pay',
-        'notes', 'status',
+        'notes', 'status', 'cancellation_reason',
         'earnings_breakdown', 'deductions_breakdown',
     ];
 

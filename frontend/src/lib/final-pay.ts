@@ -59,7 +59,8 @@ export type FinalPayRecord = {
   earnings_breakdown:   EarningsRow[]  | null;
   deductions_breakdown: DeductionRow[] | null;
   notes: string | null;
-  status: "draft" | "finalized";
+  cancellation_reason: string | null;
+  status: "draft" | "finalized" | "cancelled";
   created_at: string;
 };
 
@@ -105,6 +106,14 @@ export const finalPayApi = {
 
   finalize: async (id: number): Promise<FinalPayRecord> => {
     const { data } = await api.patch<{ data: FinalPayRecord }>(`/api/v1/final-pays/${id}`, { status: "finalized" });
+    return data.data;
+  },
+
+  cancel: async (id: number, reason: string): Promise<FinalPayRecord> => {
+    const { data } = await api.patch<{ data: FinalPayRecord }>(`/api/v1/final-pays/${id}`, {
+      status: "cancelled",
+      cancellation_reason: reason,
+    });
     return data.data;
   },
 };

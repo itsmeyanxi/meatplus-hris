@@ -192,6 +192,24 @@ export default function FinalPayDetailPage() {
     onSuccess:  () => qc.invalidateQueries({ queryKey: ["final-pays"] }),
   });
 
+  const cancel = useMutation({
+    mutationFn: (reason: string) => finalPayApi.cancel(Number(id), reason),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ["final-pays"] }),
+  });
+
+  const handleCancel = () => {
+    const reason = window.prompt(
+      "Reason for cancellation (required):"
+    );
+    if (reason === null) return;                         // dismissed
+    if (reason.trim() === "") {
+      alert("Please enter a reason before cancelling.");
+      return;
+    }
+    if (!window.confirm(`Cancel this final pay record?\n\nReason: "${reason.trim()}"\n\nThis action cannot be undone.`)) return;
+    cancel.mutate(reason.trim());
+  };
+
   if (isLoading) return (
     <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-400">Loading…</div>
   );
@@ -202,8 +220,9 @@ export default function FinalPayDetailPage() {
     </div>
   );
 
-  const empName    = fp.employee ? `${fp.employee.first_name} ${fp.employee.last_name}` : `Employee #${fp.employee_id}`;
+  const empName     = fp.employee ? `${fp.employee.first_name} ${fp.employee.last_name}` : `Employee #${fp.employee_id}`;
   const isFinalized = fp.status === "finalized";
+  const isCancelled = fp.status === "cancelled";
   const basicMonthly = Number(fp.basic_monthly ?? 0);
   const dailyRate    = Number(fp.daily_rate    ?? 0);
 
@@ -233,7 +252,8 @@ export default function FinalPayDetailPage() {
           >
             Print / PDF
           </button>
-          {!isFinalized && (
+
+          {!isCancelled && !isFinalized && (
             <button
               onClick={() => { if (window.confirm("Finalize this final pay? This marks it as official.")) finalize.mutate(); }}
               disabled={finalize.isPending}
@@ -242,13 +262,38 @@ export default function FinalPayDetailPage() {
               Finalize
             </button>
           )}
-          {isFinalized && (
+
+          {!isCancelled && (
+            <button
+              onClick={handleCancel}
+              disabled={cancel.isPending}
+              className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 transition"
+            >
+              {cancel.isPending ? "Cancelling…" : "Cancel Record"}
+            </button>
+          )}
+
+          {isFinalized && !isCancelled && (
             <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
               Finalized
             </span>
           )}
+          {isCancelled && (
+            <span className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 ring-1 ring-red-200">
+              Cancelled
+            </span>
+          )}
         </div>
       </div>
+
+      {isCancelled && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-3">
+          <p className="text-sm font-semibold text-red-700">This record has been cancelled.</p>
+          {fp.cancellation_reason && (
+            <p className="mt-0.5 text-sm text-red-600">Reason: {fp.cancellation_reason}</p>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Section title="Employee & Basis">
@@ -260,7 +305,12 @@ export default function FinalPayDetailPage() {
         </Section>
 
         <Section title="Status & Meta">
-          <Row label="Status"      value={isFinalized ? "Finalized" : "Draft"} bold />
+          <Row
+            label="Status"
+            value={isCancelled ? "Cancelled" : isFinalized ? "Finalized" : "Draft"}
+            bold
+            accent={isCancelled ? "red" : undefined}
+          />
           <Row label="Prepared by" value={fp.computed_by?.name ?? "—"} />
           <Row
             label="Prepared on"
@@ -273,6 +323,12 @@ export default function FinalPayDetailPage() {
             <div className="border-b border-slate-100 px-5 py-2.5 last:border-0">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Notes</span>
               <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{fp.notes}</p>
+            </div>
+          )}
+          {fp.cancellation_reason && (
+            <div className="border-b border-slate-100 px-5 py-2.5 last:border-0">
+              <span className="text-xs font-semibold text-red-500 uppercase tracking-wide">Cancellation Reason</span>
+              <p className="mt-1 text-sm text-red-700 whitespace-pre-wrap">{fp.cancellation_reason}</p>
             </div>
           )}
         </Section>

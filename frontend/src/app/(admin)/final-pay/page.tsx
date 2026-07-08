@@ -449,9 +449,9 @@ function RecordsList() {
               ? `${r.employee.first_name} ${r.employee.last_name}`
               : `#${r.employee_id}`;
             return (
-              <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+              <tr key={r.id} className={`hover:bg-slate-50 transition-colors ${r.status === "cancelled" ? "opacity-50" : ""}`}>
                 <td className="pl-5 pr-4 py-3">
-                  <p className="text-sm font-medium text-slate-800">{name}</p>
+                  <p className={`text-sm font-medium ${r.status === "cancelled" ? "line-through text-slate-500" : "text-slate-800"}`}>{name}</p>
                   <p className="text-xs text-slate-400">{r.employee?.employee_no}</p>
                 </td>
                 <td className="px-4 py-3 text-sm text-slate-600 whitespace-nowrap">{fmtDate(r.last_working_day)}</td>
@@ -459,11 +459,11 @@ function RecordsList() {
                 <td className="px-4 py-3 text-sm font-bold text-emerald-700 tabular-nums">{php(r.net_final_pay)}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${
-                    r.status === "finalized"
-                      ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                      : "bg-amber-50 text-amber-700 ring-amber-200"
+                    r.status === "finalized"  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                    : r.status === "cancelled" ? "bg-red-50 text-red-600 ring-red-200"
+                    :                           "bg-amber-50 text-amber-700 ring-amber-200"
                   }`}>
-                    {r.status === "finalized" ? "Finalized" : "Draft"}
+                    {r.status === "finalized" ? "Finalized" : r.status === "cancelled" ? "Cancelled" : "Draft"}
                   </span>
                 </td>
                 <td className="pl-4 pr-4 py-3 text-right">
