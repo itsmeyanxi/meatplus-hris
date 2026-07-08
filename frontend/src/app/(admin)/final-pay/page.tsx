@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
+import axios from "axios";
 import {
   finalPayApi,
   SEPARATION_TYPES,
@@ -19,7 +20,9 @@ const php = (n: number | string) =>
 
 const fmtDate = (s: string | null | undefined) => {
   if (!s) return "—";
-  return new Date(s + "T00:00:00").toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(s + "T00:00:00").toLocaleDateString("en-PH", {
+    year: "numeric", month: "short", day: "numeric",
+  });
 };
 
 const SEP_LABELS: Record<string, string> = Object.fromEntries(
@@ -27,16 +30,30 @@ const SEP_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 // ── amount input ──────────────────────────────────────────────────────────
+// Uses a local string so partial input like "1363." isn't lost mid-typing.
 
-function AmountInput({ value, onChange, placeholder = "0.00" }: {
-  value: number; onChange: (v: number) => void; placeholder?: string;
-}) {
+function AmountInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [raw, setRaw] = useState(value === 0 ? "" : String(value));
+
+  const handleChange = (s: string) => {
+    setRaw(s);
+    const num = parseFloat(s);
+    onChange(isNaN(num) || num < 0 ? 0 : num);
+  };
+
+  const handleBlur = () => {
+    const num = parseFloat(raw);
+    setRaw(isNaN(num) || num < 0 ? "" : String(num));
+  };
+
   return (
     <input
-      type="number" min={0} step="0.01"
-      value={value === 0 ? "" : value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(Number(e.target.value) || 0)}
+      type="text"
+      inputMode="decimal"
+      value={raw}
+      placeholder="0.00"
+      onChange={(e) => handleChange(e.target.value)}
+      onBlur={handleBlur}
       className="w-36 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-right text-sm font-medium outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 tabular-nums"
     />
   );
@@ -48,8 +65,8 @@ function EmployeePicker({ value, onChange }: {
   value: EmployeeListItem | null;
   onChange: (e: EmployeeListItem | null) => void;
 }) {
-  const [q, setQ]           = useState(value ? `${value.full_name} (${value.employee_no})` : "");
-  const [open, setOpen]     = useState(false);
+  const [q, setQ]       = useState(value ? `${value.full_name} (${value.employee_no})` : "");
+  const [open, setOpen] = useState(false);
 
   const { data: page } = useQuery({
     queryKey: ["employees", { q, perPage: 10 }],
@@ -63,19 +80,24 @@ function EmployeePicker({ value, onChange }: {
   return (
     <div className="relative">
       <input
-        type="text" className={cls}
+        type="text"
+        className={cls}
         placeholder="Search by name or employee no…"
         value={q}
         onChange={(e) => { setQ(e.target.value); onChange(null); setOpen(true); }}
         onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
       {open && !value && page?.data && page.data.length > 0 && (
         <div className="absolute z-20 mt-1 w-full rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
           {page.data.map((e) => (
-            <button key={e.id} type="button"
+            <button
+              key={e.id}
+              type="button"
               className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-slate-50"
               onMouseDown={(ev) => ev.preventDefault()}
-              onClick={() => { onChange(e); setQ(`${e.full_name} (${e.employee_no})`); setOpen(false); }}>
+              onClick={() => { onChange(e); setQ(`${e.full_name} (${e.employee_no})`); setOpen(false); }}
+            >
               <span className="font-medium text-slate-800">{e.full_name}</span>
               <span className="ml-auto text-xs text-slate-400">{e.employee_no}</span>
             </button>
@@ -86,28 +108,35 @@ function EmployeePicker({ value, onChange }: {
   );
 }
 
+// ── validation error extractor ────────────────────────────────────────────
+
+function getValidationErrors(err: unknown): string[] {
+  if (!axios.isAxiosError(err)) return [];
+  const data = err.response?.data as { errors?: Record<string, string[]> } | undefined;
+  if (!data?.errors) return [];
+  return Object.values(data.errors).flat();
+}
+
 // ── main form ─────────────────────────────────────────────────────────────
 
 function NewFinalPayForm({ onSaved }: { onSaved: (id: number) => void }) {
   const qc = useQueryClient();
 
-  const [employee,    setEmployee]  = useState<EmployeeListItem | null>(null);
-  const [lastDay,     setLastDay]   = useState("");
-  const [sepType,     setSepType]   = useState<SeparationType>("resigned");
-  const [monthly,     setMonthly]   = useState<number>(0);
-  const [earnings,    setEarnings]  = useState<EarningsRow[]>([{ label: "", amount: 0 }]);
-  const [deductions,  setDeds]      = useState<DeductionRow[]>([]);
-  const [notes,       setNotes]     = useState("");
+  const [employee,   setEmployee] = useState<EmployeeListItem | null>(null);
+  const [lastDay,    setLastDay]  = useState("");
+  const [sepType,    setSepType]  = useState<SeparationType>("resigned");
+  const [monthly,    setMonthly]  = useState(0);
+  const [earnings,   setEarnings] = useState<EarningsRow[]>([{ label: "", amount: 0 }]);
+  const [deductions, setDeds]     = useState<DeductionRow[]>([]);
+  const [notes,      setNotes]    = useState("");
 
-  const dailyRate = monthly > 0 ? monthly / 22 : 0;
+  const dailyRate = monthly > 0 ? Math.round((monthly / 22) * 10000) / 10000 : 0;
 
-  // earnings
   const addEarning    = () => setEarnings((r) => [...r, { label: "", amount: 0 }]);
   const removeEarning = (i: number) => setEarnings((r) => r.filter((_, idx) => idx !== i));
   const patchEarning  = (i: number, patch: Partial<EarningsRow>) =>
     setEarnings((r) => r.map((row, idx) => idx === i ? { ...row, ...patch } : row));
 
-  // deductions
   const addDed    = () => setDeds((r) => [...r, { label: "", amount: 0 }]);
   const removeDed = (i: number) => setDeds((r) => r.filter((_, idx) => idx !== i));
   const patchDed  = (i: number, patch: Partial<DeductionRow>) =>
@@ -118,19 +147,29 @@ function NewFinalPayForm({ onSaved }: { onSaved: (id: number) => void }) {
   const netPay          = totalEarnings - totalDeductions;
 
   const save = useMutation({
-    mutationFn: (status: "draft" | "finalized") => finalPayApi.store({
-      employee_id:         employee!.id,
-      last_working_day:    lastDay,
-      separation_type:     sepType,
-      basic_monthly:       monthly,
-      daily_rate:          dailyRate,
-      earnings_breakdown:  earnings,
-      deductions_breakdown: deductions,
-      notes,
-      status,
-    }),
-    onSuccess: (rec) => { qc.invalidateQueries({ queryKey: ["final-pays"] }); onSaved(rec.id); },
+    mutationFn: (status: "draft" | "finalized") => {
+      // Strip rows with no label before sending — backend rejects empty required strings
+      const cleanEarnings   = earnings.filter((r) => r.label.trim() !== "");
+      const cleanDeductions = deductions.filter((r) => r.label.trim() !== "");
+      return finalPayApi.store({
+        employee_id:          employee!.id,
+        last_working_day:     lastDay,
+        separation_type:      sepType,
+        basic_monthly:        monthly,
+        daily_rate:           dailyRate,
+        earnings_breakdown:   cleanEarnings,
+        deductions_breakdown: cleanDeductions,
+        notes,
+        status,
+      });
+    },
+    onSuccess: (rec) => {
+      qc.invalidateQueries({ queryKey: ["final-pays"] });
+      onSaved(rec.id);
+    },
   });
+
+  const validationErrors = getValidationErrors(save.error);
 
   const inputCls = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100";
   const labelCls = "flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100";
@@ -149,13 +188,24 @@ function NewFinalPayForm({ onSaved }: { onSaved: (id: number) => void }) {
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-600">Last Working Day</label>
-            <input type="date" className={inputCls} value={lastDay} onChange={(e) => setLastDay(e.target.value)} />
+            <input
+              type="date"
+              className={inputCls}
+              value={lastDay}
+              onChange={(e) => setLastDay(e.target.value)}
+            />
           </div>
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-600">Separation Type</label>
-            <select className={inputCls} value={sepType} onChange={(e) => setSepType(e.target.value as SeparationType)}>
-              {SEPARATION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            <select
+              className={inputCls}
+              value={sepType}
+              onChange={(e) => setSepType(e.target.value as SeparationType)}
+            >
+              {SEPARATION_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
             </select>
           </div>
 
@@ -163,17 +213,21 @@ function NewFinalPayForm({ onSaved }: { onSaved: (id: number) => void }) {
             <label className="mb-1 block text-xs font-semibold text-slate-600">Monthly Salary</label>
             <div className="relative">
               <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-400">₱</span>
-              <input type="number" min={0} step="0.01" placeholder="0.00"
-                value={monthly === 0 ? "" : monthly}
-                onChange={(e) => setMonthly(Number(e.target.value) || 0)}
-                className="w-full rounded-lg border border-slate-200 bg-white pl-7 pr-3 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100" />
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={monthly === 0 ? "" : String(monthly)}
+                onChange={(e) => setMonthly(parseFloat(e.target.value) || 0)}
+                className="w-full rounded-lg border border-slate-200 bg-white pl-7 pr-3 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+              />
             </div>
           </div>
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-600">Daily Rate (÷22)</label>
             <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 tabular-nums">
-              {dailyRate > 0 ? php(dailyRate) : <span className="text-slate-400">auto-computed</span>}
+              {dailyRate > 0 ? php(dailyRate) : <span className="text-slate-400">auto-computed from monthly</span>}
             </div>
           </div>
         </div>
@@ -201,8 +255,12 @@ function NewFinalPayForm({ onSaved }: { onSaved: (id: number) => void }) {
             {earnings.map((row, i) => (
               <tr key={i} className="group">
                 <td className="pl-5 pr-3 py-2.5">
-                  <input className={labelCls} value={row.label} placeholder="e.g. Salary (15 days), SIL, 13th Month…"
-                    onChange={(e) => patchEarning(i, { label: e.target.value })} />
+                  <input
+                    className={labelCls}
+                    value={row.label}
+                    placeholder="e.g. Salary (15 days), SIL, 13th Month Pay…"
+                    onChange={(e) => patchEarning(i, { label: e.target.value })}
+                  />
                 </td>
                 <td className="px-3 py-2.5 text-right">
                   <AmountInput value={row.amount} onChange={(v) => patchEarning(i, { amount: v })} />
@@ -253,8 +311,12 @@ function NewFinalPayForm({ onSaved }: { onSaved: (id: number) => void }) {
               {deductions.map((row, i) => (
                 <tr key={i} className="group">
                   <td className="pl-5 pr-3 py-2.5">
-                    <input className={labelCls} value={row.label} placeholder="e.g. Salary Loan, SSS…"
-                      onChange={(e) => patchDed(i, { label: e.target.value })} />
+                    <input
+                      className={labelCls}
+                      value={row.label}
+                      placeholder="e.g. Salary Loan, SSS…"
+                      onChange={(e) => patchDed(i, { label: e.target.value })}
+                    />
                   </td>
                   <td className="px-3 py-2.5 text-right">
                     <AmountInput value={row.amount} onChange={(v) => patchDed(i, { amount: v })} />
@@ -302,24 +364,39 @@ function NewFinalPayForm({ onSaved }: { onSaved: (id: number) => void }) {
       {/* Notes */}
       <div>
         <label className="mb-1.5 block text-xs font-semibold text-slate-600">Notes (optional)</label>
-        <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)}
+        <textarea
+          rows={2}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
           className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-          placeholder="Internal HR notes…" />
+          placeholder="Internal HR notes…"
+        />
       </div>
 
+      {/* Error display */}
       {save.isError && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">Failed to save. Please check all fields and try again.</p>
+        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 space-y-1">
+          <p className="font-semibold">Save failed.</p>
+          {validationErrors.length > 0
+            ? <ul className="list-disc pl-4 space-y-0.5">{validationErrors.map((e, i) => <li key={i}>{e}</li>)}</ul>
+            : <p>An unexpected error occurred. Please try again.</p>
+          }
+        </div>
       )}
 
       <div className="flex items-center gap-3">
-        <button onClick={() => save.mutate("finalized")}
+        <button
+          onClick={() => save.mutate("finalized")}
           disabled={!employee || !lastDay || save.isPending}
-          className="rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition">
+          className="rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition"
+        >
           {save.isPending ? "Saving…" : "Save & Finalize"}
         </button>
-        <button onClick={() => save.mutate("draft")}
+        <button
+          onClick={() => save.mutate("draft")}
           disabled={!employee || !lastDay || save.isPending}
-          className="rounded-lg border border-slate-200 bg-white px-6 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition">
+          className="rounded-lg border border-slate-200 bg-white px-6 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition"
+        >
           Save as Draft
         </button>
       </div>
@@ -330,15 +407,25 @@ function NewFinalPayForm({ onSaved }: { onSaved: (id: number) => void }) {
 // ── records list ──────────────────────────────────────────────────────────
 
 function RecordsList() {
-  const { data: records = [], isLoading } = useQuery({
+  const { data: records, isLoading, isError } = useQuery({
     queryKey: ["final-pays"],
     queryFn:  finalPayApi.list,
     staleTime: 30_000,
   });
 
   if (isLoading) return <p className="py-6 text-center text-sm text-slate-400">Loading…</p>;
-  if (records.length === 0) return (
-    <p className="py-10 text-center text-sm text-slate-400">No records yet. Click <strong>New</strong> to get started.</p>
+
+  if (isError) return (
+    <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+      Failed to load records. Make sure you have permission and the database migrations have been run
+      (<code className="font-mono text-xs">php artisan migrate</code>).
+    </div>
+  );
+
+  if (!records || records.length === 0) return (
+    <p className="py-10 text-center text-sm text-slate-400">
+      No records yet. Click <strong>New</strong> to get started.
+    </p>
   );
 
   return (
@@ -347,7 +434,10 @@ function RecordsList() {
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50">
             {["Employee", "Last Day", "Type", "Net Final Pay", "Status", ""].map((h, i) => (
-              <th key={h} className={`px-4 py-3 text-xs font-semibold text-slate-600 ${i === 5 ? "pr-4 text-right" : "text-left"} ${i === 0 ? "pl-5" : ""}`}>
+              <th
+                key={h}
+                className={`px-4 py-3 text-xs font-semibold text-slate-600 ${i === 5 ? "pr-4 text-right" : "text-left"} ${i === 0 ? "pl-5" : ""}`}
+              >
                 {h}
               </th>
             ))}
@@ -355,7 +445,9 @@ function RecordsList() {
         </thead>
         <tbody className="divide-y divide-slate-50">
           {records.map((r) => {
-            const name = r.employee ? `${r.employee.first_name} ${r.employee.last_name}` : `#${r.employee_id}`;
+            const name = r.employee
+              ? `${r.employee.first_name} ${r.employee.last_name}`
+              : `#${r.employee_id}`;
             return (
               <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                 <td className="pl-5 pr-4 py-3">
@@ -375,8 +467,10 @@ function RecordsList() {
                   </span>
                 </td>
                 <td className="pl-4 pr-4 py-3 text-right">
-                  <Link href={`/final-pay/${r.id}`}
-                    className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 transition">
+                  <Link
+                    href={`/final-pay/${r.id}`}
+                    className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 transition"
+                  >
                     View
                   </Link>
                 </td>
@@ -401,8 +495,10 @@ export default function FinalPayPage() {
           <h1 className="text-xl font-bold text-slate-900">Final Pay</h1>
           <p className="mt-0.5 text-sm text-slate-500">Compute and record employee final pay upon separation.</p>
         </div>
-        <button onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-700 transition">
+        <button
+          onClick={() => setShowForm((v) => !v)}
+          className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-700 transition"
+        >
           {showForm ? "← Back to list" : (
             <>
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

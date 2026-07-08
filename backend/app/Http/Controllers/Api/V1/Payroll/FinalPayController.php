@@ -147,12 +147,12 @@ class FinalPayController extends Controller
             'other_earnings'           => 'nullable|numeric|min:0',
             'other_earnings_note'      => 'nullable|string|max:255',
             // Structured breakdowns
-            'earnings_breakdown'       => 'nullable|array',          // [{label, days?, amount}]
-            'earnings_breakdown.*.label'  => 'required|string',
-            'earnings_breakdown.*.amount' => 'required|numeric',
-            'deductions_breakdown'     => 'nullable|array',          // [{label, amount}]
-            'deductions_breakdown.*.label'  => 'required|string',
-            'deductions_breakdown.*.amount' => 'required|numeric',
+            'earnings_breakdown'              => 'nullable|array',
+            'earnings_breakdown.*.label'      => 'nullable|string',
+            'earnings_breakdown.*.amount'     => 'required|numeric',
+            'deductions_breakdown'            => 'nullable|array',
+            'deductions_breakdown.*.label'    => 'nullable|string',
+            'deductions_breakdown.*.amount'   => 'required|numeric',
             // Legacy deduction fields (sum is split per breakdown)
             'sss_deduction'            => 'nullable|numeric|min:0',
             'philhealth_deduction'     => 'nullable|numeric|min:0',
