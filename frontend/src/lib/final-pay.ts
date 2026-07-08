@@ -108,6 +108,10 @@ export const finalPayApi = {
     return data.data;
   },
 
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/api/v1/final-pays/${id}`);
+  },
+
   cancel: async (id: number, reason: string): Promise<FinalPayRecord> => {
     const { data } = await api.patch<{ data: FinalPayRecord }>(`/api/v1/final-pays/${id}`, {
       status: "cancelled",

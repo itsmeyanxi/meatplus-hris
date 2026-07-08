@@ -197,6 +197,14 @@ export default function FinalPayDetailPage() {
     onSuccess:  () => qc.invalidateQueries({ queryKey: ["final-pays"] }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => finalPayApi.delete(Number(id)),
+    onSuccess:  () => {
+      qc.invalidateQueries({ queryKey: ["final-pays"] });
+      router.replace("/final-pay");
+    },
+  });
+
   const handleCancel = () => {
     const reason = window.prompt(
       "Reason for cancellation (required):"
@@ -283,6 +291,17 @@ export default function FinalPayDetailPage() {
               Cancelled
             </span>
           )}
+
+          <button
+            onClick={() => {
+              if (window.confirm("Permanently delete this final pay record? This cannot be undone."))
+                deleteMutation.mutate();
+            }}
+            disabled={deleteMutation.isPending}
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 transition"
+          >
+            {deleteMutation.isPending ? "Deleting…" : "Delete"}
+          </button>
         </div>
       </div>
 

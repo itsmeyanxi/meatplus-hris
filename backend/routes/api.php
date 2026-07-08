@@ -176,6 +176,7 @@ Route::prefix('v1')->group(function () {
         Route::post('final-pays', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'store']);
         Route::get('final-pays/{finalPay}', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'show']);
         Route::patch('final-pays/{finalPay}', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'update']);
+        Route::delete('final-pays/{finalPay}', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'destroy']);
 
         // Access requests (system access request form + supervisor -> HR -> IT approval)
         Route::get('access-requests', [AccessRequestController::class, 'index']);

@@ -407,6 +407,18 @@ function NewFinalPayForm({ onSaved }: { onSaved: (id: number) => void }) {
 // ── records list ──────────────────────────────────────────────────────────
 
 function RecordsList() {
+  const qc = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => finalPayApi.delete(id),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ["final-pays"] }),
+  });
+
+  const handleDelete = (id: number, name: string) => {
+    if (window.confirm(`Permanently delete the final pay record for ${name}? This cannot be undone.`))
+      deleteMutation.mutate(id);
+  };
+
   const { data: records, isLoading, isError } = useQuery({
     queryKey: ["final-pays"],
     queryFn:  finalPayApi.list,
@@ -467,12 +479,21 @@ function RecordsList() {
                   </span>
                 </td>
                 <td className="pl-4 pr-4 py-3 text-right">
-                  <Link
-                    href={`/final-pay/${r.id}`}
-                    className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 transition"
-                  >
-                    View
-                  </Link>
+                  <div className="flex items-center justify-end gap-2">
+                    <Link
+                      href={`/final-pay/${r.id}`}
+                      className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 transition"
+                    >
+                      View
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(r.id, name)}
+                      disabled={deleteMutation.isPending}
+                      className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 transition"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             );

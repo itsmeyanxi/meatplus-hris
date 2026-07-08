@@ -216,6 +216,18 @@ class FinalPayController extends Controller
         ])]);
     }
 
+    public function destroy(FinalPay $finalPay): JsonResponse
+    {
+        abort_unless(
+            auth()->user()->can('leave.approve.any') || auth()->user()->hasRole('it_admin'),
+            403
+        );
+
+        $finalPay->delete();
+
+        return response()->json(null, 204);
+    }
+
     public function update(Request $request, FinalPay $finalPay): JsonResponse
     {
         abort_unless(
