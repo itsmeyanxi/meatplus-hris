@@ -64,23 +64,17 @@ export type FinalPayRecord = {
 };
 
 export type SaveFinalPayBody = {
-  employee_id:             number;
-  last_working_day:        string;
-  separation_type:         SeparationType;
-  basic_monthly:           number;
-  daily_rate:              number;
-  days_worked_last_period: number;
-  years_of_service:        number;
-  unpaid_salary:           number;
-  thirteenth_month_pay:    number;
-  leave_conversion:        number;
-  unused_leave_days:       number;
-  separation_pay:          number;
-  other_earnings:          number;
-  earnings_breakdown:      EarningsRow[];
-  deductions_breakdown:    DeductionRow[];
-  notes?:                  string;
-  status?:                 "draft" | "finalized";
+  employee_id:              number;
+  last_working_day:         string;
+  separation_type:          SeparationType;
+  earnings_breakdown:       EarningsRow[];
+  deductions_breakdown:     DeductionRow[];
+  basic_monthly?:           number;
+  daily_rate?:              number;
+  days_worked_last_period?: number;
+  years_of_service?:        number;
+  notes?:                   string;
+  status?:                  "draft" | "finalized";
 };
 
 export const finalPayApi = {
