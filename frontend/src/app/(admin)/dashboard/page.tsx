@@ -263,6 +263,14 @@ function AdminView({
         </div>
       </section>
 
+      {/* Personal attendance (shown when admin account is linked to an employee record) */}
+      {personal.hasEmployee && (
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <AttendanceLogPanel events={personal.events} />
+          <PersonalPanel personal={personal} />
+        </div>
+      )}
+
       {/* Payroll + Quick actions */}
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <Panel>

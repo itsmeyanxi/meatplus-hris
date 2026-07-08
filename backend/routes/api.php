@@ -170,6 +170,13 @@ Route::prefix('v1')->group(function () {
         Route::post('payroll-runs/{payrollRun}/post', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'post']);
         Route::delete('payroll-runs/{payrollRun}', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'destroy']);
 
+        // Final pay
+        Route::get('final-pays', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'index']);
+        Route::post('final-pays/compute', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'compute']);
+        Route::post('final-pays', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'store']);
+        Route::get('final-pays/{finalPay}', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'show']);
+        Route::patch('final-pays/{finalPay}', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'update']);
+
         // Access requests (system access request form + supervisor -> HR -> IT approval)
         Route::get('access-requests', [AccessRequestController::class, 'index']);
         Route::get('my/access-requests', [AccessRequestController::class, 'mine']);

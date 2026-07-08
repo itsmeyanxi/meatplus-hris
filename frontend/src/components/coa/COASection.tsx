@@ -327,11 +327,12 @@ function MyHistoryList({ employeeId }: { employeeId: number }) {
   const [tab, setTab] = useState<HistoryTab>("pending");
   const qKey = ["coa-requests", "mine", employeeId];
 
-  const { data: all = [], isLoading } = useQuery({
+  const { data: paginated, isLoading } = useQuery({
     queryKey: qKey,
     queryFn:  () => certificateOfAttendanceApi.list({ employee_id: employeeId }),
     staleTime: 30_000,
   });
+  const all = paginated?.data ?? [];
 
   const rows = all.filter((r) => {
     if (tab === "pending")  return r.status === "pending" || r.status === "resubmitted";
@@ -494,11 +495,12 @@ function ApprovalRow({ req, qKey }: { req: CertificateOfAttendanceRequest; qKey:
 
 function ApprovalQueue({ isHR }: { isHR: boolean }) {
   const qKey = ["coa-requests", "pending", isHR ? "all" : "dept"] as const;
-  const { data: pending = [], isLoading } = useQuery({
+  const { data: paginated, isLoading } = useQuery({
     queryKey: qKey,
     queryFn:  () => certificateOfAttendanceApi.list({ status: "pending" }),
     staleTime: 30_000,
   });
+  const pending = paginated?.data ?? [];
 
   if (isLoading || pending.length === 0) return null;
 
