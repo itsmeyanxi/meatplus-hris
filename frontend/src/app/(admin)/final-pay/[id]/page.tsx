@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
-import { finalPayApi, SEPARATION_TYPES } from "@/lib/final-pay";
+import { finalPayApi, SEPARATION_TYPES, type FinalPayRecord } from "@/lib/final-pay";
 
 const php = (n: number | string) =>
   "₱ " + Number(n).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -18,11 +18,142 @@ const SEP_LABELS: Record<string, string> = Object.fromEntries(
   SEPARATION_TYPES.map((t) => [t.value, t.label])
 );
 
+function printFinalPay(fp: FinalPayRecord) {
+  const empName = fp.employee
+    ? `${fp.employee.first_name} ${fp.employee.last_name}`
+    : `Employee #${fp.employee_id}`;
+
+  const php = (n: number | string) =>
+    "₱" + Number(n).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const fmtD = (s: string | null | undefined) => {
+    if (!s) return "—";
+    return new Date(s + "T00:00:00").toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+  };
+
+  const earningRows = fp.earnings_breakdown && fp.earnings_breakdown.length > 0
+    ? fp.earnings_breakdown
+    : [
+        { label: "Unpaid Salary", amount: Number(fp.unpaid_salary) },
+        { label: "13th Month Pay", amount: Number(fp.thirteenth_month_pay) },
+        ...(Number(fp.leave_conversion) > 0 ? [{ label: "Leave Conversion", amount: Number(fp.leave_conversion) }] : []),
+        ...(Number(fp.separation_pay) > 0   ? [{ label: "Separation Pay",   amount: Number(fp.separation_pay) }]   : []),
+        ...(Number(fp.other_earnings) > 0   ? [{ label: "Other Earnings",   amount: Number(fp.other_earnings) }]   : []),
+      ];
+
+  const deductionRows = fp.deductions_breakdown ?? [];
+
+  const tableRow = (label: string, amount: number, bold = false) =>
+    `<tr>
+      <td style="padding:6px 12px;border-bottom:1px solid #e2e8f0;${bold ? "font-weight:700;" : ""}">${label}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #e2e8f0;text-align:right;font-variant-numeric:tabular-nums;${bold ? "font-weight:700;" : ""}">${php(amount)}</td>
+    </tr>`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Final Pay — ${empName}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #1e293b; padding: 32px 40px; max-width: 720px; margin: 0 auto; }
+    h1  { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+    h2  { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #64748b; margin: 20px 0 6px; }
+    .subtitle { font-size: 12px; color: #64748b; margin-bottom: 20px; }
+    .header { border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; margin-bottom: 20px; }
+    .info-item { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+    .info-item .lbl { color: #64748b; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+    table th { background: #f8fafc; padding: 7px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+    table th:last-child { text-align: right; }
+    .total-row td { background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1 !important; }
+    .net-box { margin-top: 16px; border: 2px solid #0f172a; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; }
+    .net-box .lbl { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+    .net-box .amt { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .sig { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 32px; margin-top: 48px; }
+    .sig-item { border-top: 1px solid #0f172a; padding-top: 6px; font-size: 11px; color: #64748b; }
+    .sig-item .name { font-weight: 600; color: #1e293b; margin-bottom: 28px; font-size: 12px; }
+    .no-ded { color: #94a3b8; font-style: italic; padding: 8px 12px; font-size: 12px; }
+    @media print {
+      body { padding: 0; }
+      @page { margin: 18mm 20mm; size: A4 portrait; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Final Pay Computation</h1>
+    <p class="subtitle">
+      ${empName} &nbsp;·&nbsp; ${fp.employee?.employee_no ?? ""}
+      &nbsp;·&nbsp; ${SEP_LABELS[fp.separation_type] ?? fp.separation_type}
+      &nbsp;·&nbsp; Last day: ${fmtD(fp.last_working_day)}
+    </p>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-item"><span class="lbl">Monthly Salary</span><span>${php(fp.basic_monthly)}</span></div>
+    <div class="info-item"><span class="lbl">Daily Rate (÷22)</span><span>${php(fp.daily_rate)}</span></div>
+    <div class="info-item"><span class="lbl">Prepared by</span><span>${fp.computed_by?.name ?? "HR Officer"}</span></div>
+    <div class="info-item"><span class="lbl">Date prepared</span><span>${fmtD(fp.created_at?.split("T")[0])}</span></div>
+  </div>
+
+  <h2>Earnings</h2>
+  <table>
+    <thead><tr><th>Description</th><th>Amount</th></tr></thead>
+    <tbody>
+      ${earningRows.map((r) => tableRow(r.label, Number(r.amount))).join("")}
+      <tr class="total-row">${tableRow("Total Earnings", Number(fp.total_gross), true).replace("<tr>", "").replace("</tr>", "")}</tr>
+    </tbody>
+  </table>
+
+  <h2 style="margin-top:20px;">Deductions</h2>
+  <table>
+    <thead><tr><th>Description</th><th>Amount</th></tr></thead>
+    <tbody>
+      ${deductionRows.length === 0
+        ? `<tr><td colspan="2" class="no-ded">No deductions.</td></tr>`
+        : deductionRows.map((r) => tableRow(r.label, Number(r.amount))).join("")
+      }
+      ${Number(fp.total_deductions_amount) > 0
+        ? `<tr class="total-row">${tableRow("Total Deductions", Number(fp.total_deductions_amount), true).replace("<tr>", "").replace("</tr>", "")}</tr>`
+        : ""
+      }
+    </tbody>
+  </table>
+
+  <div class="net-box">
+    <div>
+      <div class="lbl">Net Final Pay</div>
+      <div style="font-size:11px;color:#64748b;margin-top:2px;">
+        Gross ${php(fp.total_gross)} − Deductions ${php(fp.total_deductions_amount)}
+      </div>
+    </div>
+    <div class="amt">${php(fp.net_final_pay)}</div>
+  </div>
+
+  <div class="sig">
+    <div class="sig-item"><div class="name">${fp.computed_by?.name ?? "HR Officer"}</div>Prepared by</div>
+    <div class="sig-item"><div class="name">&nbsp;</div>Reviewed by (HR Manager)</div>
+    <div class="sig-item"><div class="name">${empName}</div>Acknowledged by (Employee)</div>
+  </div>
+
+  <script>window.onload = function() { window.print(); }<\/script>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank", "width=800,height=900");
+  if (!win) return;
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+}
+
 function Row({ label, value, bold, accent, sub }: {
   label: string; value: string; bold?: boolean; accent?: "green" | "red"; sub?: string;
 }) {
   return (
-    <div className="flex items-start justify-between border-b border-slate-100 px-5 py-2.5 last:border-0 print:px-0">
+    <div className="flex items-start justify-between border-b border-slate-100 px-5 py-2.5 last:border-0">
       <div>
         <span className="text-sm text-slate-600">{label}</span>
         {sub && <p className="text-xs text-slate-400">{sub}</p>}
@@ -39,8 +170,8 @@ function Row({ label, value, bold, accent, sub }: {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 print:text-black">{title}</h4>
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white print:border-slate-300">
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</h4>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         {children}
       </div>
     </div>
@@ -83,7 +214,7 @@ export default function FinalPayDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => window.print()}
+            onClick={() => printFinalPay(fp)}
             className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
           >
             Print / PDF
@@ -103,15 +234,6 @@ export default function FinalPayDetailPage() {
             </span>
           )}
         </div>
-      </div>
-
-      {/* Print header (only visible when printing) */}
-      <div className="hidden print:block print:mb-6">
-        <p className="text-xl font-bold">Final Pay Computation</p>
-        <p className="text-sm text-gray-600">{empName} · {fp.employee?.employee_no}</p>
-        <p className="text-sm text-gray-600">
-          {SEP_LABELS[fp.separation_type]} · Last working day: {fmtDate(fp.last_working_day)}
-        </p>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
@@ -170,38 +292,18 @@ export default function FinalPayDetailPage() {
       </Section>
 
       {/* Net pay highlight */}
-      <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 px-5 py-5 print:border-black print:bg-white">
+      <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 px-5 py-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-emerald-800 print:text-black">NET FINAL PAY</p>
-            <p className="mt-0.5 text-xs text-emerald-600 print:text-gray-500">
+            <p className="text-sm font-semibold text-emerald-800">NET FINAL PAY</p>
+            <p className="mt-0.5 text-xs text-emerald-600">
               Gross {php(fp.total_gross)} − Deductions {php(fp.total_deductions_amount)}
             </p>
           </div>
-          <p className="text-3xl font-bold text-emerald-700 print:text-black">{php(fp.net_final_pay)}</p>
+          <p className="text-3xl font-bold text-emerald-700">{php(fp.net_final_pay)}</p>
         </div>
       </div>
 
-      {/* Print footer */}
-      <div className="hidden print:block print:mt-10 print:border-t print:pt-6">
-        <div className="grid grid-cols-3 gap-8 text-sm">
-          <div>
-            <p className="font-semibold">Prepared by:</p>
-            <div className="mt-8 border-t border-black" />
-            <p className="mt-1 text-xs text-gray-500">{fp.computed_by?.name ?? "HR Officer"}</p>
-          </div>
-          <div>
-            <p className="font-semibold">Reviewed by:</p>
-            <div className="mt-8 border-t border-black" />
-            <p className="mt-1 text-xs text-gray-500">HR Manager</p>
-          </div>
-          <div>
-            <p className="font-semibold">Acknowledged by:</p>
-            <div className="mt-8 border-t border-black" />
-            <p className="mt-1 text-xs text-gray-500">Employee</p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
