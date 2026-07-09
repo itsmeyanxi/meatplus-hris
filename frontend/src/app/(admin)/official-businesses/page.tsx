@@ -47,6 +47,7 @@ export default function OfficialBusinessesPage() {
   const { data: pendingRequests = [], isLoading: pendingLoading } = useQuery({
     queryKey: ["ob-requests", "pending", isHR ? "all" : "dept"],
     queryFn: () => officialBusinessApi.list({ status: "pending" }),
+    select: (res) => res.data,
     enabled: showQueue,
     staleTime: 30_000,
   });
@@ -54,6 +55,7 @@ export default function OfficialBusinessesPage() {
   const { data: myRequests = [], isLoading: myLoading } = useQuery({
     queryKey: ["ob-requests", "mine", employeeId],
     queryFn: () => officialBusinessApi.list({ employee_id: employeeId! }),
+    select: (res) => res.data,
     enabled: !!employeeId,
     staleTime: 30_000,
   });
@@ -121,6 +123,7 @@ function StatsBar({ employeeId, isHR, isApprover }: { employeeId: number | null;
     queryFn: () => isHR || isApprover
       ? officialBusinessApi.list()
       : officialBusinessApi.list({ employee_id: employeeId! }),
+    select: (res) => res.data,
     enabled: isHR || isApprover || !!employeeId,
     staleTime: 60_000,
   });

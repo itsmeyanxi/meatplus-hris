@@ -54,6 +54,7 @@ export default function UndertimesPage() {
   const { data: pendingRequests = [], isLoading: pendingLoading } = useQuery({
     queryKey: ["undertime-requests", "pending", isHR ? "all" : "dept"],
     queryFn: () => undertimeApi.list({ status: "pending" }),
+    select: (res) => res.data,
     enabled: showQueue,
     staleTime: 30_000,
   });
@@ -61,6 +62,7 @@ export default function UndertimesPage() {
   const { data: myRequests = [], isLoading: myLoading } = useQuery({
     queryKey: ["undertime-requests", "mine", employeeId],
     queryFn: () => undertimeApi.list({ employee_id: employeeId! }),
+    select: (res) => res.data,
     enabled: !!employeeId,
     staleTime: 30_000,
   });
@@ -132,6 +134,7 @@ function StatsBar({ employeeId, isHR, isApprover }: { employeeId: number | null;
     queryFn: () => isHR || isApprover
       ? undertimeApi.list()
       : undertimeApi.list({ employee_id: employeeId! }),
+    select: (res) => res.data,
     enabled: isHR || isApprover || !!employeeId,
     staleTime: 60_000,
   });

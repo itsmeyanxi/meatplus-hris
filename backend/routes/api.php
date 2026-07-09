@@ -175,6 +175,7 @@ Route::prefix('v1')->group(function () {
         Route::post('final-pays/compute', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'compute']);
         Route::post('final-pays', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'store']);
         Route::get('final-pays/{finalPay}', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'show']);
+        Route::get('final-pays/{finalPay}/payroll-history', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'payrollHistory']);
         Route::patch('final-pays/{finalPay}', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'update']);
         Route::delete('final-pays/{finalPay}', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'destroy']);
 

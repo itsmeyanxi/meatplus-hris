@@ -1065,7 +1065,7 @@ function OngoingLeavesPanel() {
         {leaves.map((leave) => {
           const from = new Date(leave.date_from).toLocaleDateString("en-PH", { month: "short", day: "numeric" });
           const to   = new Date(leave.date_to).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
-          const days = parseFloat(leave.days_count);
+          const days = leave.days_count;
           const dayLabel = leave.half_day
             ? `Half day (${leave.half_day.toUpperCase()})`
             : `${days} day${days !== 1 ? "s" : ""}`;

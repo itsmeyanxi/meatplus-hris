@@ -56,6 +56,7 @@ export default function OvertimesPage() {
   const { data: pendingRequests = [], isLoading: pendingLoading } = useQuery({
     queryKey: ["overtime-requests", "pending", isHR ? "all" : "dept"],
     queryFn: () => overtimeApi.list({ status: "pending" }),
+    select: (res) => res.data,
     enabled: showQueue,
     staleTime: 30_000,
   });
@@ -64,6 +65,7 @@ export default function OvertimesPage() {
   const { data: myRequests = [], isLoading: myLoading } = useQuery({
     queryKey: ["overtime-requests", "mine", employeeId],
     queryFn: () => overtimeApi.list({ employee_id: employeeId! }),
+    select: (res) => res.data,
     enabled: !!employeeId,
     staleTime: 30_000,
   });
@@ -143,6 +145,7 @@ function StatsBar({ employeeId, isHR, isApprover }: { employeeId: number | null;
       : isApprover
       ? overtimeApi.list()  // backend scopes to dept
       : overtimeApi.list({ employee_id: employeeId! }),
+    select: (res) => res.data,
     enabled: isHR || isApprover || !!employeeId,
     staleTime: 60_000,
   });

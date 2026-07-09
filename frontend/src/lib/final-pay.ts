@@ -63,6 +63,24 @@ export type FinalPayRecord = {
   created_at: string;
 };
 
+export type PayrollHistoryMonth = {
+  month:            string;   // "January", "February", …
+  basic_salary:     number;
+  de_minimis:       number;
+  other_earnings:   number;
+  other_deductions: number;
+  sss_phc_hdmf:     number;
+  taxable_earnings: number;
+  withheld:         number;
+};
+
+export type PayrollHistoryTotals = Omit<PayrollHistoryMonth, "month">;
+
+export type PayrollHistory = {
+  months: PayrollHistoryMonth[];
+  totals: PayrollHistoryTotals;
+};
+
 export type SaveFinalPayBody = {
   employee_id:              number;
   last_working_day:         string;
@@ -117,6 +135,11 @@ export const finalPayApi = {
       status: "cancelled",
       notes: reason,
     });
+    return data.data;
+  },
+
+  payrollHistory: async (id: number): Promise<PayrollHistory> => {
+    const { data } = await api.get<{ data: PayrollHistory }>(`/api/v1/final-pays/${id}/payroll-history`);
     return data.data;
   },
 };

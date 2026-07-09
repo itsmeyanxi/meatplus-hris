@@ -63,7 +63,7 @@ class FinalPayController extends Controller
 
         // Suggested 13th month: YTD basic pay from payslips ÷ 12
         $yearStart          = $lastDay->copy()->startOfYear();
-        $totalBasicThisYear = (float) Payslip::whereHas('payrollRun', fn ($q) =>
+        $totalBasicThisYear = (float) Payslip::whereHas('run', fn ($q) =>
             $q->where('period_start', '>=', $yearStart->toDateString())
               ->where('period_end', '<=', $lastDay->toDateString())
         )->where('employee_id', $employee->id)->sum('basic_pay');
@@ -238,11 +238,83 @@ class FinalPayController extends Controller
         $data = $request->validate([
             'notes'  => 'nullable|string',
             'status' => 'nullable|string|in:draft,finalized,cancelled',
-            'notes'  => 'nullable|string',
         ]);
 
         $finalPay->update($data);
 
         return response()->json(['data' => $finalPay->fresh('employee:id,employee_no,first_name,last_name')]);
+    }
+
+    /**
+     * Return month-by-month payslip history for the employee in the year of last_working_day.
+     * Used to auto-populate Part III (Annual Tax Computation) of the final pay print.
+     */
+    public function payrollHistory(FinalPay $finalPay): JsonResponse
+    {
+        abort_unless(
+            auth()->user()->can('leave.approve.any') || auth()->user()->hasRole('it_admin'),
+            403
+        );
+
+        $lastDay   = Carbon::parse($finalPay->last_working_day);
+        $yearStart = $lastDay->copy()->startOfYear();
+
+        $payslips = Payslip::where('employee_id', $finalPay->employee_id)
+            ->whereHas('run', fn ($q) =>
+                $q->where('period_end', '>=', $yearStart->toDateString())
+                  ->where('period_end', '<=', $lastDay->toDateString())
+            )
+            ->with('run:id,period_end')
+            ->get();
+
+        // Group by calendar month using period_end
+        $byMonth = $payslips->groupBy(
+            fn ($p) => (int) Carbon::parse($p->run->period_end)->format('n')
+        );
+
+        $months = [];
+        $totals = array_fill_keys(
+            ['basic_salary', 'de_minimis', 'other_earnings', 'other_deductions', 'sss_phc_hdmf', 'taxable_earnings', 'withheld'],
+            0.0
+        );
+
+        for ($m = 1; $m <= 12; $m++) {
+            $group = $byMonth->get($m, collect());
+
+            $basic    = (float) $group->sum('basic_pay');
+            $otherEarnings = (float) $group->sum('overtime_pay')
+                           + (float) $group->sum('night_diff_pay')
+                           + (float) $group->sum('allowance');
+            $otherDed = (float) $group->sum('absences_deduction')
+                      + (float) $group->sum('tardiness_deduction');
+            $govDed   = (float) $group->sum('sss')
+                      + (float) $group->sum('philhealth')
+                      + (float) $group->sum('pagibig');
+            $taxable  = max(0.0, $basic + $otherEarnings - $otherDed - $govDed);
+            $withheld = (float) $group->sum('withholding_tax');
+
+            $row = [
+                'month'            => Carbon::createFromDate($lastDay->year, $m, 1)->format('F'),
+                'basic_salary'     => round($basic, 2),
+                'de_minimis'       => 0.0,
+                'other_earnings'   => round($otherEarnings, 2),
+                'other_deductions' => round($otherDed, 2),
+                'sss_phc_hdmf'     => round($govDed, 2),
+                'taxable_earnings' => round($taxable, 2),
+                'withheld'         => round($withheld, 2),
+            ];
+
+            $months[] = $row;
+
+            foreach (['basic_salary', 'other_earnings', 'other_deductions', 'sss_phc_hdmf', 'taxable_earnings', 'withheld'] as $col) {
+                $totals[$col] += $row[$col];
+            }
+        }
+
+        foreach ($totals as $k => $v) {
+            $totals[$k] = round($v, 2);
+        }
+
+        return response()->json(['data' => ['months' => $months, 'totals' => $totals]]);
     }
 }

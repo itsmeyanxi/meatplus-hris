@@ -40,7 +40,7 @@ const TABS: { key: Tab; label: string }[] = [
 
 export default function ScheduleAdjustmentsPage() {
   const qc = useQueryClient();
-  const { data: meData } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const { data: meData, isLoading: meLoading } = useQuery({ queryKey: ["me"], queryFn: getMe });
 
   const user      = meData?.user;
   const perms     = user?.permissions ?? [];
@@ -85,19 +85,40 @@ export default function ScheduleAdjustmentsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-green-700">My Schedule Adjustments</h2>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="text-sm font-semibold text-green-700 hover:text-green-800"
-        >
-          {showForm ? "✕ Close" : "+ Add"}
-        </button>
+        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Schedule Adjustments</h2>
+        {(meLoading || employeeId || canManage) && (
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            disabled={meLoading}
+            className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50 ${
+              showForm
+                ? "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                : "bg-green-600 text-white hover:bg-green-700"
+            }`}
+          >
+            {showForm ? (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Close
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                New Request
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Application form (slide in) */}
-      {showForm && employeeId && (
+      {showForm && !meLoading && (employeeId || canManage) && (
         <ApplicationForm
-          employeeId={employeeId}
+          employeeId={employeeId ?? 0}
           canManage={canManage}
           empPage={empPage?.data ?? []}
           onSuccess={() => {
