@@ -1,0 +1,108 @@
+# Render Blueprint - Meatplus HRIS
+#
+# Two services. The frontend proxies /api and /sanctum to the backend via
+# next.config.mjs rewrites, so the browser only ever talks to the frontend
+# origin. That keeps the Sanctum session cookie same-origin: no CORS, no
+# SameSite=None.
+#
+# Singapore region: the Supabase database is in ap-southeast-1. Hosting
+# elsewhere adds a round-trip to every query.
+#
+# Secrets (sync: false) must be set in the Render dashboard. Never commit them.
+
+services:
+  - type: web
+    name: meatplus-hris-api
+    runtime: docker
+    plan: free
+    region: singapore
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /up
+    envVars:
+      - key: APP_NAME
+        value: Meatplus HRIS
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_URL
+        value: https://meatplus-hris-api.onrender.com
+      - key: APP_TIMEZONE
+        value: UTC
+
+      # Reuse the SAME APP_KEY as the local .env. Employee bank accounts and
+      # government IDs are encrypted with it; a new key makes them unreadable.
+      - key: APP_KEY
+        sync: false
+
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_DATABASE
+        value: postgres
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSLMODE
+        value: require
+
+      # Render's filesystem is ephemeral: a file-based session store is wiped on
+      # every deploy and every spin-down, logging everyone out. The sessions
+      # table already exists in Supabase.
+      - key: SESSION_DRIVER
+        value: database
+      - key: SESSION_SECURE_COOKIE
+        value: "true"
+      - key: SESSION_DOMAIN
+        value: ""
+
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: sync
+
+      # Logs must go to stdout/stderr; there is no persistent log file.
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: warning
+
+      # The browser's Origin/Referer is the frontend, not this service.
+      - key: FRONTEND_URL
+        value: https://meatplus-hris-web.onrender.com
+      - key: SANCTUM_STATEFUL_DOMAINS
+        value: meatplus-hris-web.onrender.com
+
+      - key: MAIL_MAILER
+        value: smtp
+      - key: MAIL_HOST
+        value: smtp.gmail.com
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_ENCRYPTION
+        value: tls
+      - key: MAIL_FROM_ADDRESS
+        value: noreply@meatplus.ph
+
+  - type: web
+    name: meatplus-hris-web
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start -- -p $PORT -H 0.0.0.0
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: BACKEND_URL
+        value: https://meatplus-hris-api.onrender.com

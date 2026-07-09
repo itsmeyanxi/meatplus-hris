@@ -21,6 +21,11 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Render (and any load balancer) terminates TLS upstream. Without this,
+        // Laravel sees plain HTTP, generates http:// URLs and refuses to set
+        // secure session cookies.
+        $middleware->trustProxies(at: '*');
+
         $middleware->statefulApi();
 
         $middleware->api(prepend: [
