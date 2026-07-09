@@ -5,10 +5,11 @@ Each item notes *why*, the *command*, and the *dev-loop caveat* (why we don't do
 while building).
 
 > **Context (current):** the app runs on a **Laragon** stack (PHP 8.3 + Node) against a
-> **Supabase Postgres** database (`ap-southeast-1`). `start-app.bat` already serves the
-> **production frontend build** (`npm run build && npm run start`) — adopted because dev
-> mode's on-demand compiling was the biggest source of slow page loads. The remaining
-> latency is the ~145 ms/query round-trip to the cloud DB (see "Database latency" below).
+> **Supabase Postgres** database (`ap-southeast-1`). `start-servers.ps1` serves the frontend
+> in **dev mode** (`npm run dev` on `:3001`) so code changes hot-reload. Dev mode's
+> on-demand compiling makes the first visit to each route slow — switch to a production
+> build (section 1) for staging/prod. The remaining latency is the ~145 ms/query
+> round-trip to the cloud DB (see "Database latency" below).
 > Production target is a hosted Laravel (PHP-FPM/Octane) + hosted Next.js.
 
 ---
@@ -22,9 +23,11 @@ A production build is precompiled, minified, and tree-shaken — dramatically fa
 cd frontend
 npm ci                # clean, lockfile-exact install
 npm run build
-npm run start         # serves the optimized build (default :3000)
+npm run start -- -p 3001   # serves the optimized build
 ```
 
+- Use `:3001`. Only `:3001` origins are listed in `SANCTUM_STATEFUL_DOMAINS`, so serving
+  on the `npm run start` default of `:3000` makes login fail CSRF validation.
 - Set `NEXT_PUBLIC_API_URL` (or keep the proxy rewrites) to the production API origin.
 - **Dev caveat:** `build`/`start` has **no hot-reload** — every change needs a rebuild.
   Only for staging/prod, never while building features.
@@ -59,7 +62,8 @@ php artisan view:cache
 ## 3. OPcache — production settings
 
 **Why:** compiles PHP once and serves bytecode from memory. Biggest single backend win.
-Already enabled in dev (`C:\xampp\php\php.ini`, backup at `php.ini.bak-*`).
+Currently **not enabled** on the Laragon box — `zend_extension=opcache` is still commented
+out in `C:\laragon\bin\php\php-<version>\php.ini`.
 
 Dev currently keeps **timestamp validation ON** so code edits hot-reload. In production,
 turn it **OFF** so PHP never stats files (faster), and reload on each deploy.
@@ -171,4 +175,4 @@ npm run build
 - ❌ `config:cache` / `php artisan optimize` (freezes `.env`).
 - ❌ `opcache.validate_timestamps=0` (you stop seeing code changes).
 - ❌ `npm run build` as your dev loop (no hot-reload).
-- ❌ Octane on the Windows/XAMPP dev box.
+- ❌ Octane on the Windows/Laragon dev box.

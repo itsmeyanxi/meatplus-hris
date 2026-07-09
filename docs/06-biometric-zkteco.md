@@ -46,8 +46,9 @@ The device connects to **port 8000**. Allow it once:
 
 ## Step 3 — Make sure the app is running with LAN access
 
-Use the updated **`start-app.bat`** (it now starts the backend with `--host=0.0.0.0`,
-which lets the device reach it). Double‑click it, or just reboot if it's in Startup.
+Run **`.\start-servers.ps1`** (it starts the backend with `--host=0.0.0.0`, which lets
+the device reach it). If you registered the logon task with `.\register-autostart.ps1`,
+just sign in and it starts by itself.
 
 ## Step 4 — Configure the device
 

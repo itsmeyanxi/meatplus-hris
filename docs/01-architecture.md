@@ -211,8 +211,8 @@ Device scan → [ingestion adapter] → TimeLog → DtrComputer → DailyTimeRec
 ## 12. Environments & delivery
 
 - **Local dev / current run:** a **Laragon** stack (PHP 8.3 + Node) on Windows.
-  `start-app.bat` launches the Laravel API (`php artisan serve --host=0.0.0.0`, so the
-  biometric device can reach it on the LAN) and the Next.js frontend. The database is
+  `start-servers.ps1` launches the Laravel API (`php artisan serve --host=0.0.0.0`, so the
+  biometric device can reach it on the LAN) and the Next.js frontend on `:3001`. The database is
   **Supabase Postgres** (cloud). See [04-setup-supabase-laragon.md](04-setup-supabase-laragon.md).
 - **Staging / production (planned):** Next.js hosted (e.g., Vercel); Laravel on a
   managed PHP host (PHP-FPM/Octane); queue worker; scheduled tasks (`schedule:run`).

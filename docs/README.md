@@ -8,7 +8,7 @@ multiple branches, each with its own biometric device(s).
 - **Frontend:** Next.js 16 (App Router), TypeScript, TanStack Query, Tailwind
 - **Database:** PostgreSQL — **Supabase** (`ap-southeast-1`)
 - **Biometric:** ZKTeco **MB460** via the **ADMS push** protocol
-- **Runs on:** a local **Laragon** stack today (`start-app.bat`); cloud-hosted is the target
+- **Runs on:** a local **Laragon** stack today (`start-servers.ps1`); cloud-hosted is the target
 
 ---
 
@@ -28,9 +28,10 @@ multiple branches, each with its own biometric device(s).
 
 ## Quick start
 
-1. **Run the app:** double-click `start-app.bat` (project root). It launches the Laravel
+1. **Run the app:** run `.\start-servers.ps1` (project root). It launches the Laravel
    API on `:8000` (host `0.0.0.0` so the biometric device can reach it) and the Next.js
-   frontend on `:3000`. Open <http://localhost:3000>.
+   frontend on `:3001`. Open <http://localhost:3001>.
+   To have it start automatically at logon, run `.\register-autostart.ps1` once.
 2. **Set up the database:** follow [04-setup-supabase-laragon.md](04-setup-supabase-laragon.md).
 3. **Connect the biometric device:** follow [06-biometric-zkteco.md](06-biometric-zkteco.md).
 
@@ -45,14 +46,16 @@ meatplus-hris/
 │  └─ database/             migrations + seeders (PermissionsSeeder = RBAC source of truth)
 ├─ frontend/                Next.js 16 app (App Router)
 ├─ docs/                    ← you are here
-└─ start-app.bat            one-click local startup (Laragon)
+├─ start-servers.ps1        local startup: Laravel :8000 + Next.js :3001
+└─ register-autostart.ps1   registers start-servers.ps1 as a logon task
 ```
 
 ## Current status (2026-06)
 
 - ✅ Migrated to **Supabase Postgres**; codebase is driver-agnostic (Postgres + MySQL)
 - ✅ **ZKTeco ADMS receiver** built — device auto-registers by serial; raw pushes logged
-- ✅ Frontend served as a **production build** for speed
+- ✅ Frontend runs in **dev mode** (`npm run dev`) on `:3001`; a production build is the
+  faster option for staging/prod — see [07-deployment-performance.md](07-deployment-performance.md)
 - ⏳ Cloud hosting (so the app is reachable from any browser) — planned
 - ⏳ Device onboarding (MB460) — in progress
 

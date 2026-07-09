@@ -39,7 +39,9 @@ We turn it **on**.
 1. Open **Laragon**.
 2. Click the **Menu** button (or right‑click t  he Laragon window).
 3. Go to **PHP → Extensions**.
-4. Find **`pdo_pgsql`** and **click it** so it has a check ✔. (Also check `pgsql` if you see it.)
+4. Find **`pdo_pgsql`** and **click it** so it has a check ✔. (Also check `pgsql` and
+   **`zip`** — `zip` is needed by the employee-import library, and `composer install`
+   fails without it.)
 5. Click **Menu → Apache/Nginx → Reload** (or just restart Laragon).
 
 **How to know it worked:** open Laragon's **Terminal** (Menu → Terminal) and type:
@@ -112,6 +114,19 @@ DB_SSLMODE=require
 
 ## Part 4 — Build the pages of the notebook 📔
 
+> ⚠️ **Only do this for a brand-new, empty Supabase project.**
+> If you are setting up a second computer that points at the **existing** Supabase
+> database, the tables and data are already there. Check first with:
+>
+> ```
+> php artisan migrate:status
+> ```
+>
+> If it says nothing is pending, **skip this whole Part**. Running `db:seed` against the
+> live database re-runs the seeders on real data — it can duplicate or overwrite
+> employees. Only `migrate --force` (never `db:seed`) is safe on a database in use, and
+> only when migrations are actually pending.
+
 The online notebook is **empty** right now. We tell the app to draw all the tables
 and add the starting info (companies, roles, sample logins).
 
@@ -119,7 +134,10 @@ and add the starting info (companies, roles, sample logins).
 2. Type these **one at a time**, pressing Enter after each, and wait for each to finish:
 
 ```
-cd C:\xampp\htdocs\meatplus-hris\backend
+cd "C:\Users\ALL COMPANY HRIS\Documents\meatplus-hris\backend"
+```
+```
+composer install
 ```
 ```
 php artisan config:clear
@@ -160,24 +178,43 @@ Your employee list lives in your CSV/Excel file. Let's load it into the new note
 
 ## Part 6 — Turn the app on 🟢
 
-You need **two** things running. Open **two** terminals in Laragon.
+**The easy way.** Open a PowerShell window in the project folder and run:
+
+```
+.\start-servers.ps1
+```
+
+It starts both the backend and the frontend, waits for the backend to answer before
+starting the frontend, and writes output to the `logs\` folder. Running it twice is
+safe — it skips whatever is already running.
+
+Want it to start by itself every time you sign in to Windows? Run this once:
+
+```
+.\register-autostart.ps1
+```
+
+**The manual way** (if you'd rather see two windows). Open **two** terminals in Laragon:
 
 **Terminal 1 — the brain (backend):**
 ```
-cd C:\xampp\htdocs\meatplus-hris\backend
-php artisan serve
+cd "C:\Users\ALL COMPANY HRIS\Documents\meatplus-hris\backend"
+php artisan serve --host=0.0.0.0 --port=8000
 ```
 
 **Terminal 2 — the screen (frontend):**
 ```
-cd C:\xampp\htdocs\meatplus-hris\frontend
-npm run dev
+cd "C:\Users\ALL COMPANY HRIS\Documents\meatplus-hris\frontend"
+npm run dev -- -p 3001
 ```
 
 Now open your web browser and go to:
 ```
-http://localhost:3000
+http://localhost:3001
 ```
+
+> 🔴 It must be **port 3001**, not 3000. Only `:3001` is listed in
+> `SANCTUM_STATEFUL_DOMAINS`, so on port 3000 the login page loads but signing in fails.
 
 Log in with `itdevice@meatplus.ph` / `Pass@456`. 🎉
 
