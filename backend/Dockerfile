@@ -21,6 +21,17 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 COPY . .
 
+# These directories are gitignored (and stripped by .dockerignore), so they do
+# not exist in the build context. Laravel's package:discover -- which Composer
+# runs in post-autoload-dump -- aborts without bootstrap/cache, failing the build.
+RUN mkdir -p bootstrap/cache \
+        storage/framework/cache/data \
+        storage/framework/sessions \
+        storage/framework/views \
+        storage/logs \
+        storage/app/public \
+    && chmod -R 775 bootstrap/cache storage
+
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Render injects $PORT at runtime. config:cache must run here, not at build time,
