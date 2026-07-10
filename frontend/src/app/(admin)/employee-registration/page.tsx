@@ -10,7 +10,8 @@ import { employeeSchedulesApi, workSchedulesApi } from "@/lib/attendance";
 import { getMe } from "@/lib/auth";
 import {
   educationApi, emergencyContactsApi, employeeAddressesApi, employeeEmailsApi,
-  employeeLocationsApi, employeePhonesApi, governmentIdsApi, performanceGoalsApi, photoApi,
+  employeeLocationsApi, employeePhonesApi, employeeVisasApi,
+  governmentIdsApi, performanceGoalsApi, photoApi,
 } from "@/lib/employee-relations";
 import { createEmployee, getLookup, listEmployees, type EmployeeListItem, type LookupItem } from "@/lib/employees";
 import { usersApi, ROLE_LABELS, type Role } from "@/lib/users";
@@ -114,7 +115,7 @@ const ASSIGNABLE_ROLES: Role[] = [
 
 type SectionKey =
   | "basic" | "work" | "locations" | "schedule"
-  | "government" | "education" | "performance" | "contact" | "portal";
+  | "government" | "visa" | "education" | "performance" | "contact" | "portal";
 
 type SectionDef = {
   key: SectionKey;
@@ -140,6 +141,7 @@ const IconSchedule    = () => icon("M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2
 const IconGovernment  = () => icon("M12 3l9 6H3l9-6zM5 10v8m4-8v8m6-8v8m4-8v8M3 21h18");
 const IconEducation   = () => icon("M12 14l9-5-9-5-9 5 9 5zm0 0v7m-6-3.5V12l6 3 6-3v5.5");
 const IconPerformance = () => icon("M3 3v18h18M7 15l3-3 3 3 5-6");
+const IconVisa        = () => icon("M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L12 19v-5.5L21 16z");
 const IconContact     = () => icon("M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11 11 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z");
 const IconPortal      = () => icon("M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z");
 
@@ -203,6 +205,19 @@ export default function EmployeeRegistrationPage() {
   const removeEmg = (i: number) => setEmgRows((r) => r.filter((_, n) => n !== i));
   const setEmg    = (i: number, patch: Partial<EmgRow>) =>
     setEmgRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
+
+  // Visas
+  type VisaRow = {
+    visa_type: string; visa_number: string; issue_date: string;
+    expiration_date: string; place_of_issue: string; notes: string;
+  };
+  const [visaRows, setVisaRows] = useState<VisaRow[]>([]);
+  const addVisa    = () => setVisaRows((r) => [...r, {
+    visa_type: "", visa_number: "", issue_date: "", expiration_date: "", place_of_issue: "", notes: "",
+  }]);
+  const removeVisa = (i: number) => setVisaRows((r) => r.filter((_, n) => n !== i));
+  const setVisa    = (i: number, patch: Partial<VisaRow>) =>
+    setVisaRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
 
   // Alternate phones
   type PhoneRow = { title: string; contact_no: string; contact_name: string };
@@ -353,6 +368,9 @@ export default function EmployeeRegistrationPage() {
     { key: "government", label: "Government Information", description: "TIN, SSS, PhilHealth & HDMF",
       icon: <IconGovernment />, required: true,
       isComplete: (v) => !!v.tin },
+    { key: "visa", label: "Visa", description: "Visa type, number, validity & place of issue",
+      icon: <IconVisa />,
+      isComplete: () => visaRows.some((v) => v.visa_type.trim() && v.visa_number.trim()) },
     { key: "education", label: "Educational Background", description: "School, degree & years attended",
       icon: <IconEducation />,
       isComplete: () => eduRows.some((r) => r.level && r.school) },
@@ -447,6 +465,20 @@ export default function EmployeeRegistrationPage() {
             prc_expiry: v.prc_expiry || null,
             passport_no: v.passport_no || null,
             rdo_code: v.rdo_code || null,
+          }));
+      }
+
+      // Visa type and number are required; skip half-filled rows.
+      for (const [i, row] of visaRows.entries()) {
+        if (!row.visa_type.trim() || !row.visa_number.trim()) continue;
+        await attach(`Visa (row ${i + 1})`, () =>
+          employeeVisasApi.create(emp.id, {
+            visa_type: row.visa_type.trim(),
+            visa_number: row.visa_number.trim(),
+            issue_date: row.issue_date || null,
+            expiration_date: row.expiration_date || null,
+            place_of_issue: row.place_of_issue || null,
+            notes: row.notes || null,
           }));
       }
 
@@ -601,13 +633,13 @@ export default function EmployeeRegistrationPage() {
     return (
       <SuccessScreen
         result={result}
-        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
+        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setVisaRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
       />
     );
   }
 
   const toggle = (key: SectionKey) => setActive((prev) => (prev === key ? null : key));
-  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
+  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setVisaRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -744,6 +776,9 @@ export default function EmployeeRegistrationPage() {
                       />
                     )}
                     {section.key === "government"  && <GovernmentSection form={form} />}
+                    {section.key === "visa"        && (
+                      <VisaSection rows={visaRows} onAdd={addVisa} onRemove={removeVisa} onChange={setVisa} />
+                    )}
                     {section.key === "education"   && (
                       <EducationSection rows={eduRows} onAdd={addEdu} onRemove={removeEdu} onChange={setEdu} />
                     )}
@@ -1309,6 +1344,58 @@ function GovernmentSection({ form }: { form: FF }) {
         they are not personally sensitive.
       </Hint>
     </>
+  );
+}
+
+type VisaRow = {
+  visa_type: string; visa_number: string; issue_date: string;
+  expiration_date: string; place_of_issue: string; notes: string;
+};
+
+function VisaSection({ rows, onAdd, onRemove, onChange }: {
+  rows: VisaRow[];
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+  onChange: (i: number, patch: Partial<VisaRow>) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <AddButton onClick={onAdd}>Add Visa</AddButton>
+
+      <RowTable
+        headers={["Visa Type", "Visa Number", "Issue Date", "Expiration Date", "Place Of Issue", "Notes", ""]}
+        empty="No visas yet."
+      >
+        {rows.map((r, i) => (
+          <tr key={i}>
+            <td className="px-3 py-2">
+              <Input value={r.visa_type} onChange={(e) => onChange(i, { visa_type: e.target.value })} placeholder="9(G) Working" />
+            </td>
+            <td className="px-3 py-2">
+              <Input value={r.visa_number} onChange={(e) => onChange(i, { visa_number: e.target.value })} />
+            </td>
+            <td className="px-3 py-2">
+              <Input type="date" value={r.issue_date} onChange={(e) => onChange(i, { issue_date: e.target.value })} />
+            </td>
+            <td className="px-3 py-2">
+              <Input type="date" value={r.expiration_date} onChange={(e) => onChange(i, { expiration_date: e.target.value })} />
+            </td>
+            <td className="px-3 py-2">
+              <Input value={r.place_of_issue} onChange={(e) => onChange(i, { place_of_issue: e.target.value })} />
+            </td>
+            <td className="px-3 py-2">
+              <Input value={r.notes} onChange={(e) => onChange(i, { notes: e.target.value })} />
+            </td>
+            <td className="px-3 py-2 text-right"><RemoveButton onClick={() => onRemove(i)} /></td>
+          </tr>
+        ))}
+      </RowTable>
+
+      <Hint>
+        Visa Type and Visa Number are both needed for a row to save. The expiration date cannot
+        precede the issue date. Visa numbers are encrypted at rest.
+      </Hint>
+    </div>
   );
 }
 

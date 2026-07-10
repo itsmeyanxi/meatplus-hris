@@ -41,6 +41,7 @@ use App\Http\Controllers\Api\V1\Employees\LocationController;
 use App\Http\Controllers\Api\V1\Employees\PerformanceController;
 use App\Http\Controllers\Api\V1\Employees\PerformanceGoalController;
 use App\Http\Controllers\Api\V1\Employees\PhotoController;
+use App\Http\Controllers\Api\V1\Employees\VisaController;
 use App\Http\Controllers\Api\V1\Leave\LeaveApplicationController;
 use App\Http\Controllers\Api\V1\Leave\LeaveBalanceController;
 use App\Http\Controllers\Api\V1\Leave\LeaveTypeController;
@@ -106,6 +107,9 @@ Route::prefix('v1')->group(function () {
         Route::post('employees/{employee}/performance-goals', [PerformanceGoalController::class, 'store']);
         Route::put('employees/{employee}/performance-goals/{goal}', [PerformanceGoalController::class, 'update']);
         Route::delete('employees/{employee}/performance-goals/{goal}', [PerformanceGoalController::class, 'destroy']);
+        Route::apiResource('employees.visas', VisaController::class)
+            ->scoped()->parameters(['visas' => 'visa'])->except(['show']);
+
         Route::get('employees/{employee}/phones', [ContactChannelController::class, 'phones']);
         Route::post('employees/{employee}/phones', [ContactChannelController::class, 'storePhone']);
         Route::delete('employees/{employee}/phones/{phone}', [ContactChannelController::class, 'destroyPhone']);

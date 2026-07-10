@@ -411,3 +411,37 @@ export const employeeAddressesApi = {
   },
   destroy: (employeeId: number, id: number) => api.delete(nest(employeeId, `addresses/${id}`)),
 };
+
+// ── Visas (visa_number is encrypted at rest) ─────────────────────────────────
+
+export type EmployeeVisa = {
+  id: number;
+  employee_id: number;
+  visa_type: string;
+  visa_number: string;
+  issue_date: string | null;
+  expiration_date: string | null;
+  place_of_issue: string | null;
+  notes: string | null;
+};
+
+export type EmployeeVisaInput = {
+  visa_type: string;
+  visa_number: string;
+  issue_date?: string | null;
+  expiration_date?: string | null;
+  place_of_issue?: string | null;
+  notes?: string | null;
+};
+
+export const employeeVisasApi = {
+  list: async (employeeId: number): Promise<EmployeeVisa[]> => {
+    const { data } = await api.get<Listed<EmployeeVisa>>(nest(employeeId, "visas"));
+    return data.data;
+  },
+  create: async (employeeId: number, body: EmployeeVisaInput): Promise<EmployeeVisa> => {
+    const { data } = await api.post<{ data: EmployeeVisa }>(nest(employeeId, "visas"), body);
+    return data.data;
+  },
+  destroy: (employeeId: number, id: number) => api.delete(nest(employeeId, `visas/${id}`)),
+};

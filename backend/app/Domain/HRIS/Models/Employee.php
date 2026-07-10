@@ -144,6 +144,11 @@ class Employee extends Model
         return $this->hasMany(EmployeePerformanceGoal::class);
     }
 
+    public function visas(): HasMany
+    {
+        return $this->hasMany(EmployeeVisa::class);
+    }
+
     public function photo(): HasOne
     {
         return $this->hasOne(EmployeePhoto::class);
