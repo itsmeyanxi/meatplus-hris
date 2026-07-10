@@ -111,3 +111,46 @@ export function peso(v: string | number | null | undefined): string {
   const n = Number(v ?? 0);
   return n.toLocaleString("en-PH", { style: "currency", currency: "PHP" });
 }
+
+// ── Per-employee payroll profile (Current Payroll Information) ───────────────
+
+export type PayrollProfileInput = {
+  work_days_per_year?: number | null;
+  cost_center?: string | null;
+  is_rohq?: boolean;
+
+  is_minimum_wage_earner?: boolean;
+  daily_allowance?: number | null;
+  de_minimis?: number | null;
+  pay_group?: string | null;
+  consultant_percent_tax?: number | null;
+  work_hours_per_day?: number | null;
+  ot_computation_table?: string | null;
+
+  sss_contribution_mode?: "system" | "fixed";
+  sss_fixed_amount?: number | null;
+  hdmf_contribution_mode?: "system" | "fixed";
+  hdmf_additional?: number | null;
+  philhealth_contribution_mode?: "system" | "fixed";
+  philhealth_fixed_amount?: number | null;
+
+  has_previous_employment?: boolean;
+  prev_nontax_13th_month?: number | null;
+  prev_nontax_other_bonus?: number | null;
+  prev_nontax_salaries?: number | null;
+  prev_13th_month?: number | null;
+  prev_other_bonus?: number | null;
+  prev_taxable_gross?: number | null;
+  prev_tax_withheld?: number | null;
+  prev_government_deductions?: number | null;
+  prev_de_minimis?: number | null;
+  prev_taxable_compensation?: number | null;
+  prev_monetized_leave?: number | null;
+};
+
+export const payrollProfileApi = {
+  get: async (employeeId: number) =>
+    (await api.get<{ data: unknown }>(`/api/v1/employees/${employeeId}/payroll-profile`)).data.data,
+  save: async (employeeId: number, body: PayrollProfileInput) =>
+    (await api.put(`/api/v1/employees/${employeeId}/payroll-profile`, body)).data,
+};

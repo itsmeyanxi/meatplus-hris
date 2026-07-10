@@ -15,7 +15,8 @@ import {
 } from "@/lib/employee-relations";
 import { createEmployee, getLookup, listEmployees, type EmployeeListItem, type LookupItem } from "@/lib/employees";
 import { leaveBalancesApi, leaveTypesApi } from "@/lib/leaves";
-import { compensationApi } from "@/lib/payroll";
+import { compensationApi, payrollProfileApi } from "@/lib/payroll";
+import { bankAccountsApi } from "@/lib/employee-relations";
 import { usersApi, ROLE_LABELS, type Role } from "@/lib/users";
 
 // ── schema ────────────────────────────────────────────────────────────────────
@@ -94,6 +95,43 @@ const schema = z.object({
   local_trunk_line:   z.string().optional(),
   trunk_pin:          z.string().optional(),
   skype_id:           z.string().optional(),
+
+  // Current Payroll Information
+  work_days_per_year:   z.string().optional(),
+  cost_center:          z.string().optional(),
+  is_rohq:              z.boolean().default(false),
+
+  bank_name:            z.string().optional(),
+  bank_account_type:    z.string().optional(),
+  bank_account_number:  z.string().optional(),
+
+  is_minimum_wage_earner: z.boolean().default(false),
+  daily_allowance:        z.string().optional(),
+  de_minimis:             z.string().optional(),
+  pay_group:              z.string().optional(),
+  consultant_percent_tax: z.string().optional(),
+  work_hours_per_day:     z.string().optional(),
+  ot_computation_table:   z.string().optional(),
+
+  sss_contribution_mode:        z.enum(["system", "fixed"]).default("system"),
+  sss_fixed_amount:             z.string().optional(),
+  hdmf_contribution_mode:       z.enum(["system", "fixed"]).default("system"),
+  hdmf_additional:              z.string().optional(),
+  philhealth_contribution_mode: z.enum(["system", "fixed"]).default("system"),
+  philhealth_fixed_amount:      z.string().optional(),
+
+  has_previous_employment:   z.boolean().default(false),
+  prev_nontax_13th_month:    z.string().optional(),
+  prev_nontax_other_bonus:   z.string().optional(),
+  prev_nontax_salaries:      z.string().optional(),
+  prev_13th_month:           z.string().optional(),
+  prev_other_bonus:          z.string().optional(),
+  prev_taxable_gross:        z.string().optional(),
+  prev_tax_withheld:         z.string().optional(),
+  prev_government_deductions: z.string().optional(),
+  prev_de_minimis:           z.string().optional(),
+  prev_taxable_compensation: z.string().optional(),
+  prev_monetized_leave:      z.string().optional(),
 
   // Portal
   create_account:     z.boolean().default(false),
@@ -452,9 +490,9 @@ export default function EmployeeRegistrationPage() {
     { key: "salary", label: "Salary History", description: "Basic pay, allowance & effective date",
       icon: <IconSalary />,
       isComplete: () => salRows.some((s) => s.basic_monthly.trim()) },
-    { key: "payroll", label: "Current Payroll Information", description: "What payroll will compute from (read-only)",
+    { key: "payroll", label: "Current Payroll Information", description: "Cost center, bank, contributions & prior employment",
       icon: <IconPayroll />,
-      isComplete: () => false },
+      isComplete: (v) => !!(v.work_days_per_year && v.pay_group && v.ot_computation_table) },
     { key: "portal", label: "Portal Access & Role", description: "System login and role assignment (optional)",
       icon: <IconPortal />,
       isComplete: (v) => !!v.create_account },
@@ -540,6 +578,52 @@ export default function EmployeeRegistrationPage() {
             prc_expiry: v.prc_expiry || null,
             passport_no: v.passport_no || null,
             rdo_code: v.rdo_code || null,
+          }));
+      }
+
+      // Payroll profile: one row per employee, upserted.
+      const num = (s?: string) => (s && s.trim() !== "" ? Number(s) : null);
+      await attach("Payroll profile", () =>
+        payrollProfileApi.save(emp.id, {
+          work_days_per_year: num(v.work_days_per_year),
+          cost_center: v.cost_center || null,
+          is_rohq: v.is_rohq,
+          is_minimum_wage_earner: v.is_minimum_wage_earner,
+          daily_allowance: num(v.daily_allowance),
+          de_minimis: num(v.de_minimis),
+          pay_group: v.pay_group || null,
+          consultant_percent_tax: num(v.consultant_percent_tax),
+          work_hours_per_day: num(v.work_hours_per_day),
+          ot_computation_table: v.ot_computation_table || null,
+          sss_contribution_mode: v.sss_contribution_mode,
+          sss_fixed_amount: num(v.sss_fixed_amount),
+          hdmf_contribution_mode: v.hdmf_contribution_mode,
+          hdmf_additional: num(v.hdmf_additional),
+          philhealth_contribution_mode: v.philhealth_contribution_mode,
+          philhealth_fixed_amount: num(v.philhealth_fixed_amount),
+          has_previous_employment: v.has_previous_employment,
+          prev_nontax_13th_month: num(v.prev_nontax_13th_month),
+          prev_nontax_other_bonus: num(v.prev_nontax_other_bonus),
+          prev_nontax_salaries: num(v.prev_nontax_salaries),
+          prev_13th_month: num(v.prev_13th_month),
+          prev_other_bonus: num(v.prev_other_bonus),
+          prev_taxable_gross: num(v.prev_taxable_gross),
+          prev_tax_withheld: num(v.prev_tax_withheld),
+          prev_government_deductions: num(v.prev_government_deductions),
+          prev_de_minimis: num(v.prev_de_minimis),
+          prev_taxable_compensation: num(v.prev_taxable_compensation),
+          prev_monetized_leave: num(v.prev_monetized_leave),
+        }));
+
+      // Bank details reuse employee_bank_accounts; the account number is encrypted there.
+      if (v.bank_name && v.bank_account_number) {
+        await attach("Bank account", () =>
+          bankAccountsApi.create(emp.id, {
+            bank_name: v.bank_name!,
+            account_number: v.bank_account_number!,
+            account_name: `${v.first_name} ${v.last_name}`,
+            is_primary: true,
+            purpose: v.bank_account_type || "payroll",
           }));
       }
 
@@ -937,6 +1021,7 @@ export default function EmployeeRegistrationPage() {
                     )}
                     {section.key === "payroll"     && (
                       <PayrollSection
+                        form={form}
                         employeeType={watched.employee_type}
                         employmentTypeName={employmentTypes?.find((t) => String(t.id) === String(watched.employment_type_id))?.name}
                         dateHired={watched.date_hired}
@@ -1518,13 +1603,18 @@ const EMPLOYEE_TYPE_LABELS: Record<string, string> = {
  * compensation record. So this shows exactly what payroll will use, read-only,
  * rather than pretending to be a second place to edit it.
  */
-function PayrollSection({ employeeType, employmentTypeName, dateHired, dateRegularized, salaryRows }: {
+function PayrollSection({ form, employeeType, employmentTypeName, dateHired, dateRegularized, salaryRows }: {
+  form: FF;
   employeeType?: string;
   employmentTypeName?: string;
   dateHired?: string;
   dateRegularized?: string;
   salaryRows: SalRow[];
 }) {
+  const sssFixed = form.watch("sss_contribution_mode") === "fixed";
+  const hdmfFixed = form.watch("hdmf_contribution_mode") === "fixed";
+  const phFixed = form.watch("philhealth_contribution_mode") === "fixed";
+  const hasPrev = form.watch("has_previous_employment");
   const withPay = salaryRows.filter((s) => s.basic_monthly.trim());
   const current = withPay.length
     ? [...withPay].sort((a, b) => (a.effective_from || "9999").localeCompare(b.effective_from || "9999")).at(-1)
@@ -1582,6 +1672,155 @@ function PayrollSection({ employeeType, employmentTypeName, dateHired, dateRegul
             No salary recorded yet. Payroll only includes employees with an active compensation
             record — add one under Salary History.
           </Hint>
+        )}
+      </div>
+
+      {/* Employment Details */}
+      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+        <GroupTitle>Employment Details</GroupTitle>
+        <Grid>
+          <Field label="Work Days Per Year">
+            <Input type="number" min="1" max="366" {...form.register("work_days_per_year")} placeholder="261" />
+          </Field>
+          <Field label="Cost Center"><Input {...form.register("cost_center")} /></Field>
+          <Field label="Regional Operating HQ (ROHQ)">
+            <label className="flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 dark:border-slate-700">
+              <input type="checkbox" className="h-4 w-4 rounded accent-slate-900" {...form.register("is_rohq")} />
+              <span className="text-sm text-slate-700 dark:text-slate-300">Employee is ROHQ</span>
+            </label>
+          </Field>
+        </Grid>
+        <Hint>ROHQ employees are subject to a 15% expanded withholding tax. Not yet applied by the payroll computer.</Hint>
+      </div>
+
+      {/* Bank Details */}
+      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+        <GroupTitle>Bank Details</GroupTitle>
+        <Grid>
+          <Field label="Bank"><Input {...form.register("bank_name")} placeholder="BDO, BPI…" /></Field>
+          <Field label="Bank Account Type">
+            {/* BankAccountRequest allows only payroll | savings | others. */}
+            <Select {...form.register("bank_account_type")}>
+              <option value="">Select a bank account type…</option>
+              <option value="payroll">Payroll</option>
+              <option value="savings">Savings</option>
+              <option value="others">Others</option>
+            </Select>
+          </Field>
+          <Field label="Bank Account Number"><Input {...form.register("bank_account_number")} /></Field>
+        </Grid>
+        <Hint>Saved as the employee&apos;s primary bank account. The number is encrypted at rest.</Hint>
+      </div>
+
+      {/* Compensation and Benefits */}
+      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+        <GroupTitle>Compensation and Benefits (Salary)</GroupTitle>
+        <Grid>
+          <Field label="Minimum Wage Earner">
+            <label className="flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 dark:border-slate-700">
+              <input type="checkbox" className="h-4 w-4 rounded accent-slate-900" {...form.register("is_minimum_wage_earner")} />
+              <span className="text-sm text-slate-700 dark:text-slate-300">Yes</span>
+            </label>
+          </Field>
+          <Field label="Daily Allowance"><Input type="number" step="0.01" min="0" {...form.register("daily_allowance")} placeholder="0.00" /></Field>
+          <Field label="De Minimis"><Input type="number" step="0.01" min="0" {...form.register("de_minimis")} placeholder="0.00" /></Field>
+
+          <Field label="Pay Group">
+            <Select {...form.register("pay_group")}>
+              <option value="">Select pay group…</option>
+              <option value="monthly">Monthly</option>
+              <option value="semi_monthly">Semi-monthly</option>
+              <option value="weekly">Weekly</option>
+            </Select>
+          </Field>
+          <Field label="Consultant Percent Tax (%)">
+            <Input type="number" step="0.01" min="0" max="100" {...form.register("consultant_percent_tax")} placeholder="Not a consultant" />
+          </Field>
+          <Field label="Work Hours Per Day">
+            <Input type="number" step="0.25" min="0" max="24" {...form.register("work_hours_per_day")} placeholder="8.00" />
+          </Field>
+          <Field label="OT Computation Table">
+            <Select {...form.register("ot_computation_table")}>
+              <option value="">Select OT computation table…</option>
+              <option value="standard">Standard (1.25×)</option>
+              <option value="none">No overtime</option>
+            </Select>
+          </Field>
+        </Grid>
+        <Hint>
+          Basic salary lives in Salary History, not here — one source of truth for what payroll pays.
+          Work hours per day and the OT table are recorded but the computer still assumes 8 hours and 1.25×.
+        </Hint>
+      </div>
+
+      {/* Government Contribution */}
+      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+        <GroupTitle>Government Contribution</GroupTitle>
+        <Grid>
+          <Field label="SSS Contribution">
+            <Select {...form.register("sss_contribution_mode")}>
+              <option value="system">Let System Decide</option>
+              <option value="fixed">Fixed amount</option>
+            </Select>
+          </Field>
+          <Field label="SSS Fixed Amount">
+            <Input type="number" step="0.01" min="0" disabled={!sssFixed} {...form.register("sss_fixed_amount")} placeholder="0.00" />
+          </Field>
+          <Field label="HDMF Contribution">
+            <Select {...form.register("hdmf_contribution_mode")}>
+              <option value="system">Let System Decide</option>
+              <option value="fixed">Fixed amount</option>
+            </Select>
+          </Field>
+
+          <Field label="Additional HDMF Contribution">
+            <Input type="number" step="0.01" min="0" {...form.register("hdmf_additional")} placeholder="0.00" />
+          </Field>
+          <Field label="PhilHealth Contribution">
+            <Select {...form.register("philhealth_contribution_mode")}>
+              <option value="system">Let System Decide</option>
+              <option value="fixed">Fixed amount</option>
+            </Select>
+          </Field>
+          <Field label="PhilHealth Contribution Amount">
+            <Input type="number" step="0.01" min="0" disabled={!phFixed} {...form.register("philhealth_fixed_amount")} placeholder="0.00" />
+          </Field>
+        </Grid>
+        <Hint>
+          &quot;Let System Decide&quot; is what payroll does today — StatutoryCalculator derives SSS,
+          PhilHealth and Pag-IBIG from basic pay. A fixed amount is stored but not yet honoured.
+          {hdmfFixed && " HDMF fixed mode is recorded; the additional amount always applies."}
+        </Hint>
+      </div>
+
+      {/* Previous Employment */}
+      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+        <GroupTitle>Previous Employment Details (From Last Employer)</GroupTitle>
+
+        <label className="mb-4 flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-3 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+          <input type="checkbox" className="h-4 w-4 rounded accent-slate-900" {...form.register("has_previous_employment")} />
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Has previous employment this year
+          </span>
+        </label>
+
+        {hasPrev && (
+          <>
+            <Grid>
+              <Field label="Non-Tax 13th Month"><Input type="number" step="0.01" min="0" {...form.register("prev_nontax_13th_month")} placeholder="0.00" /></Field>
+              <Field label="Non-Tax Other Bonus"><Input type="number" step="0.01" min="0" {...form.register("prev_nontax_other_bonus")} placeholder="0.00" /></Field>
+              <Field label="Non-Tax Salaries"><Input type="number" step="0.01" min="0" {...form.register("prev_nontax_salaries")} placeholder="0.00" /></Field>
+              <Field label="13th Month"><Input type="number" step="0.01" min="0" {...form.register("prev_13th_month")} placeholder="0.00" /></Field>
+              <Field label="Other Bonus"><Input type="number" step="0.01" min="0" {...form.register("prev_other_bonus")} placeholder="0.00" /></Field>
+              <Field label="Taxable Gross"><Input type="number" step="0.01" min="0" {...form.register("prev_taxable_gross")} placeholder="0.00" /></Field>
+              <Field label="Tax Withheld"><Input type="number" step="0.01" min="0" {...form.register("prev_tax_withheld")} placeholder="0.00" /></Field>
+              <Field label="Government Deductions"><Input type="number" step="0.01" min="0" {...form.register("prev_government_deductions")} placeholder="0.00" /></Field>
+              <Field label="De Minimis"><Input type="number" step="0.01" min="0" {...form.register("prev_de_minimis")} placeholder="0.00" /></Field>
+              <Field label="Taxable Compensation"><Input type="number" step="0.01" min="0" {...form.register("prev_taxable_compensation")} placeholder="0.00" /></Field>
+              <Field label="Monetized Leave"><Input type="number" step="0.01" min="0" {...form.register("prev_monetized_leave")} placeholder="0.00" /></Field>
+            </Grid>
+            <Hint>Used for year-end tax annualisation. Take these from the employee&apos;s BIR 2316 from their last employer.</Hint>
+          </>
         )}
       </div>
     </div>

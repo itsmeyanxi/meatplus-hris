@@ -199,6 +199,8 @@ Route::prefix('v1')->group(function () {
         // Payroll
         Route::get('compensations', [\App\Http\Controllers\Api\V1\Payroll\CompensationController::class, 'index']);
         Route::post('compensations', [\App\Http\Controllers\Api\V1\Payroll\CompensationController::class, 'store']);
+        Route::get('employees/{employee}/payroll-profile', [\App\Http\Controllers\Api\V1\Payroll\PayrollProfileController::class, 'show']);
+        Route::put('employees/{employee}/payroll-profile', [\App\Http\Controllers\Api\V1\Payroll\PayrollProfileController::class, 'upsert']);
         Route::get('employees/{employee}/compensations', [\App\Http\Controllers\Api\V1\Payroll\CompensationController::class, 'history']);
         Route::delete('employees/{employee}/compensations/{compensation}', [\App\Http\Controllers\Api\V1\Payroll\CompensationController::class, 'destroy']);
         Route::get('payroll-runs', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'index']);

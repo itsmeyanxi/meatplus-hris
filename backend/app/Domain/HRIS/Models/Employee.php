@@ -84,6 +84,11 @@ class Employee extends Model
             );
     }
 
+    public function payrollProfile(): HasOne
+    {
+        return $this->hasOne(\App\Domain\Payroll\Models\EmployeePayrollProfile::class);
+    }
+
     /** Full salary history, newest first. */
     public function compensations(): HasMany
     {
