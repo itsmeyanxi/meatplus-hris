@@ -456,3 +456,41 @@ export const employeeVisasApi = {
   },
   destroy: (employeeId: number, id: number) => api.delete(nest(employeeId, `visas/${id}`)),
 };
+
+// ── Benefits ─────────────────────────────────────────────────────────────────
+
+export type EmployeeBenefit = {
+  id: number;
+  employee_id: number;
+  type: string;
+  is_active: boolean;
+  effective_date: string | null;
+  enrollment_date: string | null;
+  plan: string | null;
+  beneficiary: string | null;
+  payment_type: string | null;
+  notes: string | null;
+};
+
+export type EmployeeBenefitInput = {
+  type: string;
+  is_active?: boolean;
+  effective_date?: string | null;
+  enrollment_date?: string | null;
+  plan?: string | null;
+  beneficiary?: string | null;
+  payment_type?: string | null;
+  notes?: string | null;
+};
+
+export const employeeBenefitsApi = {
+  list: async (employeeId: number): Promise<EmployeeBenefit[]> => {
+    const { data } = await api.get<Listed<EmployeeBenefit>>(nest(employeeId, "benefits"));
+    return data.data;
+  },
+  create: async (employeeId: number, body: EmployeeBenefitInput): Promise<EmployeeBenefit> => {
+    const { data } = await api.post<{ data: EmployeeBenefit }>(nest(employeeId, "benefits"), body);
+    return data.data;
+  },
+  destroy: (employeeId: number, id: number) => api.delete(nest(employeeId, `benefits/${id}`)),
+};

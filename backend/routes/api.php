@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\V1\Companies\CompanyController;
 use App\Http\Controllers\Api\V1\Reports\ReportController;
 use App\Http\Controllers\Api\V1\Companies\SwitchCompanyController;
 use App\Http\Controllers\Api\V1\Employees\BankAccountController;
+use App\Http\Controllers\Api\V1\Employees\BenefitController;
 use App\Http\Controllers\Api\V1\Employees\ContactChannelController;
 use App\Http\Controllers\Api\V1\Employees\ContractController;
 use App\Http\Controllers\Api\V1\Employees\DependentController;
@@ -109,6 +110,8 @@ Route::prefix('v1')->group(function () {
         Route::delete('employees/{employee}/performance-goals/{goal}', [PerformanceGoalController::class, 'destroy']);
         Route::apiResource('employees.visas', VisaController::class)
             ->scoped()->parameters(['visas' => 'visa'])->except(['show']);
+        Route::apiResource('employees.benefits', BenefitController::class)
+            ->scoped()->parameters(['benefits' => 'benefit'])->except(['show']);
 
         Route::get('employees/{employee}/phones', [ContactChannelController::class, 'phones']);
         Route::post('employees/{employee}/phones', [ContactChannelController::class, 'storePhone']);

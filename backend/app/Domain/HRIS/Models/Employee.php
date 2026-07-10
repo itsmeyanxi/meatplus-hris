@@ -149,6 +149,11 @@ class Employee extends Model
         return $this->hasMany(EmployeeVisa::class);
     }
 
+    public function benefits(): HasMany
+    {
+        return $this->hasMany(EmployeeBenefit::class);
+    }
+
     public function photo(): HasOne
     {
         return $this->hasOne(EmployeePhoto::class);
