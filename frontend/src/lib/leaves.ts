@@ -94,6 +94,17 @@ export const leaveBalancesApi = {
     const { data } = await api.post<{ data: LeaveBalance }>(`/api/v1/leave-balances/${id}/adjust`, { adjustment, note });
     return data.data;
   },
+  /** Assign a leave plan to an employee. Idempotent: re-assigning updates the row. */
+  assign: async (
+    employeeId: number,
+    body: { leave_type_id: number; year?: number; opening_balance?: number | null },
+  ): Promise<LeaveBalance> => {
+    const { data } = await api.post<{ data: LeaveBalance }>(
+      `/api/v1/employees/${employeeId}/leave-balances`,
+      body,
+    );
+    return data.data;
+  },
 };
 
 export const leaveAppsApi = {

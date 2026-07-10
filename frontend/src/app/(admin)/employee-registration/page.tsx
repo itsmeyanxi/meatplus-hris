@@ -14,6 +14,7 @@ import {
   employeeVisasApi, governmentIdsApi, performanceGoalsApi, photoApi,
 } from "@/lib/employee-relations";
 import { createEmployee, getLookup, listEmployees, type EmployeeListItem, type LookupItem } from "@/lib/employees";
+import { leaveBalancesApi, leaveTypesApi } from "@/lib/leaves";
 import { usersApi, ROLE_LABELS, type Role } from "@/lib/users";
 
 // ── schema ────────────────────────────────────────────────────────────────────
@@ -116,7 +117,7 @@ const ASSIGNABLE_ROLES: Role[] = [
 type SectionKey =
   | "basic" | "work" | "locations" | "schedule"
   | "government" | "visa" | "education" | "performance"
-  | "contact" | "dependents" | "benefits" | "portal";
+  | "contact" | "dependents" | "benefits" | "leave" | "portal";
 
 type SectionDef = {
   key: SectionKey;
@@ -143,6 +144,7 @@ const IconGovernment  = () => icon("M12 3l9 6H3l9-6zM5 10v8m4-8v8m6-8v8m4-8v8M3 
 const IconEducation   = () => icon("M12 14l9-5-9-5-9 5 9 5zm0 0v7m-6-3.5V12l6 3 6-3v5.5");
 const IconPerformance = () => icon("M3 3v18h18M7 15l3-3 3 3 5-6");
 const IconVisa        = () => icon("M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L12 19v-5.5L21 16z");
+const IconLeave       = () => icon("M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2zm4-7h.01M15 14h.01M9 18h.01M15 18h.01");
 const IconBenefits    = () => icon("M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z");
 const IconDependents  = () => icon("M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z");
 const IconContact     = () => icon("M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11 11 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z");
@@ -208,6 +210,21 @@ export default function EmployeeRegistrationPage() {
   const removeEmg = (i: number) => setEmgRows((r) => r.filter((_, n) => n !== i));
   const setEmg    = (i: number, patch: Partial<EmgRow>) =>
     setEmgRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
+
+  // Leave plans. Balances can only exist once the employee row does, so the chosen
+  // plans are held here and assigned after creation.
+  const { data: leaveTypes } = useQuery({ queryKey: ["leave-types"], queryFn: () => leaveTypesApi.list() });
+  const [leavePlans, setLeavePlans] = useState<Record<number, string>>({});
+  const toggleLeavePlan = (id: number) =>
+    setLeavePlans((p) => {
+      if (id in p) {
+        const { [id]: _removed, ...rest } = p;
+        return rest;
+      }
+      return { ...p, [id]: "" };
+    });
+  const setLeaveOpening = (id: number, value: string) =>
+    setLeavePlans((p) => ({ ...p, [id]: value }));
 
   // Benefits
   type BenRow = {
@@ -417,6 +434,9 @@ export default function EmployeeRegistrationPage() {
     { key: "benefits", label: "Benefits", description: "HMO, insurance & other enrolments",
       icon: <IconBenefits />,
       isComplete: () => benRows.some((b) => b.type.trim()) },
+    { key: "leave", label: "Leave Plans and Usage", description: "Leave types & opening balances",
+      icon: <IconLeave />,
+      isComplete: () => Object.keys(leavePlans).length > 0 },
     { key: "portal", label: "Portal Access & Role", description: "System login and role assignment (optional)",
       icon: <IconPortal />,
       isComplete: (v) => !!v.create_account },
@@ -502,6 +522,15 @@ export default function EmployeeRegistrationPage() {
             prc_expiry: v.prc_expiry || null,
             passport_no: v.passport_no || null,
             rdo_code: v.rdo_code || null,
+          }));
+      }
+
+      // Leave plans: the balance row can only exist now that the employee does.
+      for (const [typeId, opening] of Object.entries(leavePlans)) {
+        await attach(`Leave plan (type ${typeId})`, () =>
+          leaveBalancesApi.assign(emp.id, {
+            leave_type_id: Number(typeId),
+            opening_balance: opening === "" ? null : Number(opening),
           }));
       }
 
@@ -702,13 +731,13 @@ export default function EmployeeRegistrationPage() {
     return (
       <SuccessScreen
         result={result}
-        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setVisaRows([]); setDepRows([]); setBenRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
+        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setVisaRows([]); setDepRows([]); setBenRows([]); setLeavePlans({}); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
       />
     );
   }
 
   const toggle = (key: SectionKey) => setActive((prev) => (prev === key ? null : key));
-  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setVisaRows([]); setDepRows([]); setBenRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
+  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setVisaRows([]); setDepRows([]); setBenRows([]); setLeavePlans({}); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -868,6 +897,14 @@ export default function EmployeeRegistrationPage() {
                     )}
                     {section.key === "benefits"    && (
                       <BenefitsSection rows={benRows} onAdd={addBen} onRemove={removeBen} onChange={setBen} />
+                    )}
+                    {section.key === "leave"       && (
+                      <LeaveSection
+                        leaveTypes={leaveTypes}
+                        selected={leavePlans}
+                        onToggle={toggleLeavePlan}
+                        onOpening={setLeaveOpening}
+                      />
                     )}
                     {section.key === "portal"      && <PortalSection form={form} createAccount={createAccount} />}
 
@@ -1419,6 +1456,61 @@ function GovernmentSection({ form }: { form: FF }) {
         they are not personally sensitive.
       </Hint>
     </>
+  );
+}
+
+function LeaveSection({ leaveTypes, selected, onToggle, onOpening }: {
+  leaveTypes?: { id: number; code: string; name: string }[];
+  selected: Record<number, string>;
+  onToggle: (id: number) => void;
+  onOpening: (id: number, value: string) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900 dark:bg-blue-900/20">
+        <p className="text-xs text-blue-800 dark:text-blue-300">
+          Leave balances belong to a saved employee, so the plans chosen here are assigned the
+          moment the employee is registered. Usage appears afterwards under Leaves.
+        </p>
+      </div>
+
+      <RowTable headers={["Assign", "Leave Type", "Code", "Opening Balance (days)"]} empty="No leave types configured.">
+        {(leaveTypes ?? []).map((t) => {
+          const isOn = t.id in selected;
+          return (
+            <tr key={t.id}>
+              <td className="px-3 py-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded accent-slate-900"
+                  checked={isOn}
+                  onChange={() => onToggle(t.id)}
+                />
+              </td>
+              <td className="px-3 py-2 font-medium text-slate-700 dark:text-slate-300">{t.name}</td>
+              <td className="px-3 py-2 font-mono text-xs text-slate-500 dark:text-slate-400">{t.code}</td>
+              <td className="px-3 py-2">
+                <Input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="365"
+                  disabled={!isOn}
+                  value={selected[t.id] ?? ""}
+                  onChange={(e) => onOpening(t.id, e.target.value)}
+                  placeholder="0"
+                />
+              </td>
+            </tr>
+          );
+        })}
+      </RowTable>
+
+      <Hint>
+        Leave the opening balance blank to start at zero. Assigning the same plan twice updates the
+        row rather than creating a duplicate.
+      </Hint>
+    </div>
   );
 }
 

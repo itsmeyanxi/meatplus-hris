@@ -181,6 +181,7 @@ Route::prefix('v1')->group(function () {
         Route::put('leave-types/{leaveType}', [LeaveTypeController::class, 'update']);
         Route::delete('leave-types/{leaveType}', [LeaveTypeController::class, 'destroy']);
         Route::get('leave-balances', [LeaveBalanceController::class, 'index']);
+        Route::post('employees/{employee}/leave-balances', [LeaveBalanceController::class, 'assign']);
         Route::post('leave-balances/{leaveBalance}/adjust', [LeaveBalanceController::class, 'adjust']);
         Route::get('leave-applications', [LeaveApplicationController::class, 'index']);
         Route::post('leave-applications', [LeaveApplicationController::class, 'store']);

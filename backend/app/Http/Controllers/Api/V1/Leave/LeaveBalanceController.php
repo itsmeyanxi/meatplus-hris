@@ -32,6 +32,39 @@ class LeaveBalanceController extends Controller
         return new LeaveBalanceResource($leaveBalance);
     }
 
+    /**
+     * Assign a leave plan to an employee: materialise the balance row for the year
+     * and seed its opening balance. Idempotent — ensureBalance() is firstOrCreate,
+     * so re-assigning the same plan updates rather than duplicates.
+     */
+    public function assign(
+        Request $request,
+        \App\Domain\HRIS\Models\Employee $employee,
+        LeaveBalanceService $service,
+    ): LeaveBalanceResource {
+        abort_unless($request->user()->can('employee.update'), 403);
+        abort_unless($employee->company_id === $request->user()->active_company_id, 403);
+
+        $data = $request->validate([
+            'leave_type_id' => ['required', 'integer', 'exists:leave_types,id'],
+            'year' => ['nullable', 'integer', 'min:2000', 'max:'.(now()->year + 5)],
+            'opening_balance' => ['nullable', 'numeric', 'min:0', 'max:365'],
+        ]);
+
+        $year = (int) ($data['year'] ?? now()->year);
+        $type = LeaveType::findOrFail($data['leave_type_id']);
+
+        $balance = $service->ensureBalance($employee, $type, $year);
+
+        if (array_key_exists('opening_balance', $data) && $data['opening_balance'] !== null) {
+            $balance->update(['opening_balance' => (float) $data['opening_balance']]);
+        }
+
+        $balance->load(['employee:id,employee_no,first_name,last_name,company_id', 'leaveType:id,code,name']);
+
+        return new LeaveBalanceResource($balance);
+    }
+
     public function index(Request $request, LeaveBalanceService $service): AnonymousResourceCollection
     {
         $user = $request->user();
