@@ -154,3 +154,37 @@ export const payrollProfileApi = {
   save: async (employeeId: number, body: PayrollProfileInput) =>
     (await api.put(`/api/v1/employees/${employeeId}/payroll-profile`, body)).data,
 };
+
+// ── Payroll User Access ──────────────────────────────────────────────────────
+// Backed by Spatie's per-company role grants (model_has_roles.company_id),
+// not a separate table.
+
+export type PayrollAccessRow = {
+  user_id: number;
+  user_name: string;
+  user_email: string;
+  is_active: boolean;
+  company_id: number;
+  company_code: string;
+  company_name: string;
+  payroll_role: string;
+};
+
+export type PayrollAccessOptions = {
+  roles: string[];
+  companies: { id: number; code: string; name: string }[];
+};
+
+export const payrollAccessApi = {
+  list: async (): Promise<PayrollAccessRow[]> =>
+    (await api.get<{ data: PayrollAccessRow[] }>("/api/v1/payroll-access")).data.data,
+
+  options: async (): Promise<PayrollAccessOptions> =>
+    (await api.get<{ data: PayrollAccessOptions }>("/api/v1/payroll-access/options")).data.data,
+
+  grant: async (body: { user_id: number; company_id: number; payroll_role: string }) =>
+    (await api.post("/api/v1/payroll-access", body)).data,
+
+  revoke: async (body: { user_id: number; company_id: number; payroll_role: string }) =>
+    (await api.delete("/api/v1/payroll-access", { data: body })).data,
+};
