@@ -26,13 +26,23 @@ const schema = z.object({
   civil_status:       z.enum(["single", "married", "widowed", "separated", "divorced"]),
   nationality:        z.string().default("Filipino"),
 
-  // Work
+  // Work — Basic Job Information
   department_id:        z.coerce.number().min(1, "Required"),
   position_id:          z.coerce.number().min(1, "Required"),
-  employment_type_id:   z.coerce.number().min(1, "Required"),
+  employee_type:        z.enum(["", "rank_and_file", "supervisory", "managerial", "executive"]).optional(),
   manager_employee_id:  z.union([z.coerce.number(), z.literal("")]).optional(),
-  date_hired:           z.string().min(1, "Required"),
-  date_regularized:     z.string().optional(),
+  designated_workplace: z.string().optional(),
+
+  // Work — Employment Details
+  employment_type_id:   z.coerce.number().min(1, "Required"),   // "Employment Status" in the reference
+  user_type:            z.enum(["", "employee", "manager", "admin"]).optional(),
+  job_code:             z.string().optional(),
+  job_grade:            z.string().optional(),
+  client_name:          z.string().optional(),
+  billability:          z.enum(["", "billable", "non_billable"]).optional(),
+  date_hired:                  z.string().min(1, "Required"),
+  expected_regularization_date: z.string().optional(),
+  date_regularized:            z.string().optional(),
 
   // Locations
   branch_id:          z.coerce.number().min(1, "Required"),
@@ -80,6 +90,9 @@ const schema = z.object({
 }).refine(
   (v) => !v.date_regularized || !v.date_hired || v.date_regularized >= v.date_hired,
   { path: ["date_regularized"], message: "Must be on or after the hire date" },
+).refine(
+  (v) => !v.expected_regularization_date || !v.date_hired || v.expected_regularization_date >= v.date_hired,
+  { path: ["expected_regularization_date"], message: "Must be on or after the hire date" },
 );
 
 type FormInput  = z.input<typeof schema>;
@@ -238,7 +251,15 @@ export default function EmployeeRegistrationPage() {
         position_id: v.position_id,
         employment_type_id: v.employment_type_id,
         manager_employee_id: v.manager_employee_id ? Number(v.manager_employee_id) : null,
+        employee_type: v.employee_type || null,
+        user_type: v.user_type || null,
+        job_code: v.job_code || null,
+        job_grade: v.job_grade || null,
+        client_name: v.client_name || null,
+        billability: v.billability || null,
+        designated_workplace: v.designated_workplace || null,
         date_hired: v.date_hired,
+        expected_regularization_date: v.expected_regularization_date || null,
         date_regularized: v.date_regularized || null,
       });
 
@@ -670,35 +691,77 @@ function WorkSection({ form, departments, positions, employmentTypes, supervisor
               {positions?.map((p) => <option key={p.id} value={p.id}>{p.title ?? p.name}</option>)}
             </Select>
           </Field>
-          <Field label="Employee Type *" error={E.employment_type_id?.message}>
-            <Select {...form.register("employment_type_id")}>
+          <Field label="Employee Type">
+            <Select {...form.register("employee_type")}>
               <option value="">Select employee type…</option>
-              {employmentTypes?.map((t) => <option key={t.id} value={t.id}>{t.name ?? t.title}</option>)}
+              <option value="rank_and_file">Rank &amp; File</option>
+              <option value="supervisory">Supervisory</option>
+              <option value="managerial">Managerial</option>
+              <option value="executive">Executive</option>
             </Select>
           </Field>
           <Field label="Immediate Supervisor">
             <Select {...form.register("manager_employee_id")}>
-              <option value="">None</option>
+              <option value="">Search…</option>
               {supervisors?.map((s) => (
                 <option key={s.id} value={s.id}>{s.full_name} ({s.employee_no})</option>
               ))}
             </Select>
           </Field>
+          <Field label="Designated Workplace">
+            <Input {...form.register("designated_workplace")} placeholder="e.g. Head Office, WFH" />
+          </Field>
         </Grid>
-        <Hint>Designated workplace is set under Locations.</Hint>
       </div>
 
       <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
         <GroupTitle>Employment Details</GroupTitle>
         <Grid>
+          <Field label="Employment Status *" error={E.employment_type_id?.message}>
+            <Select {...form.register("employment_type_id")}>
+              <option value="">Please select…</option>
+              {employmentTypes?.map((t) => <option key={t.id} value={t.id}>{t.name ?? t.title}</option>)}
+            </Select>
+          </Field>
+          <Field label="User Type">
+            <Select {...form.register("user_type")}>
+              <option value="">Employee</option>
+              <option value="employee">Employee</option>
+              <option value="manager">Manager</option>
+              <option value="admin">Admin</option>
+            </Select>
+          </Field>
+          <Field label="Job Code"><Input {...form.register("job_code")} /></Field>
+
+          <Field label="Job Grade">
+            <Select {...form.register("job_grade")}>
+              <option value="">Please select…</option>
+              {["G1","G2","G3","G4","G5","G6","G7"].map((g) => <option key={g} value={g}>{g}</option>)}
+            </Select>
+          </Field>
+          <Field label="Client Name"><Input {...form.register("client_name")} /></Field>
+          <Field label="Billability">
+            <Select {...form.register("billability")}>
+              <option value="">Select billability…</option>
+              <option value="billable">Billable</option>
+              <option value="non_billable">Non-billable</option>
+            </Select>
+          </Field>
+
           <Field label="Hire Date *" error={E.date_hired?.message}>
             <Input type="date" {...form.register("date_hired")} />
+          </Field>
+          <Field label="Expected Regularization Date" error={E.expected_regularization_date?.message}>
+            <Input type="date" {...form.register("expected_regularization_date")} />
           </Field>
           <Field label="Regularization Date" error={E.date_regularized?.message}>
             <Input type="date" {...form.register("date_regularized")} />
           </Field>
         </Grid>
-        <Hint>Regularization date must fall on or after the hire date. Employment status follows the employee type.</Hint>
+        <Hint>
+          Employment Status is the employee&apos;s contract type (Regular, Probationary…).
+          Both regularization dates must fall on or after the hire date.
+        </Hint>
       </div>
     </div>
   );

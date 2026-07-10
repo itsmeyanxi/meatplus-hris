@@ -144,7 +144,15 @@ export type EmployeeCreateInput = {
   position_id: number;
   employment_type_id: number;
   manager_employee_id?: number | null;
+  employee_type?: string | null;
+  user_type?: string | null;
+  job_code?: string | null;
+  job_grade?: string | null;
+  client_name?: string | null;
+  billability?: string | null;
+  designated_workplace?: string | null;
   date_hired: string;
+  expected_regularization_date?: string | null;
   date_regularized?: string | null;
 };
 

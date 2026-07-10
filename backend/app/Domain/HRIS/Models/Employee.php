@@ -27,7 +27,10 @@ class Employee extends Model
         'permanent_province', 'permanent_postal_code', 'permanent_country',
         'branch_id', 'department_id', 'position_id', 'employment_type_id',
         'manager_employee_id',
-        'date_hired', 'date_regularized', 'date_separated', 'separation_reason',
+        'employee_type', 'user_type', 'job_code', 'job_grade',
+        'client_name', 'billability', 'designated_workplace',
+        'date_hired', 'expected_regularization_date',
+        'date_regularized', 'date_separated', 'separation_reason',
         'is_active', 'photo_path',
     ];
 
@@ -36,6 +39,7 @@ class Employee extends Model
         return [
             'birth_date' => 'date',
             'date_hired' => 'date',
+            'expected_regularization_date' => 'date',
             'date_regularized' => 'date',
             'date_separated' => 'date',
             'is_active' => 'boolean',

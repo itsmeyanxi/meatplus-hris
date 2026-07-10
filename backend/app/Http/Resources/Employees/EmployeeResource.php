@@ -75,7 +75,16 @@ class EmployeeResource extends JsonResource
                 'full_name' => $this->manager->full_name,
             ] : null),
 
+            'employee_type' => $this->employee_type,
+            'user_type' => $this->user_type,
+            'job_code' => $this->job_code,
+            'job_grade' => $this->job_grade,
+            'client_name' => $this->client_name,
+            'billability' => $this->billability,
+            'designated_workplace' => $this->designated_workplace,
+
             'date_hired' => $this->date_hired?->toDateString(),
+            'expected_regularization_date' => $this->expected_regularization_date?->toDateString(),
             'date_regularized' => $this->date_regularized?->toDateString(),
             'date_separated' => $this->date_separated?->toDateString(),
             'separation_reason' => $this->separation_reason,

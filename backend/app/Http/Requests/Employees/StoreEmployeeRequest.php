@@ -52,7 +52,16 @@ class StoreEmployeeRequest extends FormRequest
                 ->where(fn ($q) => $q->whereNull('company_id')->orWhere('company_id', $companyId))],
             'manager_employee_id' => ['nullable', 'integer', Rule::exists('employees', 'id')->where('company_id', $companyId)],
 
+            'employee_type' => ['nullable', 'string', 'in:rank_and_file,supervisory,managerial,executive'],
+            'user_type' => ['nullable', 'string', 'in:employee,manager,admin'],
+            'job_code' => ['nullable', 'string', 'max:50'],
+            'job_grade' => ['nullable', 'string', 'max:30'],
+            'client_name' => ['nullable', 'string', 'max:150'],
+            'billability' => ['nullable', 'string', 'in:billable,non_billable'],
+            'designated_workplace' => ['nullable', 'string', 'max:150'],
+
             'date_hired' => ['required', 'date'],
+            'expected_regularization_date' => ['nullable', 'date', 'after_or_equal:date_hired'],
             'date_regularized' => ['nullable', 'date', 'after_or_equal:date_hired'],
         ];
     }
