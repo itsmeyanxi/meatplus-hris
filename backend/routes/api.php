@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\V1\Companies\CompanyController;
 use App\Http\Controllers\Api\V1\Reports\ReportController;
 use App\Http\Controllers\Api\V1\Companies\SwitchCompanyController;
 use App\Http\Controllers\Api\V1\Employees\BankAccountController;
+use App\Http\Controllers\Api\V1\Employees\ContactChannelController;
 use App\Http\Controllers\Api\V1\Employees\ContractController;
 use App\Http\Controllers\Api\V1\Employees\DependentController;
 use App\Http\Controllers\Api\V1\Employees\EducationController;
@@ -105,6 +106,18 @@ Route::prefix('v1')->group(function () {
         Route::post('employees/{employee}/performance-goals', [PerformanceGoalController::class, 'store']);
         Route::put('employees/{employee}/performance-goals/{goal}', [PerformanceGoalController::class, 'update']);
         Route::delete('employees/{employee}/performance-goals/{goal}', [PerformanceGoalController::class, 'destroy']);
+        Route::get('employees/{employee}/phones', [ContactChannelController::class, 'phones']);
+        Route::post('employees/{employee}/phones', [ContactChannelController::class, 'storePhone']);
+        Route::delete('employees/{employee}/phones/{phone}', [ContactChannelController::class, 'destroyPhone']);
+
+        Route::get('employees/{employee}/emails', [ContactChannelController::class, 'emails']);
+        Route::post('employees/{employee}/emails', [ContactChannelController::class, 'storeEmail']);
+        Route::delete('employees/{employee}/emails/{email}', [ContactChannelController::class, 'destroyEmail']);
+
+        Route::get('employees/{employee}/addresses', [ContactChannelController::class, 'addresses']);
+        Route::post('employees/{employee}/addresses', [ContactChannelController::class, 'storeAddress']);
+        Route::delete('employees/{employee}/addresses/{address}', [ContactChannelController::class, 'destroyAddress']);
+
         Route::get('employees/{employee}/locations', [LocationController::class, 'index']);
         Route::post('employees/{employee}/locations', [LocationController::class, 'store']);
         Route::delete('employees/{employee}/locations/{location}', [LocationController::class, 'destroy']);

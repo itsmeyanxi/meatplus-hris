@@ -9,8 +9,8 @@ import { z } from "zod";
 import { employeeSchedulesApi, workSchedulesApi } from "@/lib/attendance";
 import { getMe } from "@/lib/auth";
 import {
-  educationApi, emergencyContactsApi, employeeLocationsApi,
-  governmentIdsApi, performanceGoalsApi, photoApi,
+  educationApi, emergencyContactsApi, employeeAddressesApi, employeeEmailsApi,
+  employeeLocationsApi, employeePhonesApi, governmentIdsApi, performanceGoalsApi, photoApi,
 } from "@/lib/employee-relations";
 import { createEmployee, getLookup, listEmployees, type EmployeeListItem, type LookupItem } from "@/lib/employees";
 import { usersApi, ROLE_LABELS, type Role } from "@/lib/users";
@@ -204,6 +204,36 @@ export default function EmployeeRegistrationPage() {
   const setEmg    = (i: number, patch: Partial<EmgRow>) =>
     setEmgRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
 
+  // Alternate phones
+  type PhoneRow = { title: string; contact_no: string; contact_name: string };
+  const [phoneRows, setPhoneRows] = useState<PhoneRow[]>([]);
+  const addPhone    = () => setPhoneRows((r) => [...r, { title: "", contact_no: "", contact_name: "" }]);
+  const removePhone = (i: number) => setPhoneRows((r) => r.filter((_, n) => n !== i));
+  const setPhone    = (i: number, patch: Partial<PhoneRow>) =>
+    setPhoneRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
+
+  // Emails. Exactly one is primary; the radio enforces it here, the API there.
+  type EmailRow = { email: string; is_primary: boolean };
+  const [emailRows, setEmailRows] = useState<EmailRow[]>([]);
+  const addEmail    = () => setEmailRows((r) => [...r, { email: "", is_primary: r.length === 0 }]);
+  const removeEmail = (i: number) => setEmailRows((r) => {
+    const next = r.filter((_, n) => n !== i);
+    if (next.length && !next.some((e) => e.is_primary)) next[0].is_primary = true;
+    return [...next];
+  });
+  const setEmailAt  = (i: number, patch: Partial<EmailRow>) =>
+    setEmailRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
+  const makePrimaryEmail = (i: number) =>
+    setEmailRows((r) => r.map((row, n) => ({ ...row, is_primary: n === i })));
+
+  // Addresses
+  type AddrRow = { label: string; address_line1: string; city: string; province: string; postal_code: string };
+  const [addrRows, setAddrRows] = useState<AddrRow[]>([]);
+  const addAddr    = () => setAddrRows((r) => [...r, { label: "present", address_line1: "", city: "", province: "", postal_code: "" }]);
+  const removeAddr = (i: number) => setAddrRows((r) => r.filter((_, n) => n !== i));
+  const setAddr    = (i: number, patch: Partial<AddrRow>) =>
+    setAddrRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
+
   const addLocation = (branchId: number) => {
     if (!branchId || locations.some((l) => l.branch_id === branchId)) return;
     const next = [...locations, { branch_id: branchId, designated_workplace: "" }];
@@ -329,9 +359,9 @@ export default function EmployeeRegistrationPage() {
     { key: "performance", label: "Performance Management", description: "Goals, due dates & feedback",
       icon: <IconPerformance />,
       isComplete: () => goalRows.some((r) => r.goal.trim()) },
-    { key: "contact", label: "Contact Information", description: "Primary number, trunk line & emergency contacts",
+    { key: "contact", label: "Contact Information", description: "Primary number, emails, addresses & emergency contacts",
       icon: <IconContact />, required: true,
-      isComplete: (v) => !!v.mobile },
+      isComplete: (v) => !!v.mobile && emailRows.some((e) => e.email.trim()) },
     { key: "portal", label: "Portal Access & Role", description: "System login and role assignment (optional)",
       icon: <IconPortal />,
       isComplete: (v) => !!v.create_account },
@@ -430,6 +460,37 @@ export default function EmployeeRegistrationPage() {
             degree: row.degree || null,
             year_from: row.year_from ? Number(row.year_from) : null,
             year_to: row.year_to ? Number(row.year_to) : null,
+          }));
+      }
+
+      for (const [i, row] of phoneRows.entries()) {
+        if (!row.title.trim() || !row.contact_no.trim()) continue;
+        await attach(`Alternate phone (row ${i + 1})`, () =>
+          employeePhonesApi.create(emp.id, {
+            title: row.title.trim(),
+            contact_no: row.contact_no.trim(),
+            contact_name: row.contact_name || null,
+          }));
+      }
+
+      // Send the primary email first so the API's "first becomes primary" default
+      // never fights the explicit flag.
+      for (const [i, row] of [...emailRows].sort((a, b) => Number(b.is_primary) - Number(a.is_primary)).entries()) {
+        if (!row.email.trim()) continue;
+        await attach(`Email (row ${i + 1})`, () =>
+          employeeEmailsApi.create(emp.id, { email: row.email.trim(), is_primary: row.is_primary }));
+      }
+
+      for (const [i, row] of addrRows.entries()) {
+        if (!row.address_line1.trim()) continue;
+        await attach(`Address (row ${i + 1})`, () =>
+          employeeAddressesApi.create(emp.id, {
+            label: row.label || "present",
+            address_line1: row.address_line1.trim(),
+            city: row.city || null,
+            province: row.province || null,
+            postal_code: row.postal_code || null,
+            is_primary: i === 0,
           }));
       }
 
@@ -540,13 +601,13 @@ export default function EmployeeRegistrationPage() {
     return (
       <SuccessScreen
         result={result}
-        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
+        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
       />
     );
   }
 
   const toggle = (key: SectionKey) => setActive((prev) => (prev === key ? null : key));
-  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
+  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -690,7 +751,13 @@ export default function EmployeeRegistrationPage() {
                       <PerformanceSection rows={goalRows} onAdd={addGoal} onRemove={removeGoal} onChange={setGoal} />
                     )}
                     {section.key === "contact"     && (
-                      <ContactSection form={form} rows={emgRows} onAdd={addEmg} onRemove={removeEmg} onChange={setEmg} />
+                      <ContactSection
+                        form={form}
+                        rows={emgRows} onAdd={addEmg} onRemove={removeEmg} onChange={setEmg}
+                        phoneRows={phoneRows} onAddPhone={addPhone} onRemovePhone={removePhone} onPhone={setPhone}
+                        emailRows={emailRows} onAddEmail={addEmail} onRemoveEmail={removeEmail} onEmail={setEmailAt} onPrimaryEmail={makePrimaryEmail}
+                        addrRows={addrRows} onAddAddr={addAddr} onRemoveAddr={removeAddr} onAddr={setAddr}
+                      />
                     )}
                     {section.key === "portal"      && <PortalSection form={form} createAccount={createAccount} />}
 
@@ -1413,12 +1480,86 @@ function PerformanceSection({ rows, onAdd, onRemove, onChange }: {
 
 type EmgRow = { mobile: string; name: string; relationship: string; address: string };
 
-function ContactSection({ form, rows, onAdd, onRemove, onChange }: {
+type PhoneRow = { title: string; contact_no: string; contact_name: string };
+type EmailRow = { email: string; is_primary: boolean };
+type AddrRow  = { label: string; address_line1: string; city: string; province: string; postal_code: string };
+
+function AddButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mb-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+    >
+      {children}
+    </button>
+  );
+}
+
+function RemoveButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600 dark:border-slate-700 dark:hover:bg-slate-800"
+    >
+      Remove
+    </button>
+  );
+}
+
+function RowTable({ headers, empty, children }: { headers: string[]; empty: string; children: React.ReactNode }) {
+  const hasRows = Array.isArray(children) ? children.length > 0 : Boolean(children);
+  return (
+    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+      <table className="w-full min-w-[640px] text-sm">
+        <thead className="bg-slate-50 dark:bg-slate-800/60">
+          <tr>
+            {headers.map((h) => (
+              <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          {!hasRows ? (
+            <tr>
+              <td colSpan={headers.length} className="px-3 py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+                {empty}
+              </td>
+            </tr>
+          ) : children}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ContactSection({
+  form, rows, onAdd, onRemove, onChange,
+  phoneRows, onAddPhone, onRemovePhone, onPhone,
+  emailRows, onAddEmail, onRemoveEmail, onEmail, onPrimaryEmail,
+  addrRows, onAddAddr, onRemoveAddr, onAddr,
+}: {
   form: FF;
   rows: EmgRow[];
   onAdd: () => void;
   onRemove: (i: number) => void;
   onChange: (i: number, patch: Partial<EmgRow>) => void;
+  phoneRows: PhoneRow[];
+  onAddPhone: () => void;
+  onRemovePhone: (i: number) => void;
+  onPhone: (i: number, patch: Partial<PhoneRow>) => void;
+  emailRows: EmailRow[];
+  onAddEmail: () => void;
+  onRemoveEmail: (i: number) => void;
+  onEmail: (i: number, patch: Partial<EmailRow>) => void;
+  onPrimaryEmail: (i: number) => void;
+  addrRows: AddrRow[];
+  onAddAddr: () => void;
+  onRemoveAddr: (i: number) => void;
+  onAddr: (i: number, patch: Partial<AddrRow>) => void;
 }) {
   const E = form.formState.errors;
   return (
@@ -1444,15 +1585,80 @@ function ContactSection({ form, rows, onAdd, onRemove, onChange }: {
 
         <div className="mt-4">
           <Grid>
-            <Field label="Personal Email" error={E.email_personal?.message}>
-              <Input type="email" {...form.register("email_personal")} />
-            </Field>
             <Field label="Company Email" error={E.email_company?.message}>
               <Input type="email" {...form.register("email_company")} />
             </Field>
             <Field label="Home Phone"><Input {...form.register("phone_home")} /></Field>
           </Grid>
         </div>
+      </div>
+
+      {/* Alternate phone numbers */}
+      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+        <GroupTitle>Alternate Phone Numbers</GroupTitle>
+        <AddButton onClick={onAddPhone}>Add New Phone</AddButton>
+        <RowTable headers={["Title", "Contact No.", "Contact Name", ""]} empty="No alternate phones yet.">
+          {phoneRows.map((r, i) => (
+            <tr key={i}>
+              <td className="px-3 py-2"><Input value={r.title} onChange={(e) => onPhone(i, { title: e.target.value })} placeholder="Home, Office…" /></td>
+              <td className="px-3 py-2"><Input value={r.contact_no} onChange={(e) => onPhone(i, { contact_no: e.target.value })} /></td>
+              <td className="px-3 py-2"><Input value={r.contact_name} onChange={(e) => onPhone(i, { contact_name: e.target.value })} /></td>
+              <td className="px-3 py-2 text-right"><RemoveButton onClick={() => onRemovePhone(i)} /></td>
+            </tr>
+          ))}
+        </RowTable>
+        <Hint>Title and Contact No. are both needed for a row to save.</Hint>
+      </div>
+
+      {/* Emails */}
+      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+        <GroupTitle>Emails</GroupTitle>
+        <AddButton onClick={onAddEmail}>Add New Email</AddButton>
+        <RowTable headers={["Email Address", "Primary", ""]} empty="No emails yet.">
+          {emailRows.map((r, i) => (
+            <tr key={i}>
+              <td className="w-2/3 px-3 py-2">
+                <Input type="email" value={r.email} onChange={(e) => onEmail(i, { email: e.target.value })} />
+              </td>
+              <td className="px-3 py-2">
+                <input
+                  type="radio"
+                  name="primary-email"
+                  className="h-4 w-4 accent-slate-900"
+                  checked={r.is_primary}
+                  onChange={() => onPrimaryEmail(i)}
+                />
+              </td>
+              <td className="px-3 py-2 text-right"><RemoveButton onClick={() => onRemoveEmail(i)} /></td>
+            </tr>
+          ))}
+        </RowTable>
+        <Hint>The primary email becomes the employee&apos;s personal email. Exactly one row can be primary.</Hint>
+      </div>
+
+      {/* Addresses */}
+      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+        <GroupTitle>Addresses</GroupTitle>
+        <AddButton onClick={onAddAddr}>Add New Address</AddButton>
+        <RowTable headers={["Type", "Address", "City", "Province", "Postal", ""]} empty="No addresses yet.">
+          {addrRows.map((r, i) => (
+            <tr key={i}>
+              <td className="px-3 py-2">
+                <Select value={r.label} onChange={(e) => onAddr(i, { label: e.target.value })}>
+                  <option value="present">Present</option>
+                  <option value="permanent">Permanent</option>
+                  <option value="other">Other</option>
+                </Select>
+              </td>
+              <td className="px-3 py-2"><Input value={r.address_line1} onChange={(e) => onAddr(i, { address_line1: e.target.value })} /></td>
+              <td className="px-3 py-2"><Input value={r.city} onChange={(e) => onAddr(i, { city: e.target.value })} /></td>
+              <td className="px-3 py-2"><Input value={r.province} onChange={(e) => onAddr(i, { province: e.target.value })} /></td>
+              <td className="px-3 py-2"><Input value={r.postal_code} onChange={(e) => onAddr(i, { postal_code: e.target.value })} /></td>
+              <td className="px-3 py-2 text-right"><RemoveButton onClick={() => onRemoveAddr(i)} /></td>
+            </tr>
+          ))}
+        </RowTable>
+        <Hint>Address is required for a row to save. The first address is the primary one.</Hint>
       </div>
 
       <div className="border-t border-slate-100 pt-5 dark:border-slate-800">

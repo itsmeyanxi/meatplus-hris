@@ -361,3 +361,53 @@ export const performanceGoalsApi = {
   destroy: (employeeId: number, id: number) =>
     api.delete(nest(employeeId, `performance-goals/${id}`)),
 };
+
+// ── Contact channels: alternate phones, emails, addresses ────────────────────
+
+export type EmployeePhone   = { id: number; title: string; contact_no: string; contact_name: string | null };
+export type EmployeeEmail   = { id: number; email: string; is_primary: boolean };
+export type EmployeeAddress = {
+  id: number; label: string; address_line1: string; address_line2: string | null;
+  city: string | null; province: string | null; postal_code: string | null;
+  country: string; is_primary: boolean;
+};
+
+export const employeePhonesApi = {
+  list: async (employeeId: number): Promise<EmployeePhone[]> => {
+    const { data } = await api.get<Listed<EmployeePhone>>(nest(employeeId, "phones"));
+    return data.data;
+  },
+  create: async (employeeId: number, body: { title: string; contact_no: string; contact_name?: string | null }) => {
+    const { data } = await api.post<{ data: EmployeePhone }>(nest(employeeId, "phones"), body);
+    return data.data;
+  },
+  destroy: (employeeId: number, id: number) => api.delete(nest(employeeId, `phones/${id}`)),
+};
+
+export const employeeEmailsApi = {
+  list: async (employeeId: number): Promise<EmployeeEmail[]> => {
+    const { data } = await api.get<Listed<EmployeeEmail>>(nest(employeeId, "emails"));
+    return data.data;
+  },
+  create: async (employeeId: number, body: { email: string; is_primary?: boolean }) => {
+    const { data } = await api.post<{ data: EmployeeEmail }>(nest(employeeId, "emails"), body);
+    return data.data;
+  },
+  destroy: (employeeId: number, id: number) => api.delete(nest(employeeId, `emails/${id}`)),
+};
+
+export const employeeAddressesApi = {
+  list: async (employeeId: number): Promise<EmployeeAddress[]> => {
+    const { data } = await api.get<Listed<EmployeeAddress>>(nest(employeeId, "addresses"));
+    return data.data;
+  },
+  create: async (employeeId: number, body: {
+    label?: string; address_line1: string; address_line2?: string | null;
+    city?: string | null; province?: string | null; postal_code?: string | null;
+    country?: string | null; is_primary?: boolean;
+  }) => {
+    const { data } = await api.post<{ data: EmployeeAddress }>(nest(employeeId, "addresses"), body);
+    return data.data;
+  },
+  destroy: (employeeId: number, id: number) => api.delete(nest(employeeId, `addresses/${id}`)),
+};

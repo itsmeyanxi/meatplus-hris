@@ -154,6 +154,21 @@ class Employee extends Model
         return $this->hasMany(EmployeeLocation::class);
     }
 
+    public function phones(): HasMany
+    {
+        return $this->hasMany(EmployeePhone::class);
+    }
+
+    public function emails(): HasMany
+    {
+        return $this->hasMany(EmployeeEmail::class);
+    }
+
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(EmployeeAddress::class);
+    }
+
     public function employmentHistory(): HasMany
     {
         return $this->hasMany(EmployeeEmploymentHistory::class);
