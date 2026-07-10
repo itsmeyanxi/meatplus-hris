@@ -118,7 +118,7 @@ const ASSIGNABLE_ROLES: Role[] = [
 type SectionKey =
   | "basic" | "work" | "locations" | "schedule"
   | "government" | "visa" | "education" | "performance"
-  | "contact" | "dependents" | "benefits" | "leave" | "salary" | "portal";
+  | "contact" | "dependents" | "benefits" | "leave" | "salary" | "payroll" | "portal";
 
 type SectionDef = {
   key: SectionKey;
@@ -145,6 +145,7 @@ const IconGovernment  = () => icon("M12 3l9 6H3l9-6zM5 10v8m4-8v8m6-8v8m4-8v8M3 
 const IconEducation   = () => icon("M12 14l9-5-9-5-9 5 9 5zm0 0v7m-6-3.5V12l6 3 6-3v5.5");
 const IconPerformance = () => icon("M3 3v18h18M7 15l3-3 3 3 5-6");
 const IconVisa        = () => icon("M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L12 19v-5.5L21 16z");
+const IconPayroll     = () => icon("M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z");
 const IconSalary      = () => icon("M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z");
 const IconLeave       = () => icon("M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2zm4-7h.01M15 14h.01M9 18h.01M15 18h.01");
 const IconBenefits    = () => icon("M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z");
@@ -451,6 +452,9 @@ export default function EmployeeRegistrationPage() {
     { key: "salary", label: "Salary History", description: "Basic pay, allowance & effective date",
       icon: <IconSalary />,
       isComplete: () => salRows.some((s) => s.basic_monthly.trim()) },
+    { key: "payroll", label: "Current Payroll Information", description: "What payroll will compute from (read-only)",
+      icon: <IconPayroll />,
+      isComplete: () => false },
     { key: "portal", label: "Portal Access & Role", description: "System login and role assignment (optional)",
       icon: <IconPortal />,
       isComplete: (v) => !!v.create_account },
@@ -930,6 +934,15 @@ export default function EmployeeRegistrationPage() {
                     )}
                     {section.key === "salary"      && (
                       <SalarySection rows={salRows} onAdd={addSal} onRemove={removeSal} onChange={setSal} />
+                    )}
+                    {section.key === "payroll"     && (
+                      <PayrollSection
+                        employeeType={watched.employee_type}
+                        employmentTypeName={employmentTypes?.find((t) => String(t.id) === String(watched.employment_type_id))?.name}
+                        dateHired={watched.date_hired}
+                        dateRegularized={watched.date_regularized}
+                        salaryRows={salRows}
+                      />
                     )}
                     {section.key === "leave"       && (
                       <LeaveSection
@@ -1489,6 +1502,89 @@ function GovernmentSection({ form }: { form: FF }) {
         they are not personally sensitive.
       </Hint>
     </>
+  );
+}
+
+const EMPLOYEE_TYPE_LABELS: Record<string, string> = {
+  rank_and_file: "Rank & File",
+  supervisory: "Supervisory",
+  managerial: "Managerial",
+  executive: "Executive",
+};
+
+/**
+ * The reference syncs this section to Sprout Payroll. There is no Sprout here —
+ * PayrollComputer reads these values straight from the employee and the active
+ * compensation record. So this shows exactly what payroll will use, read-only,
+ * rather than pretending to be a second place to edit it.
+ */
+function PayrollSection({ employeeType, employmentTypeName, dateHired, dateRegularized, salaryRows }: {
+  employeeType?: string;
+  employmentTypeName?: string;
+  dateHired?: string;
+  dateRegularized?: string;
+  salaryRows: SalRow[];
+}) {
+  const withPay = salaryRows.filter((s) => s.basic_monthly.trim());
+  const current = withPay.length
+    ? [...withPay].sort((a, b) => (a.effective_from || "9999").localeCompare(b.effective_from || "9999")).at(-1)
+    : undefined;
+
+  const peso = (v?: string) =>
+    v ? `₱${Number(v).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` : "—";
+
+  const statusDate = dateRegularized || dateHired;
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-900/20">
+        <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">What is this?</p>
+        <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+          A read-only summary of the values payroll computes from. Everything here is set in
+          Work Information and Salary History — change it there, not here.
+        </p>
+        <p className="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">
+          Warning: these values determine what this employee is paid.
+        </p>
+      </div>
+
+      <div>
+        <GroupTitle>Work Information (read-only)</GroupTitle>
+        <Grid>
+          <Field label="Employee Type">
+            <Input value={employeeType ? EMPLOYEE_TYPE_LABELS[employeeType] ?? employeeType : "—"} disabled readOnly />
+          </Field>
+          <Field label="Employment Status">
+            <Input value={employmentTypeName ?? "—"} disabled readOnly />
+          </Field>
+          <Field label="Status Date">
+            <Input value={statusDate || "—"} disabled readOnly />
+          </Field>
+        </Grid>
+        <Hint>Status date is the regularization date, or the hire date if not yet regular.</Hint>
+      </div>
+
+      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+        <GroupTitle>Current Salary (read-only)</GroupTitle>
+        <Grid>
+          <Field label="Basic Monthly">
+            <Input value={peso(current?.basic_monthly)} disabled readOnly />
+          </Field>
+          <Field label="Allowance Monthly">
+            <Input value={peso(current?.allowance_monthly || "0")} disabled readOnly />
+          </Field>
+          <Field label="Effective From">
+            <Input value={current?.effective_from || "—"} disabled readOnly />
+          </Field>
+        </Grid>
+        {!current && (
+          <Hint>
+            No salary recorded yet. Payroll only includes employees with an active compensation
+            record — add one under Salary History.
+          </Hint>
+        )}
+      </div>
+    </div>
   );
 }
 
