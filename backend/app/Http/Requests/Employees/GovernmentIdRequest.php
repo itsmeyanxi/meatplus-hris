@@ -14,7 +14,8 @@ class GovernmentIdRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tin' => ['nullable', 'string', 'max:20'],
+            // TIN is mandatory on any government-ID record; the rest are optional.
+            'tin' => ['required', 'string', 'max:20'],
             'sss_no' => ['nullable', 'string', 'max:30'],
             'philhealth_no' => ['nullable', 'string', 'max:30'],
             'pagibig_no' => ['nullable', 'string', 'max:30'],
@@ -22,6 +23,13 @@ class GovernmentIdRequest extends FormRequest
             'prc_expiry' => ['nullable', 'date'],
             'passport_no' => ['nullable', 'string', 'max:30'],
             'rdo_code' => ['nullable', 'string', 'max:10'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'tin.required' => 'TIN is required to save government information.',
         ];
     }
 }

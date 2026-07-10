@@ -52,11 +52,14 @@ export default function GovernmentIdsTab() {
     }
   }, [record]);
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const save = useMutation({
     mutationFn: () =>
       governmentIdsApi.save(employeeId, {
         ...form,
-        tin: form.tin || null,
+        // TIN is required by the API; the others may be blank.
+        tin: form.tin,
         sss_no: form.sss_no || null,
         philhealth_no: form.philhealth_no || null,
         pagibig_no: form.pagibig_no || null,
@@ -64,8 +67,13 @@ export default function GovernmentIdsTab() {
         prc_expiry: form.prc_expiry || null,
       }),
     onSuccess: () => {
+      setSaveError(null);
       qc.invalidateQueries({ queryKey: key });
       setDirty(false);
+    },
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
+      setSaveError(e?.response?.data?.errors?.tin?.[0] ?? e?.response?.data?.message ?? "Could not save.");
     },
   });
 
@@ -103,7 +111,7 @@ export default function GovernmentIdsTab() {
         className="rounded-xl border border-slate-200 bg-white p-5"
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="TIN">
+          <Field label="TIN *">
             <input
               className={inputCls}
               placeholder="000-000-000-000"
@@ -160,11 +168,11 @@ export default function GovernmentIdsTab() {
 
         <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
           <p className="text-xs text-slate-400">
-            All ID numbers are stored encrypted.
+            TIN is required. SSS, TIN, PhilHealth, HDMF and Passport are stored encrypted.
           </p>
           <button
             type="submit"
-            disabled={save.isPending || !dirty}
+            disabled={save.isPending || !dirty || !form.tin}
             className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             {save.isPending ? "Saving…" : "Save changes"}
@@ -172,9 +180,7 @@ export default function GovernmentIdsTab() {
         </div>
 
         {save.isError && (
-          <p className="mt-2 text-xs text-red-600">
-            Failed to save. Please try again.
-          </p>
+          <p className="mt-2 text-xs text-red-600">{saveError ?? "Failed to save. Please try again."}</p>
         )}
         {save.isSuccess && !dirty && (
           <p className="mt-2 text-xs text-green-600">Saved successfully.</p>

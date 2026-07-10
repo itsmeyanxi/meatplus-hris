@@ -66,8 +66,8 @@ const schema = z.object({
   schedule_type:      z.enum(["", "fixed", "flexible"]).optional(),
   schedule_hours:     z.string().optional(),
 
-  // Government information (optional)
-  tin:                z.string().optional(),
+  // Government information — TIN is mandatory, the rest optional
+  tin:                z.string().min(1, "Required"),
   sss_no:             z.string().optional(),
   philhealth_no:      z.string().optional(),
   pagibig_no:         z.string().optional(),   // HDMF
@@ -295,9 +295,9 @@ export default function EmployeeRegistrationPage() {
       isComplete: (v) => !!v.schedule_from && (
         v.schedule_mode === "new" ? !!(v.schedule_type && v.schedule_hours) : !!v.work_schedule_id
       ) },
-    { key: "government", label: "Government Information", description: "TIN, SSS, PhilHealth & Pag-IBIG",
-      icon: <IconGovernment />,
-      isComplete: (v) => !!(v.tin || v.sss_no || v.philhealth_no || v.pagibig_no) },
+    { key: "government", label: "Government Information", description: "TIN, SSS, PhilHealth & HDMF",
+      icon: <IconGovernment />, required: true,
+      isComplete: (v) => !!v.tin },
     { key: "education", label: "Educational Background", description: "School, degree & years attended",
       icon: <IconEducation />,
       isComplete: (v) => !!(v.edu_level && v.edu_school) },
@@ -377,7 +377,8 @@ export default function EmployeeRegistrationPage() {
           }));
       }
 
-      if (v.tin || v.sss_no || v.philhealth_no || v.pagibig_no || v.prc_no || v.passport_no || v.rdo_code) {
+      // TIN is required, so this record is always written.
+      if (v.tin) {
         await attach("Government information", () =>
           governmentIdsApi.save(emp.id, {
             tin: v.tin || null,
@@ -484,6 +485,7 @@ export default function EmployeeRegistrationPage() {
         if (basic.some((f) => fieldErrors[f])) setActive("basic");
         else if (work.some((f) => fieldErrors[f])) setActive("work");
         else if (fieldErrors.branch_id) setActive("locations");
+        else if (fieldErrors.tin) setActive("government");
         else setActive("contact");
       }
       setServerError(e?.response?.data?.message ?? "Registration failed. Please check the required fields.");
@@ -1174,11 +1176,14 @@ function ScheduleSection({ form, workSchedules, days, onDay }: {
 }
 
 function GovernmentSection({ form }: { form: FF }) {
+  const E = form.formState.errors;
   return (
     <>
       <Grid>
         <Field label="SSS No."><Input {...form.register("sss_no")} placeholder="00-0000000-0" /></Field>
-        <Field label="TIN"><Input {...form.register("tin")} placeholder="000-000-000-000" /></Field>
+        <Field label="TIN *" error={E.tin?.message}>
+          <Input {...form.register("tin")} placeholder="000-000-000-000" />
+        </Field>
         <Field label="PhilHealth No."><Input {...form.register("philhealth_no")} placeholder="00-000000000-0" /></Field>
         <Field label="HDMF No. (Pag-IBIG)"><Input {...form.register("pagibig_no")} placeholder="0000-0000-0000" /></Field>
         <Field label="PRC License No."><Input {...form.register("prc_no")} /></Field>
