@@ -25,6 +25,7 @@ multiple branches, each with its own biometric device(s).
 | 07 | [Deployment & performance](07-deployment-performance.md) | Go-live checklist, DB latency, production hardening |
 | 08 | [Multi-tenancy](08-multi-tenancy.md) | Single DB, `company_id` scoping |
 | 09 | [Databases & backups](09-local-database.md) | Which database is live, the offline copies, `backup-db.ps1`, portability traps |
+| 10 | [Self-hosting](10-self-hosting.md) | **Plan, not yet done.** Moving the app + database off Render onto the office PC |
 
 ---
 
