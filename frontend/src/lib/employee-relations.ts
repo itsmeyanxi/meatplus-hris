@@ -275,3 +275,23 @@ export const performanceApi = {
   destroy: (employeeId: number, id: number) =>
     api.delete(nest(employeeId, `performance/${id}`)),
 };
+
+// ── Photo (stored in the database, not on disk) ──────────────────────────────
+
+export const photoApi = {
+  url: (employeeId: number) => `/api/v1/employees/${employeeId}/photo`,
+
+  upload: async (employeeId: number, file: File): Promise<{ photo_url: string }> => {
+    const body = new FormData();
+    body.append("photo", file);
+    // Let axios set Content-Type itself. A hand-written "multipart/form-data"
+    // header omits the boundary, and PHP then parses no fields at all.
+    const { data } = await api.post<{ photo_url: string }>(
+      `/api/v1/employees/${employeeId}/photo`,
+      body,
+    );
+    return data;
+  },
+
+  destroy: (employeeId: number) => api.delete(`/api/v1/employees/${employeeId}/photo`),
+};

@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\V1\Employees\EmployeeController;
 use App\Http\Controllers\Api\V1\Employees\EmploymentHistoryController;
 use App\Http\Controllers\Api\V1\Employees\GovernmentIdController;
 use App\Http\Controllers\Api\V1\Employees\PerformanceController;
+use App\Http\Controllers\Api\V1\Employees\PhotoController;
 use App\Http\Controllers\Api\V1\Leave\LeaveApplicationController;
 use App\Http\Controllers\Api\V1\Leave\LeaveBalanceController;
 use App\Http\Controllers\Api\V1\Leave\LeaveTypeController;
@@ -98,6 +99,9 @@ Route::prefix('v1')->group(function () {
             ->scoped()->parameters(['education' => 'education']);
         Route::apiResource('employees.performance', PerformanceController::class)
             ->scoped()->parameters(['performance' => 'performance']);
+        Route::get('employees/{employee}/photo', [PhotoController::class, 'show']);
+        Route::post('employees/{employee}/photo', [PhotoController::class, 'store']);
+        Route::delete('employees/{employee}/photo', [PhotoController::class, 'destroy']);
         Route::apiResource('employees.employment-history', EmploymentHistoryController::class)
             ->scoped()->parameters(['employment-history' => 'employmentHistory']);
         Route::get('employees/{employee}/government-ids', [GovernmentIdController::class, 'show']);

@@ -7,7 +7,7 @@ import { forwardRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { employeeSchedulesApi, workSchedulesApi } from "@/lib/attendance";
-import { educationApi, governmentIdsApi, performanceApi } from "@/lib/employee-relations";
+import { educationApi, governmentIdsApi, performanceApi, photoApi } from "@/lib/employee-relations";
 import { createEmployee, getLookup, type LookupItem } from "@/lib/employees";
 import { usersApi, ROLE_LABELS, type Role } from "@/lib/users";
 
@@ -127,6 +127,27 @@ export default function EmployeeRegistrationPage() {
   const [result, setResult]           = useState<RegistrationResult | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
 
+  // The photo can only be uploaded once the employee row exists, so hold the
+  // chosen file (and a local preview) until after registration.
+  const [photoFile, setPhotoFile]       = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoError, setPhotoError]     = useState<string | null>(null);
+
+  const pickPhoto = (file: File | null) => {
+    setPhotoError(null);
+    if (!file) { setPhotoFile(null); setPhotoPreview(null); return; }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setPhotoError("Use a JPG, PNG or WEBP image.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setPhotoError("Image must be 2 MB or smaller.");
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
   const { data: branches }        = useQuery({ queryKey: ["branches"],         queryFn: () => getLookup("branches") });
   const { data: departments }     = useQuery({ queryKey: ["departments"],      queryFn: () => getLookup("departments") });
   const { data: employmentTypes } = useQuery({ queryKey: ["employment-types"], queryFn: () => getLookup("employment-types") });
@@ -214,6 +235,10 @@ export default function EmployeeRegistrationPage() {
         try { await fn(); } catch { warnings.push(what); }
       };
 
+      if (photoFile) {
+        await attach("Employee photo", () => photoApi.upload(emp.id, photoFile));
+      }
+
       if (v.tin || v.sss_no || v.philhealth_no || v.pagibig_no || v.prc_no) {
         await attach("Government information", () =>
           governmentIdsApi.save(emp.id, {
@@ -300,12 +325,21 @@ export default function EmployeeRegistrationPage() {
     },
   });
 
+  // The photo lives outside react-hook-form, so it must be cleared explicitly —
+  // otherwise it would silently attach to the next employee registered.
+  const clearPhoto = () => { setPhotoFile(null); setPhotoPreview(null); setPhotoError(null); };
+
   if (result) {
-    return <SuccessScreen result={result} onAnother={() => { setResult(null); form.reset(); setActive("basic"); }} />;
+    return (
+      <SuccessScreen
+        result={result}
+        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setActive("basic"); }}
+      />
+    );
   }
 
   const toggle = (key: SectionKey) => setActive((prev) => (prev === key ? null : key));
-  const reset  = () => { form.reset(); setServerError(null); setActive("basic"); };
+  const reset  = () => { form.reset(); clearPhoto(); setServerError(null); setActive("basic"); };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -405,7 +439,14 @@ export default function EmployeeRegistrationPage() {
 
                 {isOpen && (
                   <div className="border-t border-slate-100 px-5 py-5 dark:border-slate-800">
-                    {section.key === "basic"       && <BasicSection form={form} />}
+                    {section.key === "basic"       && (
+                      <BasicSection
+                        form={form}
+                        photoPreview={photoPreview}
+                        photoError={photoError}
+                        onPickPhoto={pickPhoto}
+                      />
+                    )}
                     {section.key === "work"        && <WorkSection form={form} departments={departments} positions={positions} employmentTypes={employmentTypes} />}
                     {section.key === "locations"   && <LocationsSection form={form} branches={branches} />}
                     {section.key === "schedule"    && <ScheduleSection form={form} workSchedules={workSchedules} />}
@@ -480,42 +521,98 @@ export default function EmployeeRegistrationPage() {
 
 type FF = ReturnType<typeof useForm<FormInput, unknown, FormValues>>;
 
-function BasicSection({ form }: { form: FF }) {
+function BasicSection({ form, photoPreview, photoError, onPickPhoto }: {
+  form: FF;
+  photoPreview: string | null;
+  photoError: string | null;
+  onPickPhoto: (file: File | null) => void;
+}) {
   const E = form.formState.errors;
   return (
-    <Grid>
-      <Field label="Employee No *" error={E.employee_no?.message}>
-        <Input {...form.register("employee_no")} placeholder="e.g. 00453" />
-      </Field>
-      <Field label="First Name *" error={E.first_name?.message}>
-        <Input {...form.register("first_name")} />
-      </Field>
-      <Field label="Middle Name"><Input {...form.register("middle_name")} /></Field>
-      <Field label="Last Name *" error={E.last_name?.message}>
-        <Input {...form.register("last_name")} />
-      </Field>
-      <Field label="Suffix"><Input {...form.register("suffix")} placeholder="Jr., III…" /></Field>
-      <Field label="Birth Date *" error={E.birth_date?.message}>
-        <Input type="date" {...form.register("birth_date")} />
-      </Field>
-      <Field label="Gender *">
-        <Select {...form.register("gender")}>
-          <option value="male">Male</option>
-          <option value="female">Female</option>
-          <option value="other">Other</option>
-        </Select>
-      </Field>
-      <Field label="Civil Status *">
-        <Select {...form.register("civil_status")}>
-          <option value="single">Single</option>
-          <option value="married">Married</option>
-          <option value="widowed">Widowed</option>
-          <option value="separated">Separated</option>
-          <option value="divorced">Divorced</option>
-        </Select>
-      </Field>
-      <Field label="Nationality"><Input {...form.register("nationality")} /></Field>
-    </Grid>
+    <div className="flex flex-col gap-6 md:flex-row">
+      {/* Photo */}
+      <div className="shrink-0 md:w-44">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
+          {photoPreview ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={photoPreview} alt="Employee photo preview" className="h-44 w-full object-cover" />
+          ) : (
+            <div className="flex h-44 w-full items-center justify-center text-slate-300 dark:text-slate-600">
+              <svg className="h-20 w-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+          )}
+        </div>
+
+        <label className="mt-2 flex cursor-pointer items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100">
+          {photoPreview ? "Change photo" : "Choose photo"}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => onPickPhoto(e.target.files?.[0] ?? null)}
+          />
+        </label>
+
+        {photoPreview && (
+          <button
+            type="button"
+            onClick={() => onPickPhoto(null)}
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+          >
+            Remove
+          </button>
+        )}
+
+        {photoError
+          ? <p className="mt-1 text-xs text-red-500">{photoError}</p>
+          : <p className="mt-1 text-center text-[11px] text-slate-400 dark:text-slate-500">JPG, PNG or WEBP · max 2 MB</p>}
+      </div>
+
+      {/* Fields */}
+      <div className="flex-1 space-y-4">
+        <Grid>
+          <Field label="First Name *" error={E.first_name?.message}>
+            <Input {...form.register("first_name")} />
+          </Field>
+          <Field label="Middle Name"><Input {...form.register("middle_name")} /></Field>
+          <Field label="Last Name *" error={E.last_name?.message}>
+            <Input {...form.register("last_name")} />
+          </Field>
+        </Grid>
+
+        <Grid>
+          <Field label="System ID">
+            <Input value="Assigned on save" disabled readOnly />
+          </Field>
+          <Field label="Gender *">
+            <Select {...form.register("gender")}>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </Select>
+          </Field>
+          <Field label="Civil Status *">
+            <Select {...form.register("civil_status")}>
+              <option value="single">Single</option>
+              <option value="married">Married</option>
+              <option value="widowed">Widowed</option>
+              <option value="separated">Separated</option>
+              <option value="divorced">Divorced</option>
+            </Select>
+          </Field>
+          <Field label="Date of Birth *" error={E.birth_date?.message}>
+            <Input type="date" {...form.register("birth_date")} />
+          </Field>
+          <Field label="Employee ID *" error={E.employee_no?.message}>
+            <Input {...form.register("employee_no")} placeholder="e.g. 00453" />
+          </Field>
+          <Field label="Suffix"><Input {...form.register("suffix")} placeholder="Jr., III…" /></Field>
+          <Field label="Nationality"><Input {...form.register("nationality")} /></Field>
+        </Grid>
+      </div>
+    </div>
   );
 }
 
