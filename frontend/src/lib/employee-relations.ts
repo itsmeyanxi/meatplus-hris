@@ -233,3 +233,45 @@ export const contractsApi = {
   destroy: (employeeId: number, id: number) =>
     api.delete(nest(employeeId, `contracts/${id}`)),
 };
+
+// ── Performance reviews ──────────────────────────────────────────────────────
+
+export type Performance = {
+  id: number;
+  employee_id: number;
+  review_period_start: string;
+  review_period_end: string;
+  rating: string | null;
+  rating_label: string | null;
+  reviewer_employee_id: number | null;
+  reviewer_name?: string | null;
+  strengths: string | null;
+  areas_for_improvement: string | null;
+  remarks: string | null;
+  next_review_date: string | null;
+};
+
+export type PerformanceInput = {
+  review_period_start: string;
+  review_period_end: string;
+  rating?: number | null;
+  rating_label?: string | null;
+  reviewer_employee_id?: number | null;
+  strengths?: string | null;
+  areas_for_improvement?: string | null;
+  remarks?: string | null;
+  next_review_date?: string | null;
+};
+
+export const performanceApi = {
+  list: async (employeeId: number): Promise<Performance[]> => {
+    const { data } = await api.get<Listed<Performance>>(nest(employeeId, "performance"));
+    return data.data;
+  },
+  create: async (employeeId: number, body: PerformanceInput): Promise<Performance> => {
+    const { data } = await api.post<{ data: Performance }>(nest(employeeId, "performance"), body);
+    return data.data;
+  },
+  destroy: (employeeId: number, id: number) =>
+    api.delete(nest(employeeId, `performance/${id}`)),
+};

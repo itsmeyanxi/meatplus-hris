@@ -129,6 +129,11 @@ class Employee extends Model
         return $this->hasMany(EmployeeEducation::class);
     }
 
+    public function performanceReviews(): HasMany
+    {
+        return $this->hasMany(EmployeePerformance::class);
+    }
+
     public function employmentHistory(): HasMany
     {
         return $this->hasMany(EmployeeEmploymentHistory::class);
