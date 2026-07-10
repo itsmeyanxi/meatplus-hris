@@ -1,14 +1,14 @@
 # Meatplus HRIS — Database Schema
 
-> **Engine (live):** **MySQL 8.4** (Laragon, local, `meatplus_hris`) — see
-> [09-local-database.md](09-local-database.md). The **types below use MySQL spelling**,
-> which now matches the live engine; Postgres equivalents are noted under "Portability"
-> below and the app still runs on either. The Laravel migration files are the executable
-> source of truth.
+> **Engine (live):** **PostgreSQL** (Supabase, `ap-southeast-1`) — see
+> [09-local-database.md](09-local-database.md). This doc was first written against MySQL 8
+> and the **types below use MySQL spelling** — read them as the design contract, with the
+> Postgres equivalents noted under "Portability" below. The app runs on either. The Laravel
+> migration files are the executable source of truth.
 >
-> ⚠️ **MySQL comparisons are case-insensitive** (`utf8mb4_unicode_ci`). Values that
-> differ only by letter case — notably `users.email` — collide on unique indexes here
-> but not on Postgres.
+> ⚠️ **On MySQL, string comparison is case-insensitive** (`utf8mb4_unicode_ci`). Values
+> that differ only by letter case — notably `users.email` — collide on unique indexes
+> there but not on Postgres. Relevant whenever the data is copied to a MySQL box.
 > **Naming:** `snake_case`, plural table names, singular column names.
 > **Money:** all monetary columns use `DECIMAL(15,4)` (Postgres `NUMERIC(15,4)`).
 > **Timestamps:** every table has `created_at`, `updated_at` (and `deleted_at` where soft-deletable). Times stored as **UTC**.

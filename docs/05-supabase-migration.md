@@ -1,10 +1,10 @@
 # Migrating to Supabase (Postgres) + Laragon
 
-> 📜 **Historical (superseded 2026-07-10).** This move was completed, then reversed —
-> the database now runs on **local MySQL 8.4** in Laragon. See
+> 📜 **Historical.** This move was completed. Supabase remains the live database.
+> On 2026-07-10 the data was copied to local MySQL and back; see
 > [09-local-database.md](09-local-database.md). Kept because the driver-agnostic work it
 > describes (ILIKE/LIKE, driver-aware migrations, `DB_SSLMODE`) is still in the codebase
-> and is what made moving back possible.
+> and is what made that round trip possible.
 
 Goal: run the app on **Laragon** (local PHP runtime, replacing XAMPP) with the
 database on **Supabase Postgres** (cloud) instead of local MySQL.
@@ -102,7 +102,7 @@ phpMyAdmin and import them. (Ask and I can generate a per-table export/import pl
 - Put the project under Laragon (or keep its current path) and use Laragon's PHP 8.3.
 - Backend: `php artisan serve` (or a Laragon virtual host).
 - Frontend: `npm run dev` (unchanged).
-- ~~Laragon's bundled MySQL is **not used** — the DB lives on Supabase.~~ (no longer true; MySQL is the live DB)
+- Laragon's bundled MySQL holds an **offline copy** only — the live DB is Supabase.
 
 ## Step 6 — Verify
 

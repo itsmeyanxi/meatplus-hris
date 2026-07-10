@@ -63,3 +63,6 @@ dist/
 # Generated employee exports (contain PII — keep out of the repo)
 employee_import_ready.csv
 employee_list_*.csv
+
+# Database backups (contain employee PII — never commit)
+backups/
