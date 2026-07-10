@@ -92,6 +92,7 @@ type SectionKey =
 type SectionDef = {
   key: SectionKey;
   label: string;
+  description: string;
   icon: React.ReactNode;
   required?: boolean;
   isComplete: (v: Partial<FormValues>) => boolean;
@@ -100,7 +101,7 @@ type SectionDef = {
 // ── icons ─────────────────────────────────────────────────────────────────────
 
 const icon = (d: string) => (
-  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
+  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
     <path strokeLinecap="round" strokeLinejoin="round" d={d} />
   </svg>
 );
@@ -115,9 +116,8 @@ const IconPerformance = () => icon("M3 3v18h18M7 15l3-3 3 3 5-6");
 const IconContact     = () => icon("M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11 11 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z");
 const IconPortal      = () => icon("M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z");
 
-// Sprout alternates two blues down the list.
-const BAR_LIGHT = "bg-[#29A3DC] hover:bg-[#2AAAE4]";
-const BAR_DARK  = "bg-[#1F79C4] hover:bg-[#2183D2]";
+// Section layout follows the reference (one row per section, icon on the left),
+// but the palette is this app's: slate surfaces, emerald for "done".
 
 // ── page ──────────────────────────────────────────────────────────────────────
 
@@ -148,23 +148,32 @@ export default function EmployeeRegistrationPage() {
   });
 
   const SECTIONS: SectionDef[] = [
-    { key: "basic", label: "Basic Information", icon: <IconBasic />, required: true,
+    { key: "basic", label: "Basic Information", description: "Name, birth date, gender & civil status",
+      icon: <IconBasic />, required: true,
       isComplete: (v) => !!(v.employee_no && v.first_name && v.last_name && v.birth_date) },
-    { key: "work", label: "Work Information", icon: <IconWork />, required: true,
+    { key: "work", label: "Work Information", description: "Department, position, type & hire date",
+      icon: <IconWork />, required: true,
       isComplete: (v) => !!(v.department_id && v.position_id && v.employment_type_id && v.date_hired) },
-    { key: "locations", label: "Locations", icon: <IconLocation />, required: true,
+    { key: "locations", label: "Locations", description: "Branch or worksite & address",
+      icon: <IconLocation />, required: true,
       isComplete: (v) => !!v.branch_id },
-    { key: "schedule", label: "Work Schedule", icon: <IconSchedule />,
+    { key: "schedule", label: "Work Schedule", description: "Shift pattern & effective date",
+      icon: <IconSchedule />,
       isComplete: (v) => !!(v.work_schedule_id && v.schedule_from) },
-    { key: "government", label: "Government Information", icon: <IconGovernment />,
+    { key: "government", label: "Government Information", description: "TIN, SSS, PhilHealth & Pag-IBIG",
+      icon: <IconGovernment />,
       isComplete: (v) => !!(v.tin || v.sss_no || v.philhealth_no || v.pagibig_no) },
-    { key: "education", label: "Educational Background", icon: <IconEducation />,
+    { key: "education", label: "Educational Background", description: "School, degree & years attended",
+      icon: <IconEducation />,
       isComplete: (v) => !!(v.edu_level && v.edu_school) },
-    { key: "performance", label: "Performance Management", icon: <IconPerformance />,
+    { key: "performance", label: "Performance Management", description: "Review period, rating & remarks",
+      icon: <IconPerformance />,
       isComplete: (v) => !!(v.perf_start && v.perf_end) },
-    { key: "contact", label: "Contact Information", icon: <IconContact />,
+    { key: "contact", label: "Contact Information", description: "Email addresses & phone numbers",
+      icon: <IconContact />,
       isComplete: (v) => !!(v.email_personal || v.email_company || v.mobile) },
-    { key: "portal", label: "Portal Access & Role", icon: <IconPortal />,
+    { key: "portal", label: "Portal Access & Role", description: "System login and role assignment (optional)",
+      icon: <IconPortal />,
       isComplete: (v) => !!v.create_account },
   ];
 
@@ -299,59 +308,103 @@ export default function EmployeeRegistrationPage() {
   const reset  = () => { form.reset(); setServerError(null); setActive("basic"); };
 
   return (
-    <div className="mx-auto max-w-5xl">
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
+    <div className="mx-auto max-w-3xl">
+      {/* Module header */}
+      <div className="flex items-center justify-between rounded-t-2xl bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-5 dark:from-slate-950 dark:to-slate-900">
         <div>
-          <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Employee Registration</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {filledCount} of {SECTIONS.length} sections filled
-            {!requiredDone && " · Basic, Work and Locations are required"}
+          <h2 className="text-lg font-bold tracking-tight text-white">Employee Registration</h2>
+          <p className="mt-0.5 text-xs text-slate-400">
+            {requiredDone
+              ? "Required sections complete — ready to register."
+              : "Basic, Work and Locations are required."}
           </p>
         </div>
-        <Link
-          href="/employees"
-          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
-        >
-          ← Back
-        </Link>
+        <div className="flex items-center gap-3">
+          <div className="relative h-10 w-10">
+            <svg className="h-10 w-10 -rotate-90" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="3" />
+              <circle
+                cx="18" cy="18" r="15" fill="none"
+                stroke={requiredDone ? "#34d399" : "#60a5fa"}
+                strokeWidth="3"
+                strokeDasharray={`${(filledCount / SECTIONS.length) * 94.2} 94.2`}
+                strokeLinecap="round"
+              />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">
+              {filledCount}/{SECTIONS.length}
+            </span>
+          </div>
+          <Link
+            href="/employees"
+            className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:bg-slate-700"
+          >
+            ← Back
+          </Link>
+        </div>
       </div>
 
       <form onSubmit={form.handleSubmit((v) => { setServerError(null); register.mutate(v); })} noValidate>
-        <div className="overflow-hidden rounded-lg shadow-sm">
+        <div className="divide-y divide-slate-100 border-x border-slate-200 dark:divide-slate-800 dark:border-slate-700">
           {SECTIONS.map((section, idx) => {
             const isOpen     = active === section.key;
             const isComplete = section.isComplete(watched as Partial<FormValues>);
 
             return (
-              <div key={section.key}>
+              <div key={section.key} className="bg-white dark:bg-slate-900">
                 <button
                   type="button"
                   onClick={() => toggle(section.key)}
-                  className={`flex w-full items-center gap-4 px-5 py-4 text-left text-white transition ${
-                    idx % 2 === 0 ? BAR_LIGHT : BAR_DARK
+                  className={`flex w-full items-center gap-4 px-5 py-4 text-left transition ${
+                    isOpen
+                      ? "bg-slate-50 dark:bg-slate-800/60"
+                      : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
                   }`}
                 >
-                  <span className="shrink-0">{section.icon}</span>
-                  <span className="flex-1 text-base font-medium">
-                    {section.label}
-                    {section.required && <span className="ml-1 text-white/70">*</span>}
-                  </span>
-                  {isComplete && (
-                    <svg className="h-5 w-5 shrink-0 text-white/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition ${
+                    isComplete
+                      ? "bg-emerald-500 text-white"
+                      : isOpen
+                        ? "bg-slate-800 text-white dark:bg-white dark:text-slate-900"
+                        : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                  }`}>
+                    {isComplete ? (
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : section.icon}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+                        {String(idx + 1).padStart(2, "0")}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                        {section.label}
+                        {section.required && <span className="ml-1 text-red-500">*</span>}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{section.description}</p>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    {isComplete && !isOpen && (
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                        Done
+                      </span>
+                    )}
+                    <svg
+                      className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
-                  )}
-                  <svg
-                    className={`h-4 w-4 shrink-0 text-white/80 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
+                  </div>
                 </button>
 
                 {isOpen && (
-                  <div className="border-x border-slate-200 bg-white px-5 py-5 dark:border-slate-700 dark:bg-slate-900">
+                  <div className="border-t border-slate-100 px-5 py-5 dark:border-slate-800">
                     {section.key === "basic"       && <BasicSection form={form} />}
                     {section.key === "work"        && <WorkSection form={form} departments={departments} positions={positions} employmentTypes={employmentTypes} />}
                     {section.key === "locations"   && <LocationsSection form={form} branches={branches} />}
@@ -361,6 +414,16 @@ export default function EmployeeRegistrationPage() {
                     {section.key === "performance" && <PerformanceSection form={form} />}
                     {section.key === "contact"     && <ContactSection form={form} />}
                     {section.key === "portal"      && <PortalSection form={form} createAccount={createAccount} />}
+
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setActive(null)}
+                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                      >
+                        Done with this section
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -369,30 +432,43 @@ export default function EmployeeRegistrationPage() {
         </div>
 
         {/* Action bar */}
-        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-700 dark:bg-slate-900/80">
+        <div className="rounded-b-2xl border border-t-0 border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-700 dark:bg-slate-900/80">
           {serverError && (
             <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
               {serverError}
             </p>
           )}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={reset}
-              className="rounded bg-[#5CB85C] px-6 py-2 text-sm font-semibold text-white transition hover:bg-[#4CAE4C]"
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
             >
-              New
+              Clear form
             </button>
-            <button
-              type="submit"
-              disabled={register.isPending || !requiredDone}
-              className="rounded bg-[#5CB85C] px-6 py-2 text-sm font-semibold text-white transition hover:bg-[#4CAE4C] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {register.isPending ? "Saving…" : "Save"}
-            </button>
-            <p className="ml-auto text-xs text-slate-500 dark:text-slate-400">
-              {requiredDone ? "Ready to save." : "Fill Basic, Work and Locations to save."}
-            </p>
+            <div className="flex gap-2">
+              <Link
+                href="/employees"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </Link>
+              <button
+                type="submit"
+                disabled={register.isPending || !requiredDone}
+                className="flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+              >
+                {register.isPending ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Registering…
+                  </>
+                ) : "Save & Register"}
+              </button>
+            </div>
           </div>
         </div>
       </form>
