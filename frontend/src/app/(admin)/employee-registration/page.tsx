@@ -70,9 +70,11 @@ const schema = z.object({
   tin:                z.string().optional(),
   sss_no:             z.string().optional(),
   philhealth_no:      z.string().optional(),
-  pagibig_no:         z.string().optional(),
+  pagibig_no:         z.string().optional(),   // HDMF
   prc_no:             z.string().optional(),
   prc_expiry:         z.string().optional(),
+  passport_no:        z.string().optional(),
+  rdo_code:           z.string().optional(),
 
   // Educational background (optional — one entry at registration)
   edu_level:          z.enum(["", "elementary", "secondary", "vocational", "tertiary", "graduate"]).optional(),
@@ -375,7 +377,7 @@ export default function EmployeeRegistrationPage() {
           }));
       }
 
-      if (v.tin || v.sss_no || v.philhealth_no || v.pagibig_no || v.prc_no) {
+      if (v.tin || v.sss_no || v.philhealth_no || v.pagibig_no || v.prc_no || v.passport_no || v.rdo_code) {
         await attach("Government information", () =>
           governmentIdsApi.save(emp.id, {
             tin: v.tin || null,
@@ -384,6 +386,8 @@ export default function EmployeeRegistrationPage() {
             pagibig_no: v.pagibig_no || null,
             prc_no: v.prc_no || null,
             prc_expiry: v.prc_expiry || null,
+            passport_no: v.passport_no || null,
+            rdo_code: v.rdo_code || null,
           }));
       }
 
@@ -1173,14 +1177,19 @@ function GovernmentSection({ form }: { form: FF }) {
   return (
     <>
       <Grid>
+        <Field label="SSS No."><Input {...form.register("sss_no")} placeholder="00-0000000-0" /></Field>
         <Field label="TIN"><Input {...form.register("tin")} placeholder="000-000-000-000" /></Field>
-        <Field label="SSS No."><Input {...form.register("sss_no")} /></Field>
-        <Field label="PhilHealth No."><Input {...form.register("philhealth_no")} /></Field>
-        <Field label="Pag-IBIG No."><Input {...form.register("pagibig_no")} /></Field>
-        <Field label="PRC No."><Input {...form.register("prc_no")} /></Field>
+        <Field label="PhilHealth No."><Input {...form.register("philhealth_no")} placeholder="00-000000000-0" /></Field>
+        <Field label="HDMF No. (Pag-IBIG)"><Input {...form.register("pagibig_no")} placeholder="0000-0000-0000" /></Field>
+        <Field label="PRC License No."><Input {...form.register("prc_no")} /></Field>
         <Field label="PRC Expiry"><Input type="date" {...form.register("prc_expiry")} /></Field>
+        <Field label="Passport No."><Input {...form.register("passport_no")} /></Field>
+        <Field label="RDO No."><Input {...form.register("rdo_code")} placeholder="050" /></Field>
       </Grid>
-      <Hint>Stored encrypted at rest.</Hint>
+      <Hint>
+        SSS, TIN, PhilHealth, HDMF and Passport are encrypted at rest. PRC licence and RDO are not —
+        they are not personally sensitive.
+      </Hint>
     </>
   );
 }

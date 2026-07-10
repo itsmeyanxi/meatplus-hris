@@ -141,6 +141,8 @@ export type GovernmentId = {
   pagibig_no: string | null;
   prc_no: string | null;
   prc_expiry: string | null;
+  passport_no: string | null;
+  rdo_code: string | null;
   updated_at: string | null;
 };
 
@@ -151,6 +153,8 @@ export type GovernmentIdInput = {
   pagibig_no?: string | null;
   prc_no?: string | null;
   prc_expiry?: string | null;
+  passport_no?: string | null;
+  rdo_code?: string | null;
 };
 
 export const governmentIdsApi = {

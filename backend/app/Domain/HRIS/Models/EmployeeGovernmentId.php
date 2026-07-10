@@ -11,7 +11,7 @@ class EmployeeGovernmentId extends Model
 {
     protected $fillable = [
         'employee_id', 'tin', 'sss_no', 'philhealth_no', 'pagibig_no',
-        'prc_no', 'prc_expiry',
+        'prc_no', 'prc_expiry', 'passport_no', 'rdo_code',
     ];
 
     protected function casts(): array
@@ -32,6 +32,11 @@ class EmployeeGovernmentId extends Model
     }
 
     protected function philhealthNo(): Attribute
+    {
+        return $this->encryptedAttribute();
+    }
+
+    protected function passportNo(): Attribute
     {
         return $this->encryptedAttribute();
     }

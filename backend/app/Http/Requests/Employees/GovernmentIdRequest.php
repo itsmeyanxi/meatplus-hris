@@ -20,6 +20,8 @@ class GovernmentIdRequest extends FormRequest
             'pagibig_no' => ['nullable', 'string', 'max:30'],
             'prc_no' => ['nullable', 'string', 'max:50'],
             'prc_expiry' => ['nullable', 'date'],
+            'passport_no' => ['nullable', 'string', 'max:30'],
+            'rdo_code' => ['nullable', 'string', 'max:10'],
         ];
     }
 }

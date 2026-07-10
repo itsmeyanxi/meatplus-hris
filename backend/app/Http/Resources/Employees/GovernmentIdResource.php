@@ -18,6 +18,8 @@ class GovernmentIdResource extends JsonResource
             'pagibig_no' => $this->pagibig_no,
             'prc_no' => $this->prc_no,
             'prc_expiry' => $this->prc_expiry?->toDateString(),
+            'passport_no' => $this->passport_no,
+            'rdo_code' => $this->rdo_code,
             'updated_at' => $this->updated_at,
         ];
     }
