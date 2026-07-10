@@ -76,13 +76,7 @@ const schema = z.object({
   passport_no:        z.string().optional(),
   rdo_code:           z.string().optional(),
 
-  // Educational background (optional — one entry at registration)
-  edu_level:          z.enum(["", "elementary", "secondary", "vocational", "tertiary", "graduate"]).optional(),
-  edu_school:         z.string().optional(),
-  edu_degree:         z.string().optional(),
-  edu_year_from:      z.string().optional(),
-  edu_year_to:        z.string().optional(),
-  edu_honors:         z.string().optional(),
+  // Educational background is a list, held outside the form (see eduRows).
 
   // Performance management (optional — one review at registration)
   perf_start:         z.string().optional(),
@@ -178,6 +172,17 @@ export default function EmployeeRegistrationPage() {
 
   const setDay = (i: number, patch: Partial<DayRow>) =>
     setScheduleDays((ds) => ds.map((d, n) => (n === i ? { ...d, ...patch } : d)));
+
+  // Educational background: an employee can list several. Rows only reach the API
+  // once the employee exists, so they live here until then.
+  type EduRow = { level: string; school: string; year_from: string; year_to: string; degree: string };
+  const blankEdu: EduRow = { level: "", school: "", year_from: "", year_to: "", degree: "" };
+  const [eduRows, setEduRows] = useState<EduRow[]>([]);
+
+  const addEdu    = () => setEduRows((r) => [...r, { ...blankEdu }]);
+  const removeEdu = (i: number) => setEduRows((r) => r.filter((_, n) => n !== i));
+  const setEdu    = (i: number, patch: Partial<EduRow>) =>
+    setEduRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
 
   const addLocation = (branchId: number) => {
     if (!branchId || locations.some((l) => l.branch_id === branchId)) return;
@@ -300,7 +305,7 @@ export default function EmployeeRegistrationPage() {
       isComplete: (v) => !!v.tin },
     { key: "education", label: "Educational Background", description: "School, degree & years attended",
       icon: <IconEducation />,
-      isComplete: (v) => !!(v.edu_level && v.edu_school) },
+      isComplete: () => eduRows.some((r) => r.level && r.school) },
     { key: "performance", label: "Performance Management", description: "Review period, rating & remarks",
       icon: <IconPerformance />,
       isComplete: (v) => !!(v.perf_start && v.perf_end) },
@@ -392,15 +397,16 @@ export default function EmployeeRegistrationPage() {
           }));
       }
 
-      if (v.edu_level && v.edu_school) {
-        await attach("Educational background", () =>
+      // Level and School are what the API requires; skip half-filled rows.
+      for (const [i, row] of eduRows.entries()) {
+        if (!row.level || !row.school) continue;
+        await attach(`Educational background (row ${i + 1})`, () =>
           educationApi.create(emp.id, {
-            level: v.edu_level as Exclude<FormValues["edu_level"], "" | undefined>,
-            school: v.edu_school!,
-            degree: v.edu_degree || null,
-            year_from: v.edu_year_from ? Number(v.edu_year_from) : null,
-            year_to: v.edu_year_to ? Number(v.edu_year_to) : null,
-            honors: v.edu_honors || null,
+            level: row.level,
+            school: row.school,
+            degree: row.degree || null,
+            year_from: row.year_from ? Number(row.year_from) : null,
+            year_to: row.year_to ? Number(row.year_to) : null,
           }));
       }
 
@@ -500,13 +506,13 @@ export default function EmployeeRegistrationPage() {
     return (
       <SuccessScreen
         result={result}
-        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
+        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
       />
     );
   }
 
   const toggle = (key: SectionKey) => setActive((prev) => (prev === key ? null : key));
-  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
+  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -643,7 +649,9 @@ export default function EmployeeRegistrationPage() {
                       />
                     )}
                     {section.key === "government"  && <GovernmentSection form={form} />}
-                    {section.key === "education"   && <EducationSection form={form} />}
+                    {section.key === "education"   && (
+                      <EducationSection rows={eduRows} onAdd={addEdu} onRemove={removeEdu} onChange={setEdu} />
+                    )}
                     {section.key === "performance" && <PerformanceSection form={form} />}
                     {section.key === "contact"     && <ContactSection form={form} />}
                     {section.key === "portal"      && <PortalSection form={form} createAccount={createAccount} />}
@@ -1199,28 +1207,92 @@ function GovernmentSection({ form }: { form: FF }) {
   );
 }
 
-function EducationSection({ form }: { form: FF }) {
+type EduRow = { level: string; school: string; year_from: string; year_to: string; degree: string };
+
+const EDU_LEVELS = [
+  ["elementary", "Elementary"],
+  ["secondary", "Secondary"],
+  ["vocational", "Vocational"],
+  ["tertiary", "Tertiary"],
+  ["graduate", "Graduate"],
+] as const;
+
+function EducationSection({ rows, onAdd, onRemove, onChange }: {
+  rows: EduRow[];
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+  onChange: (i: number, patch: Partial<EduRow>) => void;
+}) {
   return (
-    <>
-      <Grid>
-        <Field label="Level">
-          <Select {...form.register("edu_level")}>
-            <option value="">Select level…</option>
-            <option value="elementary">Elementary</option>
-            <option value="secondary">Secondary</option>
-            <option value="vocational">Vocational</option>
-            <option value="tertiary">Tertiary</option>
-            <option value="graduate">Graduate</option>
-          </Select>
-        </Field>
-        <Field label="School"><Input {...form.register("edu_school")} /></Field>
-        <Field label="Degree / Course"><Input {...form.register("edu_degree")} /></Field>
-        <Field label="Year From"><Input type="number" {...form.register("edu_year_from")} placeholder="2015" /></Field>
-        <Field label="Year To"><Input type="number" {...form.register("edu_year_to")} placeholder="2019" /></Field>
-        <Field label="Honors"><Input {...form.register("edu_honors")} /></Field>
-      </Grid>
-      <Hint>Level and School are both needed to save an entry. More can be added from the employee profile.</Hint>
-    </>
+    <div className="space-y-4">
+      <button
+        type="button"
+        onClick={onAdd}
+        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+      >
+        Add Educational Background
+      </button>
+
+      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+        <table className="w-full min-w-[720px] text-sm">
+          <thead className="bg-slate-50 dark:bg-slate-800/60">
+            <tr>
+              {["Education Type", "School", "From", "To", "Degree", ""].map((h) => (
+                <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-3 py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+                  No entries yet.
+                </td>
+              </tr>
+            )}
+
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td className="px-3 py-2">
+                  <Select value={r.level} onChange={(e) => onChange(i, { level: e.target.value })}>
+                    <option value="">Select…</option>
+                    {EDU_LEVELS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                  </Select>
+                </td>
+                <td className="px-3 py-2">
+                  <Input value={r.school} onChange={(e) => onChange(i, { school: e.target.value })} />
+                </td>
+                <td className="px-3 py-2">
+                  <Input type="number" placeholder="2015" value={r.year_from} onChange={(e) => onChange(i, { year_from: e.target.value })} />
+                </td>
+                <td className="px-3 py-2">
+                  <Input type="number" placeholder="2019" value={r.year_to} onChange={(e) => onChange(i, { year_to: e.target.value })} />
+                </td>
+                <td className="px-3 py-2">
+                  <Input value={r.degree} onChange={(e) => onChange(i, { degree: e.target.value })} />
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => onRemove(i)}
+                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600 dark:border-slate-700 dark:hover:bg-slate-800"
+                  >
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Hint>
+        Education Type and School are both needed for a row to save; incomplete rows are skipped.
+        Year To must not be earlier than Year From.
+      </Hint>
+    </div>
   );
 }
 

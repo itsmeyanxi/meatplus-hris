@@ -20,8 +20,13 @@ class EducationRequest extends FormRequest
             'school' => [$req, 'string', 'max:200'],
             'degree' => ['nullable', 'string', 'max:200'],
             'year_from' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 5)],
-            'year_to' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 10),
-                'gte:year_from'],
+            // `gte:year_from` compares against null when year_from is absent, which
+            // rejects an entry that gives only the end year. Apply it only when
+            // there is something to compare against.
+            'year_to' => array_filter([
+                'nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 10),
+                $this->filled('year_from') ? 'gte:year_from' : null,
+            ]),
             'honors' => ['nullable', 'string', 'max:200'],
         ];
     }
