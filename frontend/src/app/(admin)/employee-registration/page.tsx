@@ -60,8 +60,11 @@ const schema = z.object({
   postal_code:        z.string().optional(),
 
   // Work schedule (optional — assigned after the employee exists)
+  schedule_mode:      z.enum(["existing", "new"]).default("existing"),
   work_schedule_id:   z.union([z.coerce.number(), z.literal("")]).optional(),
   schedule_from:      z.string().optional(),
+  schedule_type:      z.enum(["", "fixed", "flexible"]).optional(),
+  schedule_hours:     z.string().optional(),
 
   // Government information (optional)
   tin:                z.string().optional(),
@@ -165,6 +168,14 @@ export default function EmployeeRegistrationPage() {
   // employees.branch_id, which DTR and reports still read.
   type PickedLocation = { branch_id: number; designated_workplace: string };
   const [locations, setLocations] = useState<PickedLocation[]>([]);
+
+  // A 7-row grid, Sunday first, matching day_of_week 0..6 on work_schedule_days.
+  type DayRow = { time_in: string; time_out: string; break_start: string; break_end: string; is_rest_day: boolean };
+  const emptyDay: DayRow = { time_in: "", time_out: "", break_start: "", break_end: "", is_rest_day: false };
+  const [scheduleDays, setScheduleDays] = useState<DayRow[]>(() => Array.from({ length: 7 }, () => ({ ...emptyDay })));
+
+  const setDay = (i: number, patch: Partial<DayRow>) =>
+    setScheduleDays((ds) => ds.map((d, n) => (n === i ? { ...d, ...patch } : d)));
 
   const addLocation = (branchId: number) => {
     if (!branchId || locations.some((l) => l.branch_id === branchId)) return;
@@ -279,7 +290,9 @@ export default function EmployeeRegistrationPage() {
       isComplete: (v) => !!v.branch_id },
     { key: "schedule", label: "Work Schedule", description: "Shift pattern & effective date",
       icon: <IconSchedule />,
-      isComplete: (v) => !!(v.work_schedule_id && v.schedule_from) },
+      isComplete: (v) => !!v.schedule_from && (
+        v.schedule_mode === "new" ? !!(v.schedule_type && v.schedule_hours) : !!v.work_schedule_id
+      ) },
     { key: "government", label: "Government Information", description: "TIN, SSS, PhilHealth & Pag-IBIG",
       icon: <IconGovernment />,
       isComplete: (v) => !!(v.tin || v.sss_no || v.philhealth_no || v.pagibig_no) },
@@ -398,12 +411,37 @@ export default function EmployeeRegistrationPage() {
           }));
       }
 
-      if (v.work_schedule_id && v.schedule_from) {
-        await attach("Work schedule", () =>
-          employeeSchedulesApi.create(emp.id, {
-            work_schedule_id: Number(v.work_schedule_id),
+      if (v.schedule_from) {
+        await attach("Work schedule", async () => {
+          let scheduleId = v.work_schedule_id ? Number(v.work_schedule_id) : 0;
+
+          // Defining a schedule inline: create it for the company first, then assign.
+          if (v.schedule_mode === "new") {
+            const hhmmss = (t: string) => (t ? `${t}:00` : null);
+            const created = await workSchedulesApi.create({
+              code: `EMP-${v.employee_no}`.slice(0, 30),
+              name: `Schedule for ${v.first_name} ${v.last_name}`.slice(0, 255),
+              is_flexible: v.schedule_type === "flexible",
+              hours_per_day: v.schedule_hours ? Number(v.schedule_hours) : null,
+              weekly_workdays: scheduleDays.filter((d) => !d.is_rest_day).length || 1,
+              days: scheduleDays.map((d, i) => ({
+                day_of_week: i,
+                is_rest_day: d.is_rest_day,
+                time_in: d.is_rest_day ? null : hhmmss(d.time_in),
+                time_out: d.is_rest_day ? null : hhmmss(d.time_out),
+                break_start: d.is_rest_day ? null : hhmmss(d.break_start),
+                break_end: d.is_rest_day ? null : hhmmss(d.break_end),
+              })),
+            });
+            scheduleId = created.id;
+          }
+
+          if (!scheduleId) return;
+          return employeeSchedulesApi.create(emp.id, {
+            work_schedule_id: scheduleId,
             effective_from: v.schedule_from!,
-          }));
+          });
+        });
       }
 
       let tempPassword: string | undefined;
@@ -456,13 +494,13 @@ export default function EmployeeRegistrationPage() {
     return (
       <SuccessScreen
         result={result}
-        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setActive("basic"); }}
+        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
       />
     );
   }
 
   const toggle = (key: SectionKey) => setActive((prev) => (prev === key ? null : key));
-  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setServerError(null); setActive("basic"); };
+  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -590,7 +628,14 @@ export default function EmployeeRegistrationPage() {
                         onWorkplace={setWorkplace}
                       />
                     )}
-                    {section.key === "schedule"    && <ScheduleSection form={form} workSchedules={workSchedules} />}
+                    {section.key === "schedule"    && (
+                      <ScheduleSection
+                        form={form}
+                        workSchedules={workSchedules}
+                        days={scheduleDays}
+                        onDay={setDay}
+                      />
+                    )}
                     {section.key === "government"  && <GovernmentSection form={form} />}
                     {section.key === "education"   && <EducationSection form={form} />}
                     {section.key === "performance" && <PerformanceSection form={form} />}
@@ -1022,22 +1067,105 @@ function LocationsSection({ form, branches, locations, onAdd, onRemove, onWorkpl
   );
 }
 
-function ScheduleSection({ form, workSchedules }: { form: FF; workSchedules?: { id: number; name: string; code: string }[] }) {
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+type DayRow = { time_in: string; time_out: string; break_start: string; break_end: string; is_rest_day: boolean };
+
+function ScheduleSection({ form, workSchedules, days, onDay }: {
+  form: FF;
+  workSchedules?: { id: number; name: string; code: string }[];
+  days: DayRow[];
+  onDay: (i: number, patch: Partial<DayRow>) => void;
+}) {
+  const mode = form.watch("schedule_mode") ?? "existing";
+
   return (
-    <>
+    <div className="space-y-5">
       <Grid>
-        <Field label="Work Schedule">
-          <Select {...form.register("work_schedule_id")}>
-            <option value="">No schedule yet</option>
-            {workSchedules?.map((w) => <option key={w.id} value={w.id}>{w.name} ({w.code})</option>)}
+        <Field label="Assign">
+          <Select {...form.register("schedule_mode")}>
+            <option value="existing">Use an existing schedule</option>
+            <option value="new">Define a new schedule</option>
           </Select>
         </Field>
         <Field label="Effective From">
           <Input type="date" {...form.register("schedule_from")} />
         </Field>
       </Grid>
-      <Hint>Both fields are needed to assign a schedule. Leave blank to assign one later.</Hint>
-    </>
+
+      {mode === "existing" ? (
+        <>
+          <Grid>
+            <Field label="Work Schedule">
+              <Select {...form.register("work_schedule_id")}>
+                <option value="">No schedule yet</option>
+                {workSchedules?.map((w) => <option key={w.id} value={w.id}>{w.name} ({w.code})</option>)}
+              </Select>
+            </Field>
+          </Grid>
+          <Hint>A schedule and an effective date are both needed. Leave blank to assign one later.</Hint>
+        </>
+      ) : (
+        <>
+          <Grid>
+            <Field label="Schedule Type *">
+              <Select {...form.register("schedule_type")}>
+                <option value="">Please select…</option>
+                <option value="fixed">Fixed</option>
+                <option value="flexible">Flexible</option>
+              </Select>
+            </Field>
+            <Field label="No. of hours to work including break hours *">
+              <Input type="number" step="0.25" min="0" max="24" {...form.register("schedule_hours")} placeholder="9" />
+            </Field>
+          </Grid>
+
+          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-800/60">
+                <tr>
+                  {["Day", "Shift/Core From", "Shift/Core To", "Break Start", "Break End", "Is Rest Day"].map((h) => (
+                    <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {days.map((d, i) => (
+                  <tr key={DAY_NAMES[i]} className={d.is_rest_day ? "bg-slate-50/60 dark:bg-slate-800/30" : ""}>
+                    <td className="px-3 py-2 font-medium text-slate-700 dark:text-slate-300">{DAY_NAMES[i]}</td>
+                    {(["time_in", "time_out", "break_start", "break_end"] as const).map((k) => (
+                      <td key={k} className="px-3 py-2">
+                        <Input
+                          type="time"
+                          value={d[k]}
+                          disabled={d.is_rest_day}
+                          onChange={(e) => onDay(i, { [k]: e.target.value } as Partial<DayRow>)}
+                        />
+                      </td>
+                    ))}
+                    <td className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded accent-slate-900"
+                        checked={d.is_rest_day}
+                        onChange={(e) => onDay(i, { is_rest_day: e.target.checked })}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <Hint>
+            Ticking Is Rest Day clears that day&apos;s times. Break minutes are derived from the break
+            window. A new schedule is created for the company and assigned to this employee.
+          </Hint>
+        </>
+      )}
+    </div>
   );
 }
 

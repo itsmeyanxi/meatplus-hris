@@ -107,8 +107,11 @@ export type WorkScheduleDayInput = {
   is_rest_day: boolean;
   time_in: string | null;
   time_out: string | null;
-  break_minutes: number;
-  required_hours: number;
+  /** Break window. The API derives break_minutes from it. */
+  break_start?: string | null;
+  break_end?: string | null;
+  break_minutes?: number;
+  required_hours?: number;
 };
 
 export type WorkScheduleInput = {
@@ -118,6 +121,8 @@ export type WorkScheduleInput = {
   is_flexible?: boolean;
   breaks_paid?: boolean;
   weekly_workdays?: number;
+  /** "No of hours to work including break hours". */
+  hours_per_day?: number | null;
   is_active?: boolean;
   days?: WorkScheduleDayInput[];
 };

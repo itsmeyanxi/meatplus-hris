@@ -14,7 +14,7 @@ class WorkSchedule extends Model
 
     protected $fillable = [
         'company_id', 'code', 'name', 'description',
-        'is_flexible', 'breaks_paid', 'weekly_workdays', 'is_active',
+        'is_flexible', 'breaks_paid', 'weekly_workdays', 'hours_per_day', 'is_active',
     ];
 
     protected function casts(): array
@@ -24,6 +24,7 @@ class WorkSchedule extends Model
             'breaks_paid' => 'boolean',
             'is_active' => 'boolean',
             'weekly_workdays' => 'integer',
+            'hours_per_day' => 'decimal:2',
         ];
     }
 

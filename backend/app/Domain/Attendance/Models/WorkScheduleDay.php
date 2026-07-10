@@ -9,7 +9,8 @@ class WorkScheduleDay extends Model
 {
     protected $fillable = [
         'work_schedule_id', 'day_of_week', 'is_rest_day',
-        'time_in', 'time_out', 'break_minutes', 'required_hours',
+        'time_in', 'time_out', 'break_start', 'break_end',
+        'break_minutes', 'required_hours',
     ];
 
     protected function casts(): array
