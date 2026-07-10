@@ -332,3 +332,32 @@ export const employeeLocationsApi = {
   destroy: (employeeId: number, id: number) =>
     api.delete(nest(employeeId, `locations/${id}`)),
 };
+
+// ── Performance goals (forward-looking; distinct from a completed review) ─────
+
+export type PerformanceGoal = {
+  id: number;
+  employee_id: number;
+  goal: string;
+  due_date: string | null;
+  feedback: string | null;
+};
+
+export type PerformanceGoalInput = {
+  goal: string;
+  due_date?: string | null;
+  feedback?: string | null;
+};
+
+export const performanceGoalsApi = {
+  list: async (employeeId: number): Promise<PerformanceGoal[]> => {
+    const { data } = await api.get<Listed<PerformanceGoal>>(nest(employeeId, "performance-goals"));
+    return data.data;
+  },
+  create: async (employeeId: number, body: PerformanceGoalInput): Promise<PerformanceGoal> => {
+    const { data } = await api.post<{ data: PerformanceGoal }>(nest(employeeId, "performance-goals"), body);
+    return data.data;
+  },
+  destroy: (employeeId: number, id: number) =>
+    api.delete(nest(employeeId, `performance-goals/${id}`)),
+};

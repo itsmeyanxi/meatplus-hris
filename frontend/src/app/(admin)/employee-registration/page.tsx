@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { employeeSchedulesApi, workSchedulesApi } from "@/lib/attendance";
 import { getMe } from "@/lib/auth";
-import { educationApi, employeeLocationsApi, governmentIdsApi, performanceApi, photoApi } from "@/lib/employee-relations";
+import { educationApi, employeeLocationsApi, governmentIdsApi, performanceGoalsApi, photoApi } from "@/lib/employee-relations";
 import { createEmployee, getLookup, listEmployees, type EmployeeListItem, type LookupItem } from "@/lib/employees";
 import { usersApi, ROLE_LABELS, type Role } from "@/lib/users";
 
@@ -78,13 +78,7 @@ const schema = z.object({
 
   // Educational background is a list, held outside the form (see eduRows).
 
-  // Performance management (optional — one review at registration)
-  perf_start:         z.string().optional(),
-  perf_end:           z.string().optional(),
-  perf_rating:        z.string().optional(),
-  perf_rating_label:  z.string().optional(),
-  perf_remarks:       z.string().optional(),
-  perf_next_review:   z.string().optional(),
+  // Performance goals are a list, held outside the form (see goalRows).
 
   // Contact
   email_personal:     z.string().email("Invalid email").optional().or(z.literal("")),
@@ -183,6 +177,16 @@ export default function EmployeeRegistrationPage() {
   const removeEdu = (i: number) => setEduRows((r) => r.filter((_, n) => n !== i));
   const setEdu    = (i: number, patch: Partial<EduRow>) =>
     setEduRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
+
+  // Performance goals: goal text, optional due date and feedback.
+  type GoalRow = { goal: string; due_date: string; feedback: string };
+  const blankGoal: GoalRow = { goal: "", due_date: "", feedback: "" };
+  const [goalRows, setGoalRows] = useState<GoalRow[]>([]);
+
+  const addGoal    = () => setGoalRows((r) => [...r, { ...blankGoal }]);
+  const removeGoal = (i: number) => setGoalRows((r) => r.filter((_, n) => n !== i));
+  const setGoal    = (i: number, patch: Partial<GoalRow>) =>
+    setGoalRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
 
   const addLocation = (branchId: number) => {
     if (!branchId || locations.some((l) => l.branch_id === branchId)) return;
@@ -306,9 +310,9 @@ export default function EmployeeRegistrationPage() {
     { key: "education", label: "Educational Background", description: "School, degree & years attended",
       icon: <IconEducation />,
       isComplete: () => eduRows.some((r) => r.level && r.school) },
-    { key: "performance", label: "Performance Management", description: "Review period, rating & remarks",
+    { key: "performance", label: "Performance Management", description: "Goals, due dates & feedback",
       icon: <IconPerformance />,
-      isComplete: (v) => !!(v.perf_start && v.perf_end) },
+      isComplete: () => goalRows.some((r) => r.goal.trim()) },
     { key: "contact", label: "Contact Information", description: "Email addresses & phone numbers",
       icon: <IconContact />,
       isComplete: (v) => !!(v.email_personal || v.email_company || v.mobile) },
@@ -410,15 +414,14 @@ export default function EmployeeRegistrationPage() {
           }));
       }
 
-      if (v.perf_start && v.perf_end) {
-        await attach("Performance review", () =>
-          performanceApi.create(emp.id, {
-            review_period_start: v.perf_start!,
-            review_period_end: v.perf_end!,
-            rating: v.perf_rating ? Number(v.perf_rating) : null,
-            rating_label: v.perf_rating_label || null,
-            remarks: v.perf_remarks || null,
-            next_review_date: v.perf_next_review || null,
+      // Only the goal text is required; rows without it are skipped.
+      for (const [i, row] of goalRows.entries()) {
+        if (!row.goal.trim()) continue;
+        await attach(`Performance goal (row ${i + 1})`, () =>
+          performanceGoalsApi.create(emp.id, {
+            goal: row.goal.trim(),
+            due_date: row.due_date || null,
+            feedback: row.feedback || null,
           }));
       }
 
@@ -506,13 +509,13 @@ export default function EmployeeRegistrationPage() {
     return (
       <SuccessScreen
         result={result}
-        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
+        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
       />
     );
   }
 
   const toggle = (key: SectionKey) => setActive((prev) => (prev === key ? null : key));
-  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
+  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -652,7 +655,9 @@ export default function EmployeeRegistrationPage() {
                     {section.key === "education"   && (
                       <EducationSection rows={eduRows} onAdd={addEdu} onRemove={removeEdu} onChange={setEdu} />
                     )}
-                    {section.key === "performance" && <PerformanceSection form={form} />}
+                    {section.key === "performance" && (
+                      <PerformanceSection rows={goalRows} onAdd={addGoal} onRemove={removeGoal} onChange={setGoal} />
+                    )}
                     {section.key === "contact"     && <ContactSection form={form} />}
                     {section.key === "portal"      && <PortalSection form={form} createAccount={createAccount} />}
 
@@ -1296,39 +1301,80 @@ function EducationSection({ rows, onAdd, onRemove, onChange }: {
   );
 }
 
-function PerformanceSection({ form }: { form: FF }) {
+type GoalRow = { goal: string; due_date: string; feedback: string };
+
+function PerformanceSection({ rows, onAdd, onRemove, onChange }: {
+  rows: GoalRow[];
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+  onChange: (i: number, patch: Partial<GoalRow>) => void;
+}) {
   return (
-    <>
-      <Grid>
-        <Field label="Review Period Start"><Input type="date" {...form.register("perf_start")} /></Field>
-        <Field label="Review Period End"><Input type="date" {...form.register("perf_end")} /></Field>
-        <Field label="Rating (1–5)">
-          <Input type="number" step="0.25" min="1" max="5" {...form.register("perf_rating")} placeholder="4.25" />
-        </Field>
-        <Field label="Rating Label">
-          <Select {...form.register("perf_rating_label")}>
-            <option value="">—</option>
-            <option value="Outstanding">Outstanding</option>
-            <option value="Exceeds Expectations">Exceeds Expectations</option>
-            <option value="Meets Expectations">Meets Expectations</option>
-            <option value="Needs Improvement">Needs Improvement</option>
-            <option value="Unsatisfactory">Unsatisfactory</option>
-          </Select>
-        </Field>
-        <Field label="Next Review Date"><Input type="date" {...form.register("perf_next_review")} /></Field>
-      </Grid>
-      <div className="mt-4">
-        <Field label="Remarks">
-          <textarea
-            {...form.register("perf_remarks")}
-            rows={3}
-            className={baseCls}
-            placeholder="Strengths, areas for improvement, agreed goals…"
-          />
-        </Field>
+    <div className="space-y-4">
+      <button
+        type="button"
+        onClick={onAdd}
+        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+      >
+        Add Performance Goal
+      </button>
+
+      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+        <table className="w-full min-w-[680px] text-sm">
+          <thead className="bg-slate-50 dark:bg-slate-800/60">
+            <tr>
+              {["Goal", "Due Date", "Feedback", ""].map((h) => (
+                <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-3 py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+                  No goals yet.
+                </td>
+              </tr>
+            )}
+
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td className="w-1/2 px-3 py-2">
+                  <Input
+                    value={r.goal}
+                    onChange={(e) => onChange(i, { goal: e.target.value })}
+                    placeholder="e.g. Complete onboarding checklist"
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <Input type="date" value={r.due_date} onChange={(e) => onChange(i, { due_date: e.target.value })} />
+                </td>
+                <td className="px-3 py-2">
+                  <Input value={r.feedback} onChange={(e) => onChange(i, { feedback: e.target.value })} />
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => onRemove(i)}
+                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600 dark:border-slate-700 dark:hover:bg-slate-800"
+                  >
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-      <Hint>Both period dates are needed to save a review. New hires normally have none.</Hint>
-    </>
+
+      <Hint>
+        A goal is what the employee is expected to achieve. Only the Goal column is required;
+        rows left blank are skipped. Completed appraisals (period, rating, reviewer) are recorded
+        separately, not here.
+      </Hint>
+    </div>
   );
 }
 

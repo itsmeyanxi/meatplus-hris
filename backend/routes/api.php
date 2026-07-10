@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\V1\Employees\EmploymentHistoryController;
 use App\Http\Controllers\Api\V1\Employees\GovernmentIdController;
 use App\Http\Controllers\Api\V1\Employees\LocationController;
 use App\Http\Controllers\Api\V1\Employees\PerformanceController;
+use App\Http\Controllers\Api\V1\Employees\PerformanceGoalController;
 use App\Http\Controllers\Api\V1\Employees\PhotoController;
 use App\Http\Controllers\Api\V1\Leave\LeaveApplicationController;
 use App\Http\Controllers\Api\V1\Leave\LeaveBalanceController;
@@ -100,6 +101,10 @@ Route::prefix('v1')->group(function () {
             ->scoped()->parameters(['education' => 'education']);
         Route::apiResource('employees.performance', PerformanceController::class)
             ->scoped()->parameters(['performance' => 'performance']);
+        Route::get('employees/{employee}/performance-goals', [PerformanceGoalController::class, 'index']);
+        Route::post('employees/{employee}/performance-goals', [PerformanceGoalController::class, 'store']);
+        Route::put('employees/{employee}/performance-goals/{goal}', [PerformanceGoalController::class, 'update']);
+        Route::delete('employees/{employee}/performance-goals/{goal}', [PerformanceGoalController::class, 'destroy']);
         Route::get('employees/{employee}/locations', [LocationController::class, 'index']);
         Route::post('employees/{employee}/locations', [LocationController::class, 'store']);
         Route::delete('employees/{employee}/locations/{location}', [LocationController::class, 'destroy']);
