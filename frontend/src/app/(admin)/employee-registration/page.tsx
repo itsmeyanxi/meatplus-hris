@@ -15,6 +15,7 @@ import {
 } from "@/lib/employee-relations";
 import { createEmployee, getLookup, listEmployees, type EmployeeListItem, type LookupItem } from "@/lib/employees";
 import { leaveBalancesApi, leaveTypesApi } from "@/lib/leaves";
+import { compensationApi } from "@/lib/payroll";
 import { usersApi, ROLE_LABELS, type Role } from "@/lib/users";
 
 // ── schema ────────────────────────────────────────────────────────────────────
@@ -117,7 +118,7 @@ const ASSIGNABLE_ROLES: Role[] = [
 type SectionKey =
   | "basic" | "work" | "locations" | "schedule"
   | "government" | "visa" | "education" | "performance"
-  | "contact" | "dependents" | "benefits" | "leave" | "portal";
+  | "contact" | "dependents" | "benefits" | "leave" | "salary" | "portal";
 
 type SectionDef = {
   key: SectionKey;
@@ -144,6 +145,7 @@ const IconGovernment  = () => icon("M12 3l9 6H3l9-6zM5 10v8m4-8v8m6-8v8m4-8v8M3 
 const IconEducation   = () => icon("M12 14l9-5-9-5-9 5 9 5zm0 0v7m-6-3.5V12l6 3 6-3v5.5");
 const IconPerformance = () => icon("M3 3v18h18M7 15l3-3 3 3 5-6");
 const IconVisa        = () => icon("M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L12 19v-5.5L21 16z");
+const IconSalary      = () => icon("M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z");
 const IconLeave       = () => icon("M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2zm4-7h.01M15 14h.01M9 18h.01M15 18h.01");
 const IconBenefits    = () => icon("M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z");
 const IconDependents  = () => icon("M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z");
@@ -210,6 +212,15 @@ export default function EmployeeRegistrationPage() {
   const removeEmg = (i: number) => setEmgRows((r) => r.filter((_, n) => n !== i));
   const setEmg    = (i: number, patch: Partial<EmgRow>) =>
     setEmgRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
+
+  // Salary history. Each POST closes the previous record and appends a new one, so
+  // rows must be sent oldest-first for the newest to end up active.
+  type SalRow = { effective_from: string; basic_monthly: string; allowance_monthly: string };
+  const [salRows, setSalRows] = useState<SalRow[]>([]);
+  const addSal    = () => setSalRows((r) => [...r, { effective_from: "", basic_monthly: "", allowance_monthly: "" }]);
+  const removeSal = (i: number) => setSalRows((r) => r.filter((_, n) => n !== i));
+  const setSal    = (i: number, patch: Partial<SalRow>) =>
+    setSalRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
 
   // Leave plans. Balances can only exist once the employee row does, so the chosen
   // plans are held here and assigned after creation.
@@ -437,6 +448,9 @@ export default function EmployeeRegistrationPage() {
     { key: "leave", label: "Leave Plans and Usage", description: "Leave types & opening balances",
       icon: <IconLeave />,
       isComplete: () => Object.keys(leavePlans).length > 0 },
+    { key: "salary", label: "Salary History", description: "Basic pay, allowance & effective date",
+      icon: <IconSalary />,
+      isComplete: () => salRows.some((s) => s.basic_monthly.trim()) },
     { key: "portal", label: "Portal Access & Role", description: "System login and role assignment (optional)",
       icon: <IconPortal />,
       isComplete: (v) => !!v.create_account },
@@ -522,6 +536,22 @@ export default function EmployeeRegistrationPage() {
             prc_expiry: v.prc_expiry || null,
             passport_no: v.passport_no || null,
             rdo_code: v.rdo_code || null,
+          }));
+      }
+
+      // Each save closes the previous record, so post oldest-first: the last one
+      // sent is the salary that ends up active. Rows without a date sort last.
+      const salaryOrder = [...salRows]
+        .filter((s) => s.basic_monthly.trim())
+        .sort((a, b) => (a.effective_from || "9999").localeCompare(b.effective_from || "9999"));
+
+      for (const [i, row] of salaryOrder.entries()) {
+        await attach(`Salary record (row ${i + 1})`, () =>
+          compensationApi.save({
+            employee_id: emp.id,
+            basic_monthly: Number(row.basic_monthly),
+            allowance_monthly: row.allowance_monthly ? Number(row.allowance_monthly) : 0,
+            effective_from: row.effective_from || null,
           }));
       }
 
@@ -731,13 +761,13 @@ export default function EmployeeRegistrationPage() {
     return (
       <SuccessScreen
         result={result}
-        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setVisaRows([]); setDepRows([]); setBenRows([]); setLeavePlans({}); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
+        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setVisaRows([]); setDepRows([]); setBenRows([]); setLeavePlans({}); setSalRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
       />
     );
   }
 
   const toggle = (key: SectionKey) => setActive((prev) => (prev === key ? null : key));
-  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setVisaRows([]); setDepRows([]); setBenRows([]); setLeavePlans({}); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
+  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setVisaRows([]); setDepRows([]); setBenRows([]); setLeavePlans({}); setSalRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -897,6 +927,9 @@ export default function EmployeeRegistrationPage() {
                     )}
                     {section.key === "benefits"    && (
                       <BenefitsSection rows={benRows} onAdd={addBen} onRemove={removeBen} onChange={setBen} />
+                    )}
+                    {section.key === "salary"      && (
+                      <SalarySection rows={salRows} onAdd={addSal} onRemove={removeSal} onChange={setSal} />
                     )}
                     {section.key === "leave"       && (
                       <LeaveSection
@@ -1456,6 +1489,60 @@ function GovernmentSection({ form }: { form: FF }) {
         they are not personally sensitive.
       </Hint>
     </>
+  );
+}
+
+type SalRow = { effective_from: string; basic_monthly: string; allowance_monthly: string };
+
+function SalarySection({ rows, onAdd, onRemove, onChange }: {
+  rows: SalRow[];
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+  onChange: (i: number, patch: Partial<SalRow>) => void;
+}) {
+  const sorted = [...rows]
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => (a.r.effective_from || "9999").localeCompare(b.r.effective_from || "9999"));
+  const currentIdx = sorted.length ? sorted[sorted.length - 1].i : -1;
+
+  return (
+    <div className="space-y-4">
+      <AddButton onClick={onAdd}>Add Salary Record</AddButton>
+
+      <RowTable headers={["Effective Date", "Basic Monthly", "Allowance Monthly", "Status", ""]} empty="No salary records yet.">
+        {rows.map((r, i) => (
+          <tr key={i}>
+            <td className="px-3 py-2">
+              <Input type="date" value={r.effective_from} onChange={(e) => onChange(i, { effective_from: e.target.value })} />
+            </td>
+            <td className="px-3 py-2">
+              <Input type="number" step="0.01" min="0" value={r.basic_monthly}
+                onChange={(e) => onChange(i, { basic_monthly: e.target.value })} placeholder="30000.00" />
+            </td>
+            <td className="px-3 py-2">
+              <Input type="number" step="0.01" min="0" value={r.allowance_monthly}
+                onChange={(e) => onChange(i, { allowance_monthly: e.target.value })} placeholder="0.00" />
+            </td>
+            <td className="px-3 py-2">
+              {i === currentIdx && r.basic_monthly.trim() ? (
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                  Current
+                </span>
+              ) : (
+                <span className="text-xs text-slate-400 dark:text-slate-500">Historical</span>
+              )}
+            </td>
+            <td className="px-3 py-2 text-right"><RemoveButton onClick={() => onRemove(i)} /></td>
+          </tr>
+        ))}
+      </RowTable>
+
+      <Hint>
+        The record with the latest effective date becomes the current salary — it is what payroll
+        computes from. Earlier rows are kept as history. Basic Monthly is required; rows without it
+        are skipped.
+      </Hint>
+    </div>
   );
 }
 

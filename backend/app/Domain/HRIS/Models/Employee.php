@@ -69,9 +69,27 @@ class Employee extends Model
         return $this->belongsTo(Branch::class);
     }
 
+    /**
+     * The salary in force. Was a bare hasOne, which was only ever safe because the
+     * controller kept exactly one row per employee. Now that compensation is a
+     * history, pin this to the newest ACTIVE record — PayrollComputer reads it, so
+     * an arbitrary row here would mean paying the wrong salary.
+     */
     public function compensation(): HasOne
     {
-        return $this->hasOne(\App\Domain\Payroll\Models\EmployeeCompensation::class);
+        return $this->hasOne(\App\Domain\Payroll\Models\EmployeeCompensation::class)
+            ->ofMany(
+                ['effective_from' => 'max', 'id' => 'max'],
+                fn ($q) => $q->where('is_active', true),
+            );
+    }
+
+    /** Full salary history, newest first. */
+    public function compensations(): HasMany
+    {
+        return $this->hasMany(\App\Domain\Payroll\Models\EmployeeCompensation::class)
+            ->orderByDesc('effective_from')
+            ->orderByDesc('id');
     }
 
     public function department(): BelongsTo

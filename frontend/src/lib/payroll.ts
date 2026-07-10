@@ -77,13 +77,33 @@ export const payrollApi = {
   deleteRun: async (id: number) => (await api.delete(`/api/v1/payroll-runs/${id}`)).data,
 };
 
+export type SalaryRecord = {
+  id: number;
+  basic_monthly: string;
+  allowance_monthly: string;
+  effective_from: string | null;
+  is_active: boolean;
+};
+
 export const compensationApi = {
   list: async (): Promise<CompRow[]> => {
     const { data } = await api.get<Listed<CompRow>>("/api/v1/compensations");
     return data.data;
   },
-  save: async (body: { employee_id: number; basic_monthly: number; allowance_monthly?: number }) =>
-    (await api.post("/api/v1/compensations", body)).data,
+  /** Appends a new salary record and closes the previous one. */
+  save: async (body: {
+    employee_id: number;
+    basic_monthly: number;
+    allowance_monthly?: number;
+    effective_from?: string | null;
+  }) => (await api.post("/api/v1/compensations", body)).data,
+
+  history: async (employeeId: number): Promise<SalaryRecord[]> => {
+    const { data } = await api.get<Listed<SalaryRecord>>(`/api/v1/employees/${employeeId}/compensations`);
+    return data.data;
+  },
+  destroy: (employeeId: number, id: number) =>
+    api.delete(`/api/v1/employees/${employeeId}/compensations/${id}`),
 };
 
 /** Format a peso amount from a string|number value. */
