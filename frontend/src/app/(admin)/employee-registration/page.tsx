@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { forwardRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { employeeSchedulesApi, workSchedulesApi } from "@/lib/attendance";
@@ -27,6 +27,7 @@ const schema = z.object({
   nationality:        z.string().default("Filipino"),
 
   // Work — Basic Job Information
+  company_id:           z.coerce.number().min(1, "Required"),
   department_id:        z.coerce.number().min(1, "Required"),
   position_id:          z.coerce.number().min(1, "Required"),
   employee_type:        z.enum(["", "rank_and_file", "supervisory", "managerial", "executive"]).optional(),
@@ -175,40 +176,84 @@ export default function EmployeeRegistrationPage() {
     setPhotoPreview(URL.createObjectURL(file));
   };
 
-  const { data: branches }        = useQuery({ queryKey: ["branches"],         queryFn: () => getLookup("branches") });
-  const { data: departments }     = useQuery({ queryKey: ["departments"],      queryFn: () => getLookup("departments") });
-  const { data: employmentTypes } = useQuery({ queryKey: ["employment-types"], queryFn: () => getLookup("employment-types") });
-  const { data: workSchedules }   = useQuery({ queryKey: ["work-schedules"],   queryFn: () => workSchedulesApi.list() });
-  const { data: me }              = useQuery({ queryKey: ["me"],               queryFn: getMe });
+  const { data: workSchedules } = useQuery({ queryKey: ["work-schedules"], queryFn: () => workSchedulesApi.list() });
+  const { data: me }           = useQuery({ queryKey: ["me"],             queryFn: getMe });
+  const { data: companies }    = useQuery({ queryKey: ["companies"],      queryFn: () => getLookup("companies") });
 
-  // Immediate supervisor is picked from active employees of the current company.
-  const { data: supervisors } = useQuery({
-    queryKey: ["employees", "supervisor-options"],
-    queryFn: () => listEmployees({ perPage: 200, onlyActive: true }),
-  });
 
   const form = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { nationality: "Filipino", gender: "male", civil_status: "single", create_account: false },
   });
 
+  const companyId     = form.watch("company_id");
   const departmentId  = form.watch("department_id");
   const createAccount = form.watch("create_account");
   const watched       = form.watch();
 
-  const { data: positions } = useQuery({
-    queryKey: ["positions", departmentId],
-    queryFn: () => getLookup("positions", departmentId ? { department_id: Number(departmentId) } : {}),
-    enabled: !!departmentId,
+  // Branch, department and position all belong to the chosen company, so every
+  // lookup is keyed by it and refetches when it changes.
+  const cid = companyId ? Number(companyId) : undefined;
+
+  const { data: branches } = useQuery({
+    queryKey: ["branches", cid],
+    queryFn: () => getLookup("branches", cid ? { company_id: cid } : {}),
+    enabled: !!cid,
   });
+  const { data: departments } = useQuery({
+    queryKey: ["departments", cid],
+    queryFn: () => getLookup("departments", cid ? { company_id: cid } : {}),
+    enabled: !!cid,
+  });
+  const { data: employmentTypes } = useQuery({
+    queryKey: ["employment-types", cid],
+    queryFn: () => getLookup("employment-types", cid ? { company_id: cid } : {}),
+    enabled: !!cid,
+  });
+  const { data: positions } = useQuery({
+    queryKey: ["positions", cid, departmentId],
+    queryFn: () => getLookup("positions", {
+      ...(cid ? { company_id: cid } : {}),
+      ...(departmentId ? { department_id: Number(departmentId) } : {}),
+    }),
+    enabled: !!cid && !!departmentId,
+  });
+
+  // Immediate supervisor must be an employee of the chosen company.
+  const { data: supervisors } = useQuery({
+    queryKey: ["employees", "supervisor-options", cid],
+    queryFn: () => listEmployees({ perPage: 200, onlyActive: true, companyId: cid }),
+    enabled: !!cid,
+  });
+
+  // Default to the active company once /me resolves, without clobbering a choice.
+  useEffect(() => {
+    const active = me?.user.active_company?.id;
+    if (active && !form.getValues("company_id")) {
+      form.setValue("company_id", active);
+    }
+  }, [me, form]);
+
+  // Branch, department and position belong to the previous company — clear them.
+  const prevCompany = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (prevCompany.current !== undefined && prevCompany.current !== cid) {
+      form.setValue("branch_id", "" as unknown as number);
+      form.setValue("department_id", "" as unknown as number);
+      form.setValue("position_id", "" as unknown as number);
+      form.setValue("employment_type_id", "" as unknown as number);
+      form.setValue("manager_employee_id", "");
+    }
+    prevCompany.current = cid;
+  }, [cid, form]);
 
   const SECTIONS: SectionDef[] = [
     { key: "basic", label: "Basic Information", description: "Name, birth date, gender & civil status",
       icon: <IconBasic />, required: true,
       isComplete: (v) => !!(v.employee_no && v.first_name && v.last_name && v.birth_date) },
-    { key: "work", label: "Work Information", description: "Department, position, type & hire date",
+    { key: "work", label: "Work Information", description: "Company, department, position & hire date",
       icon: <IconWork />, required: true,
-      isComplete: (v) => !!(v.department_id && v.position_id && v.employment_type_id && v.date_hired) },
+      isComplete: (v) => !!(v.company_id && v.department_id && v.position_id && v.employment_type_id && v.date_hired) },
     { key: "locations", label: "Locations", description: "Branch or worksite & address",
       icon: <IconLocation />, required: true,
       isComplete: (v) => !!v.branch_id },
@@ -238,6 +283,7 @@ export default function EmployeeRegistrationPage() {
   const register = useMutation({
     mutationFn: async (v: FormValues) => {
       const emp = await createEmployee({
+        company_id: v.company_id,
         employee_no: v.employee_no,
         first_name: v.first_name,
         middle_name: v.middle_name || null,
@@ -497,11 +543,11 @@ export default function EmployeeRegistrationPage() {
                     {section.key === "work"        && (
                       <WorkSection
                         form={form}
+                        companies={companies}
                         departments={departments}
                         positions={positions}
                         employmentTypes={employmentTypes}
                         supervisors={supervisors?.data}
-                        companyName={me?.user.active_company?.legal_name}
                       />
                     )}
                     {section.key === "locations"   && <LocationsSection form={form} branches={branches} />}
@@ -672,16 +718,17 @@ function BasicSection({ form, photoPreview, photoError, onPickPhoto }: {
   );
 }
 
-function WorkSection({ form, departments, positions, employmentTypes, supervisors, companyName }: {
+function WorkSection({ form, companies, departments, positions, employmentTypes, supervisors }: {
   form: FF;
+  companies?: LookupItem[];
   departments?: LookupItem[];
   positions?: LookupItem[];
   employmentTypes?: LookupItem[];
   supervisors?: EmployeeListItem[];
-  companyName?: string;
 }) {
   const E = form.formState.errors;
   const deptId = form.watch("department_id");
+  const companySelected = !!form.watch("company_id");
 
   // Approvers are derived, not stored: HandlesApprovalWorkflow routes a request to
   // the employee's manager and to department heads. Show who that will actually be.
@@ -693,12 +740,17 @@ function WorkSection({ form, departments, positions, employmentTypes, supervisor
       <div>
         <GroupTitle>Basic Job Information</GroupTitle>
         <Grid>
-          <Field label="Company">
-            <Input value={companyName ?? "Loading…"} disabled readOnly />
+          <Field label="Company *" error={E.company_id?.message}>
+            <Select {...form.register("company_id")}>
+              <option value="">Please select…</option>
+              {companies?.map((c) => (
+                <option key={c.id} value={c.id}>{c.code ? `${c.code} — ${c.name}` : c.name}</option>
+              ))}
+            </Select>
           </Field>
           <Field label="Department *" error={E.department_id?.message}>
-            <Select {...form.register("department_id")}>
-              <option value="">Please select…</option>
+            <Select {...form.register("department_id")} disabled={!companySelected}>
+              <option value="">{companySelected ? "Please select…" : "Pick company first"}</option>
               {departments?.map((d) => <option key={d.id} value={d.id}>{d.name ?? d.title}</option>)}
             </Select>
           </Field>
@@ -828,11 +880,12 @@ function WorkSection({ form, departments, positions, employmentTypes, supervisor
 
 function LocationsSection({ form, branches }: { form: FF; branches?: LookupItem[] }) {
   const E = form.formState.errors;
+  const companySelected = !!form.watch("company_id");
   return (
     <Grid>
       <Field label="Branch / Worksite *" error={E.branch_id?.message}>
-        <Select {...form.register("branch_id")}>
-          <option value="">Select branch…</option>
+        <Select {...form.register("branch_id")} disabled={!companySelected}>
+          <option value="">{companySelected ? "Select branch…" : "Pick a company under Work Information"}</option>
           {branches?.map((b) => <option key={b.id} value={b.id}>{b.name ?? b.title}</option>)}
         </Select>
       </Field>

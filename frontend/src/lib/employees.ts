@@ -122,6 +122,8 @@ export async function getEmployee(id: number): Promise<EmployeeDetail> {
 }
 
 export type EmployeeCreateInput = {
+  /** Register into this company. Omit to use the caller's active company. */
+  company_id?: number;
   employee_no: string;
   biometric_user_id?: string | null;
   first_name: string;
@@ -173,7 +175,7 @@ export async function updateEmployee(
 
 export async function getLookup(
   resource: "branches" | "departments" | "positions" | "employment-types" | "companies",
-  params: { department_id?: number } = {},
+  params: { department_id?: number; company_id?: number } = {},
 ): Promise<LookupItem[]> {
   const { data } = await api.get<{ data: LookupItem[] }>(`/api/v1/lookups/${resource}`, { params });
   return data.data;

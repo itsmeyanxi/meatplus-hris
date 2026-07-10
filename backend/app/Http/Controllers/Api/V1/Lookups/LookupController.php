@@ -7,12 +7,47 @@ use App\Domain\HRIS\Models\EmploymentType;
 use App\Domain\HRIS\Models\Position;
 use App\Domain\Identity\Models\Branch;
 use App\Domain\Identity\Models\Company;
+use App\Domain\Identity\Scopes\CompanyScope;
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class LookupController extends Controller
 {
+    /** Companies the user may read from: all of them for it_admin, else their own. */
+    private function allowedCompanyIds(Request $request): array
+    {
+        $user = $request->user();
+
+        return $user->hasRole('it_admin')
+            ? Company::query()->pluck('id')->all()
+            : $user->companies()->pluck('companies.id')->all();
+    }
+
+    /**
+     * Registration lets an authorised user pick a company other than their active
+     * one, so these lookups accept ?company_id=. The global CompanyScope pins every
+     * query to the active company, so it is lifted and replaced with an explicit
+     * filter — but only for a company the user actually belongs to. Without that
+     * membership check this would be a tenancy hole.
+     */
+    private function scopeToCompany(Builder $query, Request $request): Builder
+    {
+        $requested = (int) $request->query('company_id');
+        if (! $requested) {
+            return $query;
+        }
+
+        abort_unless(
+            in_array($requested, $this->allowedCompanyIds($request), true),
+            403,
+            'You do not belong to that company.',
+        );
+
+        return $query->withoutGlobalScope(CompanyScope::class)->where('company_id', $requested);
+    }
+
     public function companies(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -36,7 +71,7 @@ class LookupController extends Controller
     public function branches(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => Branch::query()
+            'data' => $this->scopeToCompany(Branch::query(), $request)
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'code', 'name', 'is_head_office']),
@@ -46,7 +81,7 @@ class LookupController extends Controller
     public function departments(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => Department::query()
+            'data' => $this->scopeToCompany(Department::query(), $request)
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'code', 'name', 'parent_department_id']),
@@ -56,7 +91,7 @@ class LookupController extends Controller
     public function positions(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => Position::query()
+            'data' => $this->scopeToCompany(Position::query(), $request)
                 ->where('is_active', true)
                 ->when($request->query('department_id'), fn ($q, $d) => $q->where('department_id', $d))
                 ->orderBy('title')
@@ -66,7 +101,16 @@ class LookupController extends Controller
 
     public function employmentTypes(Request $request): JsonResponse
     {
-        $companyId = $request->user()->active_company_id;
+        // EmploymentType is not company-scoped: rows are either global or company-specific.
+        $requested = (int) $request->query('company_id');
+        if ($requested) {
+            abort_unless(
+                in_array($requested, $this->allowedCompanyIds($request), true),
+                403,
+                'You do not belong to that company.',
+            );
+        }
+        $companyId = $requested ?: $request->user()->active_company_id;
 
         return response()->json([
             'data' => EmploymentType::query()

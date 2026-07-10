@@ -12,11 +12,36 @@ class StoreEmployeeRequest extends FormRequest
         return $this->user()?->can('employee.create') ?? false;
     }
 
+    /** Companies this user may register an employee into. */
+    private function allowedCompanyIds(): array
+    {
+        $user = $this->user();
+
+        return $user->hasRole('it_admin')
+            ? \App\Domain\Identity\Models\Company::query()->pluck('id')->all()
+            : $user->companies()->pluck('companies.id')->all();
+    }
+
+    /**
+     * The employee is registered into the chosen company, not necessarily the
+     * active one. Everything below — branch, department, position, and the
+     * uniqueness of employee_no — is validated against that company.
+     */
+    private function targetCompanyId(): int
+    {
+        $requested = (int) $this->input('company_id');
+
+        return $requested && in_array($requested, $this->allowedCompanyIds(), true)
+            ? $requested
+            : (int) $this->user()->active_company_id;
+    }
+
     public function rules(): array
     {
-        $companyId = $this->user()->active_company_id;
+        $companyId = $this->targetCompanyId();
 
         return [
+            'company_id' => ['nullable', 'integer', Rule::in($this->allowedCompanyIds())],
             'employee_no' => [
                 'required', 'string', 'max:30',
                 Rule::unique('employees', 'employee_no')->where('company_id', $companyId),
