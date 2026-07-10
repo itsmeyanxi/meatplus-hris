@@ -56,6 +56,10 @@ class UpdateEmployeeRequest extends FormRequest
                 ->where(fn ($q) => $q->whereNull('company_id')->orWhere('company_id', $companyId))],
             'manager_employee_id' => ['nullable', 'integer', Rule::exists('employees', 'id')->where('company_id', $companyId)],
 
+            'local_trunk_line' => ['nullable', 'string', 'max:50'],
+            'trunk_pin' => ['nullable', 'string', 'max:20'],
+            'skype_id' => ['nullable', 'string', 'max:100'],
+
             'employee_type' => ['nullable', 'string', 'in:rank_and_file,supervisory,managerial,executive'],
             'user_type' => ['nullable', 'string', 'in:employee,manager,admin'],
             'job_code' => ['nullable', 'string', 'max:50'],

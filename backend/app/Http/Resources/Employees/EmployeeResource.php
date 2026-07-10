@@ -30,6 +30,9 @@ class EmployeeResource extends JsonResource
             'email_company' => $this->email_company,
             'mobile' => $this->mobile,
             'phone_home' => $this->phone_home,
+            'local_trunk_line' => $this->local_trunk_line,
+            'trunk_pin' => $this->trunk_pin,
+            'skype_id' => $this->skype_id,
 
             'address' => [
                 'line1' => $this->address_line1,

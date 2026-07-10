@@ -60,8 +60,14 @@ class StoreEmployeeRequest extends FormRequest
 
             'email_personal' => ['nullable', 'email', 'max:255'],
             'email_company' => ['nullable', 'email', 'max:255'],
-            'mobile' => ['nullable', 'string', 'max:50'],
+            // Primary contact number. Required on new employees; existing rows
+            // (all 113 of which predate this) are untouched, and the CSV importer
+            // does not go through this request.
+            'mobile' => ['required', 'string', 'max:50'],
             'phone_home' => ['nullable', 'string', 'max:50'],
+            'local_trunk_line' => ['nullable', 'string', 'max:50'],
+            'trunk_pin' => ['nullable', 'string', 'max:20'],
+            'skype_id' => ['nullable', 'string', 'max:100'],
 
             'address_line1' => ['nullable', 'string', 'max:255'],
             'address_line2' => ['nullable', 'string', 'max:255'],
@@ -90,6 +96,13 @@ class StoreEmployeeRequest extends FormRequest
             'date_hired' => ['required', 'date'],
             'expected_regularization_date' => ['nullable', 'date', 'after_or_equal:date_hired'],
             'date_regularized' => ['nullable', 'date', 'after_or_equal:date_hired'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'mobile.required' => 'A primary contact number is required.',
         ];
     }
 }

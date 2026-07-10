@@ -8,7 +8,10 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { employeeSchedulesApi, workSchedulesApi } from "@/lib/attendance";
 import { getMe } from "@/lib/auth";
-import { educationApi, employeeLocationsApi, governmentIdsApi, performanceGoalsApi, photoApi } from "@/lib/employee-relations";
+import {
+  educationApi, emergencyContactsApi, employeeLocationsApi,
+  governmentIdsApi, performanceGoalsApi, photoApi,
+} from "@/lib/employee-relations";
 import { createEmployee, getLookup, listEmployees, type EmployeeListItem, type LookupItem } from "@/lib/employees";
 import { usersApi, ROLE_LABELS, type Role } from "@/lib/users";
 
@@ -80,11 +83,14 @@ const schema = z.object({
 
   // Performance goals are a list, held outside the form (see goalRows).
 
-  // Contact
+  // Contact — the primary contact number is a mobile and is required
   email_personal:     z.string().email("Invalid email").optional().or(z.literal("")),
   email_company:      z.string().email("Invalid email").optional().or(z.literal("")),
-  mobile:             z.string().optional(),
+  mobile:             z.string().min(1, "Required").regex(/^09\d{9}$/, "Must be a mobile, e.g. 09991234567"),
   phone_home:         z.string().optional(),
+  local_trunk_line:   z.string().optional(),
+  trunk_pin:          z.string().optional(),
+  skype_id:           z.string().optional(),
 
   // Portal
   create_account:     z.boolean().default(false),
@@ -187,6 +193,16 @@ export default function EmployeeRegistrationPage() {
   const removeGoal = (i: number) => setGoalRows((r) => r.filter((_, n) => n !== i));
   const setGoal    = (i: number, patch: Partial<GoalRow>) =>
     setGoalRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
+
+  // Emergency contacts. The API requires name and relationship.
+  type EmgRow = { mobile: string; name: string; relationship: string; address: string };
+  const blankEmg: EmgRow = { mobile: "", name: "", relationship: "", address: "" };
+  const [emgRows, setEmgRows] = useState<EmgRow[]>([]);
+
+  const addEmg    = () => setEmgRows((r) => [...r, { ...blankEmg }]);
+  const removeEmg = (i: number) => setEmgRows((r) => r.filter((_, n) => n !== i));
+  const setEmg    = (i: number, patch: Partial<EmgRow>) =>
+    setEmgRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
 
   const addLocation = (branchId: number) => {
     if (!branchId || locations.some((l) => l.branch_id === branchId)) return;
@@ -313,9 +329,9 @@ export default function EmployeeRegistrationPage() {
     { key: "performance", label: "Performance Management", description: "Goals, due dates & feedback",
       icon: <IconPerformance />,
       isComplete: () => goalRows.some((r) => r.goal.trim()) },
-    { key: "contact", label: "Contact Information", description: "Email addresses & phone numbers",
-      icon: <IconContact />,
-      isComplete: (v) => !!(v.email_personal || v.email_company || v.mobile) },
+    { key: "contact", label: "Contact Information", description: "Primary number, trunk line & emergency contacts",
+      icon: <IconContact />, required: true,
+      isComplete: (v) => !!v.mobile },
     { key: "portal", label: "Portal Access & Role", description: "System login and role assignment (optional)",
       icon: <IconPortal />,
       isComplete: (v) => !!v.create_account },
@@ -339,8 +355,11 @@ export default function EmployeeRegistrationPage() {
         nationality: v.nationality,
         email_personal: v.email_personal || null,
         email_company: v.email_company || null,
-        mobile: v.mobile || null,
+        mobile: v.mobile,
         phone_home: v.phone_home || null,
+        local_trunk_line: v.local_trunk_line || null,
+        trunk_pin: v.trunk_pin || null,
+        skype_id: v.skype_id || null,
         city: v.city || null,
         province: v.province || null,
         postal_code: v.postal_code || null,
@@ -411,6 +430,18 @@ export default function EmployeeRegistrationPage() {
             degree: row.degree || null,
             year_from: row.year_from ? Number(row.year_from) : null,
             year_to: row.year_to ? Number(row.year_to) : null,
+          }));
+      }
+
+      // Name and relationship are what the API requires; skip incomplete rows.
+      for (const [i, row] of emgRows.entries()) {
+        if (!row.name.trim() || !row.relationship.trim()) continue;
+        await attach(`Emergency contact (row ${i + 1})`, () =>
+          emergencyContactsApi.create(emp.id, {
+            name: row.name.trim(),
+            relationship: row.relationship.trim(),
+            mobile: row.mobile || null,
+            address: row.address || null,
           }));
       }
 
@@ -509,13 +540,13 @@ export default function EmployeeRegistrationPage() {
     return (
       <SuccessScreen
         result={result}
-        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
+        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
       />
     );
   }
 
   const toggle = (key: SectionKey) => setActive((prev) => (prev === key ? null : key));
-  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
+  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -658,7 +689,9 @@ export default function EmployeeRegistrationPage() {
                     {section.key === "performance" && (
                       <PerformanceSection rows={goalRows} onAdd={addGoal} onRemove={removeGoal} onChange={setGoal} />
                     )}
-                    {section.key === "contact"     && <ContactSection form={form} />}
+                    {section.key === "contact"     && (
+                      <ContactSection form={form} rows={emgRows} onAdd={addEmg} onRemove={removeEmg} onChange={setEmg} />
+                    )}
                     {section.key === "portal"      && <PortalSection form={form} createAccount={createAccount} />}
 
                     <div className="mt-4 flex justify-end">
@@ -1378,19 +1411,113 @@ function PerformanceSection({ rows, onAdd, onRemove, onChange }: {
   );
 }
 
-function ContactSection({ form }: { form: FF }) {
+type EmgRow = { mobile: string; name: string; relationship: string; address: string };
+
+function ContactSection({ form, rows, onAdd, onRemove, onChange }: {
+  form: FF;
+  rows: EmgRow[];
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+  onChange: (i: number, patch: Partial<EmgRow>) => void;
+}) {
   const E = form.formState.errors;
   return (
-    <Grid>
-      <Field label="Personal Email" error={E.email_personal?.message}>
-        <Input type="email" {...form.register("email_personal")} />
-      </Field>
-      <Field label="Company Email" error={E.email_company?.message}>
-        <Input type="email" {...form.register("email_company")} />
-      </Field>
-      <Field label="Mobile"><Input {...form.register("mobile")} placeholder="09XX XXX XXXX" /></Field>
-      <Field label="Home Phone"><Input {...form.register("phone_home")} /></Field>
-    </Grid>
+    <div className="space-y-6">
+      <div>
+        <GroupTitle>Primary Contact Number</GroupTitle>
+        <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+          A primary contact can only be a mobile number.
+        </p>
+        <div className="max-w-sm">
+          <Field label="Primary Contact Number *" error={E.mobile?.message}>
+            <Input {...form.register("mobile")} placeholder="ex: 09991234567" />
+          </Field>
+        </div>
+
+        <div className="mt-4">
+          <Grid>
+            <Field label="Local Trunk Line"><Input {...form.register("local_trunk_line")} /></Field>
+            <Field label="Pin"><Input {...form.register("trunk_pin")} /></Field>
+            <Field label="Skype ID"><Input {...form.register("skype_id")} /></Field>
+          </Grid>
+        </div>
+
+        <div className="mt-4">
+          <Grid>
+            <Field label="Personal Email" error={E.email_personal?.message}>
+              <Input type="email" {...form.register("email_personal")} />
+            </Field>
+            <Field label="Company Email" error={E.email_company?.message}>
+              <Input type="email" {...form.register("email_company")} />
+            </Field>
+            <Field label="Home Phone"><Input {...form.register("phone_home")} /></Field>
+          </Grid>
+        </div>
+      </div>
+
+      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+        <GroupTitle>Emergency Contact Numbers</GroupTitle>
+
+        <button
+          type="button"
+          onClick={onAdd}
+          className="mb-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+        >
+          Add New Emergency Contact
+        </button>
+
+        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+          <table className="w-full min-w-[720px] text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-800/60">
+              <tr>
+                {["Contact No.", "Contact Name", "Relationship", "Address", ""].map((h) => (
+                  <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-3 py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+                    No emergency contacts yet.
+                  </td>
+                </tr>
+              )}
+
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  <td className="px-3 py-2">
+                    <Input value={r.mobile} onChange={(e) => onChange(i, { mobile: e.target.value })} placeholder="09991234567" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Input value={r.name} onChange={(e) => onChange(i, { name: e.target.value })} />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Input value={r.relationship} onChange={(e) => onChange(i, { relationship: e.target.value })} placeholder="Spouse, Parent…" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Input value={r.address} onChange={(e) => onChange(i, { address: e.target.value })} />
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onRemove(i)}
+                      className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600 dark:border-slate-700 dark:hover:bg-slate-800"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <Hint>Contact Name and Relationship are both needed for a row to save; incomplete rows are skipped.</Hint>
+      </div>
+    </div>
   );
 }
 

@@ -20,7 +20,8 @@ const schema = z.object({
   nationality: z.string().default("Filipino"),
   email_personal: z.string().email().optional().or(z.literal("")),
   email_company: z.string().email().optional().or(z.literal("")),
-  mobile: z.string().optional(),
+  // The API requires a primary contact number when creating an employee.
+  mobile: z.string().min(1, "Required"),
   city: z.string().optional(),
   province: z.string().optional(),
   postal_code: z.string().optional(),
@@ -135,8 +136,8 @@ export default function NewEmployeePage() {
             <Field label="Company email" error={form.formState.errors.email_company?.message}>
               <input type="email" className={inputCls} {...form.register("email_company")} />
             </Field>
-            <Field label="Mobile">
-              <input className={inputCls} {...form.register("mobile")} />
+            <Field label="Mobile *" error={form.formState.errors.mobile?.message}>
+              <input className={inputCls} placeholder="09991234567" {...form.register("mobile")} />
             </Field>
             <Field label="City">
               <input className={inputCls} {...form.register("city")} />

@@ -136,8 +136,12 @@ export type EmployeeCreateInput = {
   nationality?: string;
   email_personal?: string | null;
   email_company?: string | null;
-  mobile?: string | null;
+  /** Primary contact number — required by the API on create. */
+  mobile: string;
   phone_home?: string | null;
+  local_trunk_line?: string | null;
+  trunk_pin?: string | null;
+  skype_id?: string | null;
   city?: string | null;
   province?: string | null;
   postal_code?: string | null;

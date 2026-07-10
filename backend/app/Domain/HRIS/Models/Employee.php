@@ -22,6 +22,7 @@ class Employee extends Model
         'first_name', 'middle_name', 'last_name', 'suffix',
         'birth_date', 'gender', 'civil_status', 'nationality', 'religion',
         'email_personal', 'email_company', 'mobile', 'phone_home',
+        'local_trunk_line', 'trunk_pin', 'skype_id',
         'address_line1', 'address_line2', 'city', 'province', 'postal_code', 'country',
         'permanent_address_line1', 'permanent_address_line2', 'permanent_city',
         'permanent_province', 'permanent_postal_code', 'permanent_country',
