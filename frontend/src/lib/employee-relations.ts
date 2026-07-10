@@ -5,17 +5,28 @@ type Listed<T> = { data: T[] };
 export type Dependent = {
   id: number;
   employee_id: number;
+  first_name: string | null;
+  middle_name: string | null;
+  last_name: string | null;
   full_name: string;
   relationship: string;
   birth_date: string | null;
+  gender: string | null;
+  notes: string | null;
   is_minor: boolean;
   is_pwd: boolean;
   is_qualified_for_tax_exemption: boolean;
 };
 export type DependentInput = {
-  full_name: string;
+  /** Send the name parts; the API composes full_name from them. */
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
+  full_name?: string;
   relationship: string;
   birth_date?: string | null;
+  gender?: string | null;
+  notes?: string | null;
   is_minor?: boolean;
   is_pwd?: boolean;
   is_qualified_for_tax_exemption?: boolean;
