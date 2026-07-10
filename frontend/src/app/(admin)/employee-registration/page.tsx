@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { employeeSchedulesApi, workSchedulesApi } from "@/lib/attendance";
 import { getMe } from "@/lib/auth";
-import { educationApi, governmentIdsApi, performanceApi, photoApi } from "@/lib/employee-relations";
+import { educationApi, employeeLocationsApi, governmentIdsApi, performanceApi, photoApi } from "@/lib/employee-relations";
 import { createEmployee, getLookup, listEmployees, type EmployeeListItem, type LookupItem } from "@/lib/employees";
 import { usersApi, ROLE_LABELS, type Role } from "@/lib/users";
 
@@ -161,6 +161,25 @@ export default function EmployeeRegistrationPage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoError, setPhotoError]     = useState<string | null>(null);
 
+  // Worksites are rows, not a single select. The first is the primary and mirrors
+  // employees.branch_id, which DTR and reports still read.
+  type PickedLocation = { branch_id: number; designated_workplace: string };
+  const [locations, setLocations] = useState<PickedLocation[]>([]);
+
+  const addLocation = (branchId: number) => {
+    if (!branchId || locations.some((l) => l.branch_id === branchId)) return;
+    const next = [...locations, { branch_id: branchId, designated_workplace: "" }];
+    setLocations(next);
+    form.setValue("branch_id", next[0].branch_id, { shouldValidate: true });
+  };
+  const removeLocation = (branchId: number) => {
+    const next = locations.filter((l) => l.branch_id !== branchId);
+    setLocations(next);
+    form.setValue("branch_id", (next[0]?.branch_id ?? "") as unknown as number, { shouldValidate: true });
+  };
+  const setWorkplace = (branchId: number, value: string) =>
+    setLocations((ls) => ls.map((l) => (l.branch_id === branchId ? { ...l, designated_workplace: value } : l)));
+
   const pickPhoto = (file: File | null) => {
     setPhotoError(null);
     if (!file) { setPhotoFile(null); setPhotoPreview(null); return; }
@@ -234,7 +253,7 @@ export default function EmployeeRegistrationPage() {
     }
   }, [me, form]);
 
-  // Branch, department and position belong to the previous company — clear them.
+  // Branch, department, position and worksites belong to the previous company.
   const prevCompany = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (prevCompany.current !== undefined && prevCompany.current !== cid) {
@@ -243,6 +262,7 @@ export default function EmployeeRegistrationPage() {
       form.setValue("position_id", "" as unknown as number);
       form.setValue("employment_type_id", "" as unknown as number);
       form.setValue("manager_employee_id", "");
+      setLocations([]);
     }
     prevCompany.current = cid;
   }, [cid, form]);
@@ -330,6 +350,16 @@ export default function EmployeeRegistrationPage() {
 
       if (photoFile) {
         await attach("Employee photo", () => photoApi.upload(emp.id, photoFile));
+      }
+
+      // Row 0 is the primary; the API keeps employees.branch_id in step.
+      for (const [i, loc] of locations.entries()) {
+        await attach(`Location ${i + 1}`, () =>
+          employeeLocationsApi.create(emp.id, {
+            branch_id: loc.branch_id,
+            designated_workplace: loc.designated_workplace || null,
+            is_primary: i === 0,
+          }));
       }
 
       if (v.tin || v.sss_no || v.philhealth_no || v.pagibig_no || v.prc_no) {
@@ -426,13 +456,13 @@ export default function EmployeeRegistrationPage() {
     return (
       <SuccessScreen
         result={result}
-        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setActive("basic"); }}
+        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setActive("basic"); }}
       />
     );
   }
 
   const toggle = (key: SectionKey) => setActive((prev) => (prev === key ? null : key));
-  const reset  = () => { form.reset(); clearPhoto(); setServerError(null); setActive("basic"); };
+  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setServerError(null); setActive("basic"); };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -550,7 +580,16 @@ export default function EmployeeRegistrationPage() {
                         supervisors={supervisors?.data}
                       />
                     )}
-                    {section.key === "locations"   && <LocationsSection form={form} branches={branches} />}
+                    {section.key === "locations"   && (
+                      <LocationsSection
+                        form={form}
+                        branches={branches}
+                        locations={locations}
+                        onAdd={addLocation}
+                        onRemove={removeLocation}
+                        onWorkplace={setWorkplace}
+                      />
+                    )}
                     {section.key === "schedule"    && <ScheduleSection form={form} workSchedules={workSchedules} />}
                     {section.key === "government"  && <GovernmentSection form={form} />}
                     {section.key === "education"   && <EducationSection form={form} />}
@@ -777,10 +816,8 @@ function WorkSection({ form, companies, departments, positions, employmentTypes,
               ))}
             </Select>
           </Field>
-          <Field label="Designated Workplace">
-            <Input {...form.register("designated_workplace")} placeholder="e.g. Head Office, WFH" />
-          </Field>
         </Grid>
+        <Hint>Worksites and their designated workplace are set under Locations.</Hint>
       </div>
 
       <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
@@ -878,21 +915,110 @@ function WorkSection({ form, companies, departments, positions, employmentTypes,
   );
 }
 
-function LocationsSection({ form, branches }: { form: FF; branches?: LookupItem[] }) {
+type BranchLookup = LookupItem & { latitude?: string | null; longitude?: string | null };
+
+function LocationsSection({ form, branches, locations, onAdd, onRemove, onWorkplace }: {
+  form: FF;
+  branches?: LookupItem[];
+  locations: { branch_id: number; designated_workplace: string }[];
+  onAdd: (branchId: number) => void;
+  onRemove: (branchId: number) => void;
+  onWorkplace: (branchId: number, value: string) => void;
+}) {
   const E = form.formState.errors;
   const companySelected = !!form.watch("company_id");
+  const byId = (id: number) => (branches as BranchLookup[] | undefined)?.find((b) => b.id === id);
+  const unpicked = (branches ?? []).filter((b) => !locations.some((l) => l.branch_id === b.id));
+
   return (
-    <Grid>
-      <Field label="Branch / Worksite *" error={E.branch_id?.message}>
-        <Select {...form.register("branch_id")} disabled={!companySelected}>
-          <option value="">{companySelected ? "Select branch…" : "Pick a company under Work Information"}</option>
-          {branches?.map((b) => <option key={b.id} value={b.id}>{b.name ?? b.title}</option>)}
-        </Select>
-      </Field>
-      <Field label="City"><Input {...form.register("city")} /></Field>
-      <Field label="Province"><Input {...form.register("province")} /></Field>
-      <Field label="Postal Code"><Input {...form.register("postal_code")} /></Field>
-    </Grid>
+    <div className="space-y-4">
+      {E.branch_id?.message && <p className="text-xs text-red-500">*{E.branch_id.message}</p>}
+
+      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead className="bg-slate-50 dark:bg-slate-800/60">
+            <tr>
+              {["Location", "Code", "Latitude & Longitude", "Designated Workplace", ""].map((h) => (
+                <th key={h} className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {locations.map((l, i) => {
+              const b = byId(l.branch_id);
+              const coords = b?.latitude && b?.longitude ? `${b.latitude}, ${b.longitude}` : "—";
+              return (
+                <tr key={l.branch_id}>
+                  <td className="px-4 py-2.5 font-medium text-slate-700 dark:text-slate-300">
+                    {b?.name ?? b?.title}
+                    {i === 0 && (
+                      <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                        Primary
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 font-mono text-xs text-slate-500 dark:text-slate-400">{b?.code ?? "—"}</td>
+                  <td className="px-4 py-2.5 font-mono text-xs text-slate-500 dark:text-slate-400">{coords}</td>
+                  <td className="px-4 py-2.5">
+                    <Input
+                      value={l.designated_workplace}
+                      onChange={(e) => onWorkplace(l.branch_id, e.target.value)}
+                      placeholder="e.g. 2nd floor, WFH"
+                    />
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onRemove(l.branch_id)}
+                      className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600 dark:border-slate-700 dark:hover:bg-slate-800"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+
+            <tr>
+              <td className="px-4 py-2.5" colSpan={5}>
+                <div className="max-w-xs">
+                  <Select
+                    value=""
+                    disabled={!companySelected || unpicked.length === 0}
+                    onChange={(e) => onAdd(Number(e.target.value))}
+                  >
+                    <option value="">
+                      {!companySelected
+                        ? "Pick a company under Work Information"
+                        : unpicked.length === 0
+                          ? "All branches added"
+                          : "Add Location"}
+                    </option>
+                    {unpicked.map((b) => <option key={b.id} value={b.id}>{b.name ?? b.title}</option>)}
+                  </Select>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <Hint>
+        The first location is the primary worksite and is what attendance and reports use.
+        Remove it and the next one is promoted. Latitude and longitude come from the branch record.
+      </Hint>
+
+      <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
+        <GroupTitle>Home Address</GroupTitle>
+        <Grid>
+          <Field label="City"><Input {...form.register("city")} /></Field>
+          <Field label="Province"><Input {...form.register("province")} /></Field>
+          <Field label="Postal Code"><Input {...form.register("postal_code")} /></Field>
+        </Grid>
+      </div>
+    </div>
   );
 }
 

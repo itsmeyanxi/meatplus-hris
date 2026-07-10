@@ -74,7 +74,7 @@ class LookupController extends Controller
             'data' => $this->scopeToCompany(Branch::query(), $request)
                 ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'code', 'name', 'is_head_office']),
+                ->get(['id', 'code', 'name', 'is_head_office', 'latitude', 'longitude']),
         ]);
     }
 

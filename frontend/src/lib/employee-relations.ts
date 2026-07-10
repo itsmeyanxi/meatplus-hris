@@ -295,3 +295,36 @@ export const photoApi = {
 
   destroy: (employeeId: number) => api.delete(`/api/v1/employees/${employeeId}/photo`),
 };
+
+// ── Worksite locations (an employee can be assigned to several) ───────────────
+
+export type EmployeeLocation = {
+  id: number;
+  employee_id: number;
+  branch_id: number;
+  branch_name?: string | null;
+  code?: string | null;
+  latitude?: string | null;
+  longitude?: string | null;
+  designated_workplace: string | null;
+  is_primary: boolean;
+};
+
+export type EmployeeLocationInput = {
+  branch_id: number;
+  designated_workplace?: string | null;
+  is_primary?: boolean;
+};
+
+export const employeeLocationsApi = {
+  list: async (employeeId: number): Promise<EmployeeLocation[]> => {
+    const { data } = await api.get<Listed<EmployeeLocation>>(nest(employeeId, "locations"));
+    return data.data;
+  },
+  create: async (employeeId: number, body: EmployeeLocationInput): Promise<EmployeeLocation> => {
+    const { data } = await api.post<{ data: EmployeeLocation }>(nest(employeeId, "locations"), body);
+    return data.data;
+  },
+  destroy: (employeeId: number, id: number) =>
+    api.delete(nest(employeeId, `locations/${id}`)),
+};

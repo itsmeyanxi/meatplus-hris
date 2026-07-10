@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\V1\Employees\EmergencyContactController;
 use App\Http\Controllers\Api\V1\Employees\EmployeeController;
 use App\Http\Controllers\Api\V1\Employees\EmploymentHistoryController;
 use App\Http\Controllers\Api\V1\Employees\GovernmentIdController;
+use App\Http\Controllers\Api\V1\Employees\LocationController;
 use App\Http\Controllers\Api\V1\Employees\PerformanceController;
 use App\Http\Controllers\Api\V1\Employees\PhotoController;
 use App\Http\Controllers\Api\V1\Leave\LeaveApplicationController;
@@ -99,6 +100,9 @@ Route::prefix('v1')->group(function () {
             ->scoped()->parameters(['education' => 'education']);
         Route::apiResource('employees.performance', PerformanceController::class)
             ->scoped()->parameters(['performance' => 'performance']);
+        Route::get('employees/{employee}/locations', [LocationController::class, 'index']);
+        Route::post('employees/{employee}/locations', [LocationController::class, 'store']);
+        Route::delete('employees/{employee}/locations/{location}', [LocationController::class, 'destroy']);
         Route::get('employees/{employee}/photo', [PhotoController::class, 'show']);
         Route::post('employees/{employee}/photo', [PhotoController::class, 'store']);
         Route::delete('employees/{employee}/photo', [PhotoController::class, 'destroy']);

@@ -16,6 +16,7 @@ class Branch extends Model
     protected $fillable = [
         'company_id', 'code', 'name',
         'address_line1', 'address_line2', 'city', 'province', 'postal_code', 'country',
+        'latitude', 'longitude',
         'is_head_office', 'is_active',
     ];
 
@@ -24,6 +25,8 @@ class Branch extends Model
         return [
             'is_head_office' => 'boolean',
             'is_active' => 'boolean',
+            'latitude' => 'decimal:7',
+            'longitude' => 'decimal:7',
         ];
     }
 }
