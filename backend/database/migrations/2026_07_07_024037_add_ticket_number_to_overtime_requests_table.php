@@ -11,6 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // The earlier add_classification migration was later edited to add this
+        // column too, so on a fresh database it already exists by now. Existing
+        // databases ran this migration back when it did not.
+        if (Schema::hasColumn('overtime_requests', 'ticket_number')) {
+            return;
+        }
+
         Schema::table('overtime_requests', function (Blueprint $table) {
             $table->string('ticket_number', 100)->nullable()->after('classification');
         });

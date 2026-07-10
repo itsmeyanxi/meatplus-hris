@@ -1,5 +1,12 @@
 # 🟢 Easy Guide: Move the App to Supabase + Laragon
 
+> ⛔ **OUT OF DATE (2026-07-10).** The app no longer uses Supabase. The live database is
+> **local MySQL 8.4** in Laragon (`meatplus_hris`) — see
+> [09-local-database.md](09-local-database.md), which is the guide to follow now.
+>
+> Keep this document only if you intend to move the database back to the cloud.
+> Parts 1 (PHP extensions) and 6 (starting the app) are still accurate.
+
 This guide is written **super simply**. Just follow the steps in order, top to bottom.
 Don't skip steps. ✅ = you finished that step.
 

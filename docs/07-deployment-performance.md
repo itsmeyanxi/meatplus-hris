@@ -4,13 +4,16 @@ Performance steps to run **at deployment**, not during active development.
 Each item notes *why*, the *command*, and the *dev-loop caveat* (why we don't do it
 while building).
 
-> **Context (current):** the app runs on a **Laragon** stack (PHP 8.3 + Node) against a
-> **Supabase Postgres** database (`ap-southeast-1`). `start-servers.ps1` serves the frontend
-> in **dev mode** (`npm run dev` on `:3001`) so code changes hot-reload. Dev mode's
-> on-demand compiling makes the first visit to each route slow — switch to a production
-> build (section 1) for staging/prod. The remaining latency is the ~145 ms/query
-> round-trip to the cloud DB (see "Database latency" below).
-> Production target is a hosted Laravel (PHP-FPM/Octane) + hosted Next.js.
+> **Context (current, 2026-07-10):** the app runs on a **Laragon** stack (PHP 8.3 + Node)
+> against a **local MySQL 8.4** database on the same PC ([09-local-database.md](09-local-database.md)).
+> `start-servers.ps1` serves the frontend in **dev mode** (`npm run dev` on `:3001`) so code
+> changes hot-reload. Dev mode's on-demand compiling makes the first visit to each route
+> slow — switch to a production build (section 1) for staging/prod.
+>
+> The "Database latency" section below describes the **old Supabase** setup, where the
+> ~145 ms/query cloud round-trip dominated. On a local database queries are sub-millisecond,
+> so that section is now historical — it applies again only if the DB returns to the cloud.
+> The dominant cost today is dev-mode compiling, not the database.
 
 ---
 

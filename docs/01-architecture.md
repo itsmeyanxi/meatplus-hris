@@ -1,8 +1,10 @@
 # Meatplus HRIS — Software Architecture
 
 > **Status:** living document. Sections marked **(planned)** are target-state, not yet built.
-> **Current deployment:** runs locally on a Laragon stack (PHP 8.3 + Node) against a
-> **Supabase Postgres** database in `ap-southeast-1`. The ZKTeco ADMS receiver is **built**.
+> **Current deployment (2026-07-10):** runs locally on a Laragon stack (PHP 8.3 + Node)
+> against a **local MySQL 8.4** database (`meatplus_hris`) on the same PC. The app moved
+> off Supabase — see [09-local-database.md](09-local-database.md). The code stays
+> driver-agnostic (Postgres + MySQL). The ZKTeco ADMS receiver is **built**.
 
 ## 0. Design principles & non-goals
 
@@ -83,7 +85,7 @@ speak ADMS (§8). A small local **sync agent** is only needed for pull-only devi
 |---|---|---|
 | Web frontend | Next.js 16 (App Router), TypeScript, TanStack Query, Tailwind | All user UIs; talks to the API over HTTPS |
 | API / app server | Laravel (PHP 8.3), DDD layout | Business logic, ingestion, auth, REST API |
-| Database | PostgreSQL (Supabase or managed) | System of record |
+| Database | MySQL 8.4 local today; PostgreSQL also supported | System of record |
 | Ingestion layer | Laravel controllers + adapters | Receive punches from devices (ADMS push / ISAPI pull) |
 | Background workers | Queue (Redis or DB driver) | DTR recompute, payroll compute, notifications, mail |
 | File storage | S3-compatible / Supabase Storage | Attachments, payslip PDFs *(planned)*, imports |
@@ -223,16 +225,19 @@ Device scan → [ingestion adapter] → TimeLog → DtrComputer → DailyTimeRec
 - **Backend:** Laravel (PHP 8.3), Sanctum, Spatie Permission (teams), openspout
   (CSV/XLSX), domain-driven layout.
 - **Frontend:** Next.js 16 (App Router), TypeScript, TanStack Query, Tailwind, sonner.
-- **Database:** PostgreSQL (**Supabase**, `ap-southeast-1`) — **live**. The codebase is
+- **Database:** **MySQL 8.4** (Laragon, local, `meatplus_hris`) — **live**. The codebase is
   driver-agnostic (Postgres + MySQL) via a `likeOperator()` helper (ILIKE/LIKE),
-  driver-aware migrations (`ALTER COLUMN` vs `MODIFY`), and `DB_SSLMODE`.
+  driver-aware migrations (`ALTER COLUMN` vs `MODIFY`), and `DB_SSLMODE`. A PostgreSQL
+  17.6 snapshot of the old Supabase data is kept on port 5433. See
+  [09-local-database.md](09-local-database.md).
 - **Async:** queue (database driver today; Redis in prod) + scheduler.
 
 ## 14. Migration path (progress)
 
-1. **DB → Supabase Postgres — ✅ done.** Provisioned, MySQL-specific bits ported
-   (driver-aware migrations, ILIKE/LIKE), schema + data migrated. (Old XAMPP/MySQL
-   retired in favor of Laragon + Supabase.)
+1. **DB → Supabase Postgres — ✅ done, then reversed.** Ported to Postgres
+   (driver-aware migrations, ILIKE/LIKE), then moved **back to a local MySQL 8.4** on
+   2026-07-10 so the database lives on the office PC. Supabase is no longer written to.
+   See [09-local-database.md](09-local-database.md).
 2. **Devices → ADMS — ✅ done (receiver).** ADMS endpoint built; ZKTeco MB460 in
    onboarding (point device at the server, enroll employees: PIN ↔ `biometric_user_id`).
 3. **App hosting — ⏳ planned.** Deploy Laravel to a managed PHP host (PHP-FPM/Octane);

@@ -6,9 +6,9 @@ multiple branches, each with its own biometric device(s).
 
 - **Backend:** Laravel (PHP 8.3), domain-driven (`app/Domain/*`), versioned REST API (`/api/v1`)
 - **Frontend:** Next.js 16 (App Router), TypeScript, TanStack Query, Tailwind
-- **Database:** PostgreSQL — **Supabase** (`ap-southeast-1`)
+- **Database:** **MySQL 8.4** — Laragon, local (`meatplus_hris`). See [09-local-database.md](09-local-database.md)
 - **Biometric:** ZKTeco **MB460** via the **ADMS push** protocol
-- **Runs on:** a local **Laragon** stack today (`start-servers.ps1`); cloud-hosted is the target
+- **Runs on:** a local **Laragon** stack (`start-servers.ps1`); everything lives on one office PC
 
 ---
 
@@ -23,6 +23,8 @@ multiple branches, each with its own biometric device(s).
 | 05 | [Supabase migration](05-supabase-migration.md) | Technical reference for the MySQL → Postgres move |
 | 06 | [Biometric — ZKTeco/ADMS](06-biometric-zkteco.md) | Connect the MB460, enroll people, troubleshoot punches |
 | 07 | [Deployment & performance](07-deployment-performance.md) | Go-live checklist, DB latency, production hardening |
+| 08 | [Multi-tenancy](08-multi-tenancy.md) | Single DB, `company_id` scoping |
+| 09 | [Local database](09-local-database.md) | **The live MySQL database**, how the data moved off Supabase, backups |
 
 ---
 
