@@ -143,7 +143,9 @@ export type EmployeeCreateInput = {
   department_id: number;
   position_id: number;
   employment_type_id: number;
+  manager_employee_id?: number | null;
   date_hired: string;
+  date_regularized?: string | null;
 };
 
 export async function createEmployee(input: EmployeeCreateInput): Promise<EmployeeDetail> {

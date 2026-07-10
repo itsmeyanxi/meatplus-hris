@@ -7,8 +7,9 @@ import { forwardRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { employeeSchedulesApi, workSchedulesApi } from "@/lib/attendance";
+import { getMe } from "@/lib/auth";
 import { educationApi, governmentIdsApi, performanceApi, photoApi } from "@/lib/employee-relations";
-import { createEmployee, getLookup, type LookupItem } from "@/lib/employees";
+import { createEmployee, getLookup, listEmployees, type EmployeeListItem, type LookupItem } from "@/lib/employees";
 import { usersApi, ROLE_LABELS, type Role } from "@/lib/users";
 
 // ── schema ────────────────────────────────────────────────────────────────────
@@ -26,10 +27,12 @@ const schema = z.object({
   nationality:        z.string().default("Filipino"),
 
   // Work
-  department_id:      z.coerce.number().min(1, "Required"),
-  position_id:        z.coerce.number().min(1, "Required"),
-  employment_type_id: z.coerce.number().min(1, "Required"),
-  date_hired:         z.string().min(1, "Required"),
+  department_id:        z.coerce.number().min(1, "Required"),
+  position_id:          z.coerce.number().min(1, "Required"),
+  employment_type_id:   z.coerce.number().min(1, "Required"),
+  manager_employee_id:  z.union([z.coerce.number(), z.literal("")]).optional(),
+  date_hired:           z.string().min(1, "Required"),
+  date_regularized:     z.string().optional(),
 
   // Locations
   branch_id:          z.coerce.number().min(1, "Required"),
@@ -74,7 +77,10 @@ const schema = z.object({
   // Portal
   create_account:     z.boolean().default(false),
   role:               z.string().optional(),
-});
+}).refine(
+  (v) => !v.date_regularized || !v.date_hired || v.date_regularized >= v.date_hired,
+  { path: ["date_regularized"], message: "Must be on or after the hire date" },
+);
 
 type FormInput  = z.input<typeof schema>;
 type FormValues = z.output<typeof schema>;
@@ -152,6 +158,13 @@ export default function EmployeeRegistrationPage() {
   const { data: departments }     = useQuery({ queryKey: ["departments"],      queryFn: () => getLookup("departments") });
   const { data: employmentTypes } = useQuery({ queryKey: ["employment-types"], queryFn: () => getLookup("employment-types") });
   const { data: workSchedules }   = useQuery({ queryKey: ["work-schedules"],   queryFn: () => workSchedulesApi.list() });
+  const { data: me }              = useQuery({ queryKey: ["me"],               queryFn: getMe });
+
+  // Immediate supervisor is picked from active employees of the current company.
+  const { data: supervisors } = useQuery({
+    queryKey: ["employees", "supervisor-options"],
+    queryFn: () => listEmployees({ perPage: 200, onlyActive: true }),
+  });
 
   const form = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
@@ -224,7 +237,9 @@ export default function EmployeeRegistrationPage() {
         department_id: v.department_id,
         position_id: v.position_id,
         employment_type_id: v.employment_type_id,
+        manager_employee_id: v.manager_employee_id ? Number(v.manager_employee_id) : null,
         date_hired: v.date_hired,
+        date_regularized: v.date_regularized || null,
       });
 
       // The employee record must exist before its related rows can be attached.
@@ -447,7 +462,16 @@ export default function EmployeeRegistrationPage() {
                         onPickPhoto={pickPhoto}
                       />
                     )}
-                    {section.key === "work"        && <WorkSection form={form} departments={departments} positions={positions} employmentTypes={employmentTypes} />}
+                    {section.key === "work"        && (
+                      <WorkSection
+                        form={form}
+                        departments={departments}
+                        positions={positions}
+                        employmentTypes={employmentTypes}
+                        supervisors={supervisors?.data}
+                        companyName={me?.user.active_company?.legal_name}
+                      />
+                    )}
                     {section.key === "locations"   && <LocationsSection form={form} branches={branches} />}
                     {section.key === "schedule"    && <ScheduleSection form={form} workSchedules={workSchedules} />}
                     {section.key === "government"  && <GovernmentSection form={form} />}
@@ -616,35 +640,67 @@ function BasicSection({ form, photoPreview, photoError, onPickPhoto }: {
   );
 }
 
-function WorkSection({ form, departments, positions, employmentTypes }: {
-  form: FF; departments?: LookupItem[]; positions?: LookupItem[]; employmentTypes?: LookupItem[];
+function WorkSection({ form, departments, positions, employmentTypes, supervisors, companyName }: {
+  form: FF;
+  departments?: LookupItem[];
+  positions?: LookupItem[];
+  employmentTypes?: LookupItem[];
+  supervisors?: EmployeeListItem[];
+  companyName?: string;
 }) {
   const E = form.formState.errors;
   const deptId = form.watch("department_id");
   return (
-    <Grid>
-      <Field label="Department *" error={E.department_id?.message}>
-        <Select {...form.register("department_id")}>
-          <option value="">Select department…</option>
-          {departments?.map((d) => <option key={d.id} value={d.id}>{d.name ?? d.title}</option>)}
-        </Select>
-      </Field>
-      <Field label="Position *" error={E.position_id?.message}>
-        <Select {...form.register("position_id")} disabled={!deptId}>
-          <option value="">{deptId ? "Select position…" : "Pick department first"}</option>
-          {positions?.map((p) => <option key={p.id} value={p.id}>{p.title ?? p.name}</option>)}
-        </Select>
-      </Field>
-      <Field label="Employment Type *" error={E.employment_type_id?.message}>
-        <Select {...form.register("employment_type_id")}>
-          <option value="">Select type…</option>
-          {employmentTypes?.map((t) => <option key={t.id} value={t.id}>{t.name ?? t.title}</option>)}
-        </Select>
-      </Field>
-      <Field label="Date Hired *" error={E.date_hired?.message}>
-        <Input type="date" {...form.register("date_hired")} />
-      </Field>
-    </Grid>
+    <div className="space-y-6">
+      <div>
+        <GroupTitle>Basic Job Information</GroupTitle>
+        <Grid>
+          <Field label="Company">
+            <Input value={companyName ?? "Loading…"} disabled readOnly />
+          </Field>
+          <Field label="Department *" error={E.department_id?.message}>
+            <Select {...form.register("department_id")}>
+              <option value="">Please select…</option>
+              {departments?.map((d) => <option key={d.id} value={d.id}>{d.name ?? d.title}</option>)}
+            </Select>
+          </Field>
+          <Field label="Job Title *" error={E.position_id?.message}>
+            <Select {...form.register("position_id")} disabled={!deptId}>
+              <option value="">{deptId ? "Please select…" : "Pick department first"}</option>
+              {positions?.map((p) => <option key={p.id} value={p.id}>{p.title ?? p.name}</option>)}
+            </Select>
+          </Field>
+          <Field label="Employee Type *" error={E.employment_type_id?.message}>
+            <Select {...form.register("employment_type_id")}>
+              <option value="">Select employee type…</option>
+              {employmentTypes?.map((t) => <option key={t.id} value={t.id}>{t.name ?? t.title}</option>)}
+            </Select>
+          </Field>
+          <Field label="Immediate Supervisor">
+            <Select {...form.register("manager_employee_id")}>
+              <option value="">None</option>
+              {supervisors?.map((s) => (
+                <option key={s.id} value={s.id}>{s.full_name} ({s.employee_no})</option>
+              ))}
+            </Select>
+          </Field>
+        </Grid>
+        <Hint>Designated workplace is set under Locations.</Hint>
+      </div>
+
+      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+        <GroupTitle>Employment Details</GroupTitle>
+        <Grid>
+          <Field label="Hire Date *" error={E.date_hired?.message}>
+            <Input type="date" {...form.register("date_hired")} />
+          </Field>
+          <Field label="Regularization Date" error={E.date_regularized?.message}>
+            <Input type="date" {...form.register("date_regularized")} />
+          </Field>
+        </Grid>
+        <Hint>Regularization date must fall on or after the hire date. Employment status follows the employee type.</Hint>
+      </div>
+    </div>
   );
 }
 
@@ -901,6 +957,14 @@ function Grid({ children }: { children: React.ReactNode }) {
 
 function Hint({ children }: { children: React.ReactNode }) {
   return <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">{children}</p>;
+}
+
+function GroupTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+      {children}
+    </h3>
+  );
 }
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
