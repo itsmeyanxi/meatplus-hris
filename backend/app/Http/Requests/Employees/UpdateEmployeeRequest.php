@@ -63,6 +63,8 @@ class UpdateEmployeeRequest extends FormRequest
             'client_name' => ['nullable', 'string', 'max:150'],
             'billability' => ['nullable', 'string', 'in:billable,non_billable'],
             'designated_workplace' => ['nullable', 'string', 'max:150'],
+            'payroll_run_type' => ['nullable', 'string', 'in:monthly,semi_monthly,weekly,daily'],
+            'remarks' => ['nullable', 'string', 'max:300'],
 
             'date_hired' => ['sometimes', 'date'],
             'expected_regularization_date' => ['nullable', 'date'],

@@ -151,6 +151,8 @@ export type EmployeeCreateInput = {
   client_name?: string | null;
   billability?: string | null;
   designated_workplace?: string | null;
+  payroll_run_type?: string | null;
+  remarks?: string | null;
   date_hired: string;
   expected_regularization_date?: string | null;
   date_regularized?: string | null;

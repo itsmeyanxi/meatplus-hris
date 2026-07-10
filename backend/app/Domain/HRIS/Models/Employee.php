@@ -28,9 +28,9 @@ class Employee extends Model
         'branch_id', 'department_id', 'position_id', 'employment_type_id',
         'manager_employee_id',
         'employee_type', 'user_type', 'job_code', 'job_grade',
-        'client_name', 'billability', 'designated_workplace',
+        'client_name', 'billability', 'designated_workplace', 'payroll_run_type',
         'date_hired', 'expected_regularization_date',
-        'date_regularized', 'date_separated', 'separation_reason',
+        'date_regularized', 'date_separated', 'separation_reason', 'remarks',
         'is_active', 'photo_path',
     ];
 

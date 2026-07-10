@@ -44,6 +44,14 @@ const schema = z.object({
   expected_regularization_date: z.string().optional(),
   date_regularized:            z.string().optional(),
 
+  // Work — Other Information
+  // Biometric ID is *not* required, unlike the reference: only 2 of 113 existing
+  // employees have one, and the server rule is nullable. Requiring it here would
+  // block registering anyone who is not enrolled on a device.
+  remarks:            z.string().max(300, "Maximum 300 characters").optional(),
+  biometric_user_id:  z.string().optional(),
+  payroll_run_type:   z.enum(["", "monthly", "semi_monthly", "weekly", "daily"]).optional(),
+
   // Locations
   branch_id:          z.coerce.number().min(1, "Required"),
   city:               z.string().optional(),
@@ -258,6 +266,9 @@ export default function EmployeeRegistrationPage() {
         client_name: v.client_name || null,
         billability: v.billability || null,
         designated_workplace: v.designated_workplace || null,
+        payroll_run_type: v.payroll_run_type || null,
+        remarks: v.remarks || null,
+        biometric_user_id: v.biometric_user_id || null,
         date_hired: v.date_hired,
         expected_regularization_date: v.expected_regularization_date || null,
         date_regularized: v.date_regularized || null,
@@ -671,6 +682,12 @@ function WorkSection({ form, departments, positions, employmentTypes, supervisor
 }) {
   const E = form.formState.errors;
   const deptId = form.watch("department_id");
+
+  // Approvers are derived, not stored: HandlesApprovalWorkflow routes a request to
+  // the employee's manager and to department heads. Show who that will actually be.
+  const managerId = form.watch("manager_employee_id");
+  const supervisorName = supervisors?.find((s) => String(s.id) === String(managerId))?.full_name;
+
   return (
     <div className="space-y-6">
       <div>
@@ -762,6 +779,48 @@ function WorkSection({ form, departments, positions, employmentTypes, supervisor
           Employment Status is the employee&apos;s contract type (Regular, Probationary…).
           Both regularization dates must fall on or after the hire date.
         </Hint>
+
+        <div className="mt-4">
+          <Field label="Employee Remarks" error={E.remarks?.message}>
+            <textarea
+              {...form.register("remarks")}
+              rows={3}
+              maxLength={300}
+              className={baseCls}
+              placeholder="Notes about this employee's engagement…"
+            />
+          </Field>
+          <p className="mt-1 text-right text-xs text-slate-400 dark:text-slate-500">
+            {(form.watch("remarks") ?? "").length}/300
+          </p>
+        </div>
+      </div>
+
+      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+        <GroupTitle>Other Information</GroupTitle>
+        <Grid>
+          <Field label="Biometric ID" error={E.biometric_user_id?.message}>
+            <Input {...form.register("biometric_user_id")} placeholder="Device enrollment number" />
+          </Field>
+          <Field label="Payroll Run Type">
+            <Select {...form.register("payroll_run_type")}>
+              <option value="">Please select…</option>
+              <option value="monthly">Monthly</option>
+              <option value="semi_monthly">Semi-monthly</option>
+              <option value="weekly">Weekly</option>
+              <option value="daily">Daily</option>
+            </Select>
+          </Field>
+        </Grid>
+        <Hint>
+          Biometric ID is the number the ZKTeco device sends with each punch. Optional — leave
+          blank until the employee is enrolled on a device.
+        </Hint>
+      </div>
+
+      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+        <GroupTitle>Attendance Request Approval</GroupTitle>
+        <ApprovalLevels supervisorName={supervisorName} />
       </div>
     </div>
   );
@@ -1020,6 +1079,43 @@ function Grid({ children }: { children: React.ReactNode }) {
 
 function Hint({ children }: { children: React.ReactNode }) {
   return <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">{children}</p>;
+}
+
+/**
+ * The reference stores an editable Level/Person approval chain. This app has no
+ * such table: HandlesApprovalWorkflow routes attendance requests to the employee's
+ * manager and to department heads. So show the resulting chain rather than invite
+ * edits that would go nowhere.
+ */
+function ApprovalLevels({ supervisorName }: { supervisorName?: string }) {
+  const levels = [
+    { level: "Level 1", person: supervisorName ?? "Immediate Supervisor (not selected)" },
+    { level: "Level 2", person: "Department Head" },
+    { level: "Level 3", person: "HR Administrator" },
+  ];
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+      <table className="w-full text-sm">
+        <thead className="bg-slate-50 dark:bg-slate-800/60">
+          <tr>
+            <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Level</th>
+            <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Person</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          {levels.map((l) => (
+            <tr key={l.level}>
+              <td className="px-4 py-2.5 font-medium text-slate-700 dark:text-slate-300">{l.level}</td>
+              <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400">{l.person}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="border-t border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-500">
+        Derived from the immediate supervisor and role permissions — not editable per employee.
+      </p>
+    </div>
+  );
 }
 
 function GroupTitle({ children }: { children: React.ReactNode }) {

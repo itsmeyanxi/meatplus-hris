@@ -82,6 +82,8 @@ class EmployeeResource extends JsonResource
             'client_name' => $this->client_name,
             'billability' => $this->billability,
             'designated_workplace' => $this->designated_workplace,
+            'payroll_run_type' => $this->payroll_run_type,
+            'remarks' => $this->remarks,
 
             'date_hired' => $this->date_hired?->toDateString(),
             'expected_regularization_date' => $this->expected_regularization_date?->toDateString(),
