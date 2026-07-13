@@ -101,7 +101,7 @@ export default function PayrollAccessPage() {
         <p className="mt-1 text-sm text-slate-500">Payroll user access, advances and training.</p>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 divide-y divide-slate-100">
+      <div className="space-y-4">
         {/* 01 — Payroll User Access */}
         <SectionShell
           index={1}
