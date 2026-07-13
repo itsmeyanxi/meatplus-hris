@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { payrollAccessApi, type PayrollAccessRow } from "@/lib/payroll";
 import { usersApi } from "@/lib/users";
+import { AdvancesSection } from "@/components/payroll/AdvancesSection";
 
 const ROLE_BLURB: Record<string, string> = {
   payroll_officer: "Run, approve and post payroll; manage compensation",
@@ -202,6 +203,9 @@ export default function PayrollAccessPage() {
         Roles are the ones that actually hold payroll permissions, read from the permission tables —
         not a separate list that could drift from what the seeder grants.
       </p>
+
+      {/* Advances — a section on this page, not a separate module page */}
+      <AdvancesSection />
 
       {/* Add form modal, scoped to the chosen company code */}
       {addCompanyId != null && (

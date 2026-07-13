@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader, AppButton, TableShell } from "@/components/ui";
+import { AppButton, TableShell } from "@/components/ui";
 import { EmptyState } from "@/components/feedback";
 import { inputCls, labelCls } from "@/lib/form-classes";
 import { peso } from "@/lib/payroll";
@@ -38,7 +38,7 @@ const COLS = [
   "Balance",
 ];
 
-export default function AdvancesPage() {
+export function AdvancesSection() {
   const [rows, setRows] = useState<Advance[]>([]);
   const [showForm, setShowForm] = useState(false);
 
@@ -48,8 +48,13 @@ export default function AdvancesPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Advances" description="Cash advances and loans, deducted over a schedule of pay periods." />
+    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
+      <div>
+        <h2 className="text-lg font-bold text-slate-800">Advances</h2>
+        <p className="mt-0.5 text-sm text-slate-500">
+          Cash advances and loans, deducted over a schedule of pay periods.
+        </p>
+      </div>
 
       <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-4 py-2.5 text-xs text-amber-800">
         Preview only — advances aren&apos;t saved to the server yet. Persisting them and folding the
@@ -113,7 +118,7 @@ export default function AdvancesPage() {
           }}
         />
       )}
-    </div>
+    </section>
   );
 }
 
