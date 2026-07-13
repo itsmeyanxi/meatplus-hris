@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { payrollAccessApi, type PayrollAccessRow } from "@/lib/payroll";
 import { usersApi } from "@/lib/users";
 
@@ -12,11 +12,15 @@ const ROLE_BLURB: Record<string, string> = {
 
 export default function PayrollAccessPage() {
   const qc = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // When a company code is chosen from the dropdown, the add form opens scoped to it.
+  const [addCompanyId, setAddCompanyId] = useState<number | null>(null);
   const [userId, setUserId] = useState("");
-  const [companyId, setCompanyId] = useState("");
   const [role, setRole] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const { data: grants, isLoading } = useQuery({
     queryKey: ["payroll-access"],
@@ -32,17 +36,34 @@ export default function PayrollAccessPage() {
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["payroll-access"] });
+  const selectedCompany = options?.companies.find((c) => c.id === addCompanyId);
+
+  // Close the company-code dropdown on an outside click.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
+
+  const closeForm = () => {
+    setAddCompanyId(null);
+    setUserId("");
+    setRole("");
+    setError(null);
+  };
 
   const grant = useMutation({
     mutationFn: () =>
       payrollAccessApi.grant({
         user_id: Number(userId),
-        company_id: Number(companyId),
+        company_id: addCompanyId as number,
         payroll_role: role,
       }),
     onSuccess: () => {
-      setError(null);
-      setUserId(""); setCompanyId(""); setRole("");
+      closeForm();
       invalidate();
     },
     onError: (e: unknown) => {
@@ -59,10 +80,7 @@ export default function PayrollAccessPage() {
         payroll_role: row.payroll_role,
       }),
     onSuccess: invalidate,
-    onError: () => setError("Could not revoke access."),
   });
-
-  const canSubmit = userId && companyId && role && !grant.isPending;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -78,64 +96,52 @@ export default function PayrollAccessPage() {
         </p>
       </div>
 
-      {/* Grant form */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+      {/* Add — company code first (Sprout-style dropdown) */}
+      <div className="relative inline-block" ref={menuRef}>
+        <button
+          type="button"
+          onClick={() => setMenuOpen((o) => !o)}
+          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+        >
           Add Payroll User Access
-        </h2>
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Field label="User">
-            <Select value={userId} onChange={(e) => setUserId(e.target.value)}>
-              <option value="">Select a user…</option>
-              {users?.map((u) => (
-                <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
-              ))}
-            </Select>
-          </Field>
-
-          <Field label="Payroll Company Code">
-            <Select value={companyId} onChange={(e) => setCompanyId(e.target.value)}>
-              <option value="">Select payroll company code…</option>
-              {options?.companies.map((c) => (
-                <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
-              ))}
-            </Select>
-          </Field>
-
-          <Field label="Payroll Role">
-            <Select value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="">Select a payroll role…</option>
-              {options?.roles.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </Select>
-          </Field>
-        </div>
-
-        {role && ROLE_BLURB[role] && (
-          <p className="mt-3 text-xs text-slate-500">{ROLE_BLURB[role]}</p>
+        {menuOpen && (
+          <div className="absolute left-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+            <div className="border-b border-slate-100 px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-400">
+              Select payroll company code
+            </div>
+            <div className="max-h-72 overflow-y-auto py-1">
+              {options?.companies.length ? (
+                options.companies.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setAddCompanyId(c.id);
+                      setUserId("");
+                      setRole("");
+                      setError(null);
+                      setMenuOpen(false);
+                    }}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <span className="font-mono">{c.code}</span>
+                    <span className="truncate text-xs text-slate-400">{c.name}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="px-3 py-3 text-xs text-slate-400">No companies available.</div>
+              )}
+            </div>
+          </div>
         )}
-
-        {error && (
-          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-            {error}
-          </p>
-        )}
-
-        <div className="mt-4">
-          <button
-            type="button"
-            disabled={!canSubmit}
-            onClick={() => grant.mutate()}
-            className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
-          >
-            {grant.isPending ? "Granting…" : "Add Payroll User Access"}
-          </button>
-        </div>
       </div>
 
-      {/* Grants */}
+      {/* Grants table */}
       <div className="overflow-x-auto rounded-2xl border border-slate-200">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-slate-50">
@@ -196,6 +202,64 @@ export default function PayrollAccessPage() {
         Roles are the ones that actually hold payroll permissions, read from the permission tables —
         not a separate list that could drift from what the seeder grants.
       </p>
+
+      {/* Add form modal, scoped to the chosen company code */}
+      {addCompanyId != null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="dialog" aria-modal>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-base font-bold text-slate-800">Add Payroll User Access</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Payroll company code <span className="font-mono font-medium text-slate-700">{selectedCompany?.code}</span>
+              {selectedCompany?.name ? ` — ${selectedCompany.name}` : ""}
+            </p>
+
+            <div className="mt-4 space-y-4">
+              <Field label="User">
+                <Select value={userId} onChange={(e) => setUserId(e.target.value)}>
+                  <option value="">Select a user…</option>
+                  {users?.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+                  ))}
+                </Select>
+              </Field>
+
+              <Field label="Payroll Role">
+                <Select value={role} onChange={(e) => setRole(e.target.value)}>
+                  <option value="">Select a payroll role…</option>
+                  {options?.roles.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </Select>
+                {role && ROLE_BLURB[role] && (
+                  <p className="mt-1.5 text-xs text-slate-500">{ROLE_BLURB[role]}</p>
+                )}
+              </Field>
+
+              {error && (
+                <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeForm}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!userId || !role || grant.isPending}
+                onClick={() => grant.mutate()}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {grant.isPending ? "Adding…" : "Add Payroll User Access"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
