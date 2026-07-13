@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { AppButton, TableShell } from "@/components/ui";
-import { EmptyState } from "@/components/feedback";
 import { inputCls, labelCls } from "@/lib/form-classes";
 import { peso } from "@/lib/payroll";
 
@@ -65,21 +64,25 @@ export function AdvancesSection() {
         <AppButton onClick={() => setShowForm(true)}>+ Add Transaction</AppButton>
       </div>
 
-      {rows.length === 0 ? (
-        <EmptyState title="No advances yet" message="Record a cash advance or loan to schedule its deductions." />
-      ) : (
-        <TableShell>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-                  {COLS.map((c) => (
-                    <th key={c} className="whitespace-nowrap px-4 py-3">{c}</th>
-                  ))}
+      <TableShell>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1000px] text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                {COLS.map((c) => (
+                  <th key={c} className="whitespace-nowrap px-4 py-3">{c}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={COLS.length} className="px-4 py-8 text-center text-xs text-slate-400">
+                    No advances yet. Use “Add Transaction” to record a cash advance or loan.
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {rows.map((r) => {
+              ) : (
+                rows.map((r) => {
                   const balance = r.total_amount - r.total_paid;
                   return (
                     <tr key={r.id} className="hover:bg-slate-50/60">
@@ -95,12 +98,12 @@ export function AdvancesSection() {
                       <td className="whitespace-nowrap px-4 py-2.5 text-right font-medium tabular-nums">{peso(balance)}</td>
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </TableShell>
-      )}
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </TableShell>
 
       <div className="max-w-md">
         <label className="mb-1 block text-sm text-slate-600">Current Outstanding Balance:</label>
