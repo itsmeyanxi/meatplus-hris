@@ -3,51 +3,28 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 import { PageHeader, AppButton, TableShell } from "@/components/ui";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { inputCls, labelCls } from "@/lib/form-classes";
 import {
   payrollApi,
-  compensationApi,
   peso,
   type PayrollRun,
   type RunStatus,
   type NewRunInput,
-  type CompRow,
 } from "@/lib/payroll";
 
-type Tab = "runs" | "compensation";
-
 export default function PayrollPage() {
-  const [tab, setTab] = useState<Tab>("runs");
-
   return (
     <div className="space-y-6">
-      <PageHeader title="Payroll" description="Run semi-monthly payroll and manage employee compensation." />
-
-      <div className="flex gap-1 border-b border-slate-200">
-        {([["runs", "Payroll Runs"], ["compensation", "Compensation"]] as const).map(([k, label]) => (
-          <button
-            key={k}
-            onClick={() => setTab(k)}
-            className={
-              tab === k
-                ? "-mb-px border-b-2 border-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-900"
-                : "px-4 py-2.5 text-sm font-medium text-slate-500 hover:text-slate-800"
-            }
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <PageHeader title="Payroll Runs" description="Run semi-monthly payroll and manage payslips." />
 
       <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-4 py-2.5 text-xs text-amber-800">
         Statutory deductions (SSS, PhilHealth, Pag-IBIG) and withholding tax use simplified 2024 formulas.
         Verify against the current official tables before live payroll.
       </div>
 
-      {tab === "runs" ? <RunsTab /> : <CompensationTab />}
+      <RunsTab />
     </div>
   );
 }
@@ -163,86 +140,5 @@ function NewRunModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         </form>
       </div>
     </div>
-  );
-}
-
-function CompensationTab() {
-  const qc = useQueryClient();
-  const { data: rows, isLoading } = useQuery({ queryKey: ["compensations"], queryFn: compensationApi.list });
-  const [edits, setEdits] = useState<Record<number, { basic: string; allowance: string }>>({});
-
-  const save = useMutation({
-    mutationFn: (r: CompRow) => {
-      const e = edits[r.employee_id];
-      return compensationApi.save({
-        employee_id: r.employee_id,
-        basic_monthly: Number(e?.basic ?? r.basic_monthly ?? 0),
-        allowance_monthly: Number(e?.allowance ?? r.allowance_monthly ?? 0),
-      });
-    },
-    onSuccess: () => {
-      toast.success("Compensation saved.");
-      qc.invalidateQueries({ queryKey: ["compensations"] });
-    },
-  });
-
-  if (isLoading) return <TableShell><TableSkeleton rows={6} cols={4} /></TableShell>;
-  if (!rows || rows.length === 0) return <EmptyState title="No employees" message="Add employees first." />;
-
-  return (
-    <TableShell>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-            <th className="px-4 py-3">Employee</th>
-            <th className="px-4 py-3">Department</th>
-            <th className="px-4 py-3">Basic / month</th>
-            <th className="px-4 py-3">Allowance / month</th>
-            <th className="px-4 py-3"></th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {rows.map((r) => {
-            const e = edits[r.employee_id];
-            return (
-              <tr key={r.employee_id} className="hover:bg-slate-50/60">
-                <td className="px-4 py-2.5">
-                  <div className="font-medium text-slate-800">{r.name}</div>
-                  <div className="font-mono text-xs text-slate-400">{r.employee_no}</div>
-                </td>
-                <td className="px-4 py-2.5 text-slate-600">{r.department ?? "—"}</td>
-                <td className="px-4 py-2.5">
-                  <input
-                    type="number" min={0} step="0.01"
-                    className="w-32 rounded-lg border border-slate-200 px-2 py-1 text-sm tabular-nums"
-                    value={e?.basic ?? (r.basic_monthly != null ? String(r.basic_monthly) : "")}
-                    onChange={(ev) => setEdits({ ...edits, [r.employee_id]: { basic: ev.target.value, allowance: e?.allowance ?? (r.allowance_monthly != null ? String(r.allowance_monthly) : "0") } })}
-                    placeholder="0.00"
-                  />
-                </td>
-                <td className="px-4 py-2.5">
-                  <input
-                    type="number" min={0} step="0.01"
-                    className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-sm tabular-nums"
-                    value={e?.allowance ?? (r.allowance_monthly != null ? String(r.allowance_monthly) : "")}
-                    onChange={(ev) => setEdits({ ...edits, [r.employee_id]: { basic: e?.basic ?? (r.basic_monthly != null ? String(r.basic_monthly) : "0"), allowance: ev.target.value } })}
-                    placeholder="0.00"
-                  />
-                </td>
-                <td className="px-4 py-2.5 text-right">
-                  <button
-                    onClick={() => save.mutate(r)}
-                    disabled={save.isPending}
-                    className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-40"
-                  >
-                    Save
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </TableShell>
   );
 }
