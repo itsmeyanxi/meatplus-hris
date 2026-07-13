@@ -89,6 +89,44 @@ function nest(employeeId: number, segment: string) {
   return `/api/v1/employees/${employeeId}/${segment}`;
 }
 
+export type Asset = {
+  id: number;
+  employee_id: number;
+  item: string;
+  category: string | null;
+  condition: string | null;
+  purchase_price: string | null;
+  serial_number: string | null;
+  acquired_date: string | null;
+  date_issued: string | null;
+  date_returned: string | null;
+  notes: string | null;
+};
+export type AssetInput = {
+  item: string;
+  category?: string | null;
+  condition?: string | null;
+  purchase_price?: number | null;
+  serial_number?: string | null;
+  acquired_date?: string | null;
+  date_issued?: string | null;
+  date_returned?: string | null;
+  notes?: string | null;
+};
+
+export const assetsApi = {
+  list: async (employeeId: number): Promise<Asset[]> => {
+    const { data } = await api.get<Listed<Asset>>(nest(employeeId, "assets"));
+    return data.data;
+  },
+  create: async (employeeId: number, body: AssetInput): Promise<Asset> => {
+    const { data } = await api.post<{ data: Asset }>(nest(employeeId, "assets"), body);
+    return data.data;
+  },
+  destroy: (employeeId: number, id: number) =>
+    api.delete(nest(employeeId, `assets/${id}`)),
+};
+
 export const dependentsApi = {
   list: async (employeeId: number): Promise<Dependent[]> => {
     const { data } = await api.get<Listed<Dependent>>(nest(employeeId, "dependents"));

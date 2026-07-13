@@ -1,24 +1,11 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { toast } from "sonner";
 import { AppButton, TableShell } from "@/components/ui";
 import { inputCls, labelCls } from "@/lib/form-classes";
-
-// UI shell only — assets are held in local state for preview. Persisting them
-// (a backend table + API) is a later pass.
-
-type Asset = {
-  id: number;
-  item: string;
-  category: string;
-  condition: string;
-  purchase_price: string;
-  serial_number: string;
-  acquired_date: string;
-  date_issued: string;
-  date_returned: string;
-  notes: string;
-};
+import { assetsApi, type Asset, type AssetInput } from "@/lib/employee-relations";
 
 const COLS = [
   "Item",
@@ -34,49 +21,81 @@ const COLS = [
 
 const CONDITIONS = ["New", "Good", "Fair", "Damaged", "For Repair"];
 
-export function AssetsSection() {
-  const [rows, setRows] = useState<Asset[]>([]);
+export function AssetsSection({ employeeId }: { employeeId: number }) {
+  const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+
+  const key = ["employee", employeeId, "assets"];
+  const { data: rows, isLoading } = useQuery({
+    queryKey: key,
+    queryFn: () => assetsApi.list(employeeId),
+    enabled: !!employeeId,
+  });
+
+  const create = useMutation({
+    mutationFn: (body: AssetInput) => assetsApi.create(employeeId, body),
+    onSuccess: () => {
+      toast.success("Asset added.");
+      qc.invalidateQueries({ queryKey: key });
+      setShowForm(false);
+    },
+    onError: () => toast.error("Could not add the asset."),
+  });
+
+  const destroy = useMutation({
+    mutationFn: (id: number) => assetsApi.destroy(employeeId, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+    onError: () => toast.error("Could not remove the asset."),
+  });
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-4 py-2.5 text-xs text-amber-800">
-        Preview only — assets aren&apos;t saved to the server yet.
-      </div>
-
       <div>
         <AppButton onClick={() => setShowForm(true)}>+ Add Assets</AppButton>
       </div>
 
       <TableShell>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-sm">
+          <table className="w-full min-w-[1150px] text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
                 {COLS.map((c) => (
                   <th key={c} className="whitespace-nowrap px-4 py-3">{c}</th>
                 ))}
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {rows.length === 0 ? (
+              {isLoading ? (
+                <tr><td colSpan={COLS.length + 1} className="px-4 py-8 text-center text-xs text-slate-400">Loading…</td></tr>
+              ) : (rows?.length ?? 0) === 0 ? (
                 <tr>
-                  <td colSpan={COLS.length} className="px-4 py-8 text-center text-xs text-slate-400">
+                  <td colSpan={COLS.length + 1} className="px-4 py-8 text-center text-xs text-slate-400">
                     No assets yet. Use “Add Assets” to record one.
                   </td>
                 </tr>
               ) : (
-                rows.map((r) => (
+                rows!.map((r) => (
                   <tr key={r.id} className="hover:bg-slate-50/60">
                     <td className="whitespace-nowrap px-4 py-2.5 font-medium text-slate-800">{r.item}</td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">{r.category || "—"}</td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">{r.condition || "—"}</td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums">{r.purchase_price || "—"}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums">{r.purchase_price ?? "—"}</td>
                     <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-slate-600">{r.serial_number || "—"}</td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">{r.acquired_date || "—"}</td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">{r.date_issued || "—"}</td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">{r.date_returned || "—"}</td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">{r.notes || "—"}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => destroy.mutate(r.id)}
+                        disabled={destroy.isPending}
+                        className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600 disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -87,11 +106,9 @@ export function AssetsSection() {
 
       {showForm && (
         <AddAssetModal
+          saving={create.isPending}
           onClose={() => setShowForm(false)}
-          onAdd={(a) => {
-            setRows((prev) => [...prev, { ...a, id: Date.now() }]);
-            setShowForm(false);
-          }}
+          onAdd={(a) => create.mutate(a)}
         />
       )}
     </div>
@@ -99,13 +116,15 @@ export function AssetsSection() {
 }
 
 function AddAssetModal({
+  saving,
   onClose,
   onAdd,
 }: {
+  saving: boolean;
   onClose: () => void;
-  onAdd: (a: Omit<Asset, "id">) => void;
+  onAdd: (a: AssetInput) => void;
 }) {
-  const [f, setF] = useState<Omit<Asset, "id">>({
+  const [f, setF] = useState({
     item: "",
     category: "",
     condition: CONDITIONS[0],
@@ -116,7 +135,20 @@ function AddAssetModal({
     date_returned: "",
     notes: "",
   });
-  const set = (k: keyof Omit<Asset, "id">, v: string) => setF((s) => ({ ...s, [k]: v }));
+  const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
+
+  const submit = () =>
+    onAdd({
+      item: f.item.trim(),
+      category: f.category || null,
+      condition: f.condition || null,
+      purchase_price: f.purchase_price ? Number(f.purchase_price) : null,
+      serial_number: f.serial_number || null,
+      acquired_date: f.acquired_date || null,
+      date_issued: f.date_issued || null,
+      date_returned: f.date_returned || null,
+      notes: f.notes || null,
+    });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="dialog" aria-modal>
@@ -168,9 +200,11 @@ function AddAssetModal({
 
         <div className="mt-6 flex justify-end gap-2">
           <AppButton type="button" variant="secondary" onClick={onClose}>Cancel</AppButton>
-          <AppButton type="button" onClick={() => onAdd(f)} disabled={!f.item.trim()}>Add</AppButton>
+          <AppButton type="button" onClick={submit} disabled={!f.item.trim() || saving}>{saving ? "Adding…" : "Add"}</AppButton>
         </div>
       </div>
     </div>
   );
 }
+
+export type { Asset };

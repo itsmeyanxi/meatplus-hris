@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\V1\Employees\BenefitController;
 use App\Http\Controllers\Api\V1\Employees\ContactChannelController;
 use App\Http\Controllers\Api\V1\Employees\ContractController;
 use App\Http\Controllers\Api\V1\Employees\DependentController;
+use App\Http\Controllers\Api\V1\Employees\EmployeeAssetController;
 use App\Http\Controllers\Api\V1\Employees\EducationController;
 use App\Http\Controllers\Api\V1\Employees\EmergencyContactController;
 use App\Http\Controllers\Api\V1\Employees\EmployeeController;
@@ -98,6 +99,8 @@ Route::prefix('v1')->group(function () {
         Route::post('employees/bulk-invite', [InvitationController::class, 'bulkSend']);
         Route::apiResource('employees', EmployeeController::class);
         Route::apiResource('employees.dependents', DependentController::class)->scoped();
+        Route::apiResource('employees.assets', EmployeeAssetController::class)
+            ->scoped()->only(['index', 'store', 'update', 'destroy']);
         Route::apiResource('employees.emergency-contacts', EmergencyContactController::class)
             ->scoped()->parameters(['emergency-contacts' => 'emergencyContact']);
         Route::apiResource('employees.education', EducationController::class)
