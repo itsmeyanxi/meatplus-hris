@@ -6,6 +6,7 @@ import { payrollAccessApi, type PayrollAccessRow } from "@/lib/payroll";
 import { usersApi } from "@/lib/users";
 import { AdvancesSection } from "@/components/payroll/AdvancesSection";
 import { TrainingSection } from "@/components/payroll/TrainingSection";
+import { AssetsSection } from "@/components/payroll/AssetsSection";
 import { SectionShell } from "@/components/payroll/SectionShell";
 
 const ROLE_BLURB: Record<string, string> = {
@@ -21,6 +22,7 @@ const svg = (d: string) => (
 const IconAccess = () => svg("M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z");
 const IconAdvances = () => svg("M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z");
 const IconTraining = () => svg("M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.958a1 1 0 00.95.69h4.163c.969 0 1.371 1.24.588 1.81l-3.368 2.447a1 1 0 00-.364 1.118l1.287 3.958c.3.922-.755 1.688-1.539 1.118l-3.367-2.447a1 1 0 00-1.176 0l-3.367 2.447c-.784.57-1.838-.196-1.539-1.118l1.287-3.958a1 1 0 00-.364-1.118L2.012 9.385c-.783-.57-.38-1.81.588-1.81h4.163a1 1 0 00.95-.69l1.286-3.958z");
+const IconAssets = () => svg("M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4");
 
 export default function PayrollAccessPage() {
   const qc = useQueryClient();
@@ -242,6 +244,16 @@ export default function PayrollAccessPage() {
           description="Seminars and trainings attended"
         >
           <TrainingSection />
+        </SectionShell>
+
+        {/* 04 — Assets */}
+        <SectionShell
+          index={4}
+          icon={<IconAssets />}
+          title="Assets"
+          description="Company items issued to the employee"
+        >
+          <AssetsSection />
         </SectionShell>
       </div>
 
