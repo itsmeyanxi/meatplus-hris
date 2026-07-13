@@ -860,7 +860,7 @@ export default function EmployeeRegistrationPage() {
   return (
     <div className="mx-auto max-w-3xl">
       {/* Module header */}
-      <div className="flex items-center justify-between rounded-t-2xl bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-5 dark:from-slate-950 dark:to-slate-900">
+      <div className="flex items-center justify-between rounded-t-2xl bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-5">
         <div>
           <h2 className="text-lg font-bold tracking-tight text-white">Employee Registration</h2>
           <p className="mt-0.5 text-xs text-slate-400">
@@ -895,28 +895,28 @@ export default function EmployeeRegistrationPage() {
       </div>
 
       <form onSubmit={form.handleSubmit((v) => { setServerError(null); register.mutate(v); })} noValidate>
-        <div className="divide-y divide-slate-100 border-x border-slate-200 dark:divide-slate-800 dark:border-slate-700">
+        <div className="divide-y divide-slate-100 border-x border-slate-200">
           {SECTIONS.map((section, idx) => {
             const isOpen     = active === section.key;
             const isComplete = section.isComplete(watched as Partial<FormValues>);
 
             return (
-              <div key={section.key} className="bg-white dark:bg-slate-900">
+              <div key={section.key} className="bg-white">
                 <button
                   type="button"
                   onClick={() => toggle(section.key)}
                   className={`flex w-full items-center gap-4 px-5 py-4 text-left transition ${
                     isOpen
-                      ? "bg-slate-50 dark:bg-slate-800/60"
-                      : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                      ? "bg-slate-50"
+                      : "hover:bg-slate-50"
                   }`}
                 >
                   <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition ${
                     isComplete
                       ? "bg-emerald-500 text-white"
                       : isOpen
-                        ? "bg-slate-800 text-white dark:bg-white dark:text-slate-900"
-                        : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                        ? "bg-slate-800 text-white"
+                        : "bg-slate-100 text-slate-500"
                   }`}>
                     {isComplete ? (
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -927,20 +927,20 @@ export default function EmployeeRegistrationPage() {
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+                      <span className="text-xs font-semibold text-slate-400">
                         {String(idx + 1).padStart(2, "0")}
                       </span>
-                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      <span className="text-sm font-semibold text-slate-800">
                         {section.label}
                         {section.required && <span className="ml-1 text-red-500">*</span>}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{section.description}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{section.description}</p>
                   </div>
 
                   <div className="flex shrink-0 items-center gap-2">
                     {isComplete && !isOpen && (
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                         Done
                       </span>
                     )}
@@ -954,7 +954,7 @@ export default function EmployeeRegistrationPage() {
                 </button>
 
                 {isOpen && (
-                  <div className="border-t border-slate-100 px-5 py-5 dark:border-slate-800">
+                  <div className="border-t border-slate-100 px-5 py-5">
                     {section.key === "basic"       && (
                       <BasicSection
                         form={form}
@@ -1043,7 +1043,7 @@ export default function EmployeeRegistrationPage() {
                       <button
                         type="button"
                         onClick={() => setActive(null)}
-                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
                       >
                         Done with this section
                       </button>
@@ -1056,9 +1056,9 @@ export default function EmployeeRegistrationPage() {
         </div>
 
         {/* Action bar */}
-        <div className="rounded-b-2xl border border-t-0 border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-700 dark:bg-slate-900/80">
+        <div className="rounded-b-2xl border border-t-0 border-slate-200 bg-slate-50 px-5 py-4">
           {serverError && (
-            <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+            <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
               {serverError}
             </p>
           )}
@@ -1066,21 +1066,21 @@ export default function EmployeeRegistrationPage() {
             <button
               type="button"
               onClick={reset}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
             >
               Clear form
             </button>
             <div className="flex gap-2">
               <Link
                 href="/employees"
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
               >
                 Cancel
               </Link>
               <button
                 type="submit"
                 disabled={register.isPending || !requiredDone}
-                className="flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                className="flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
               >
                 {register.isPending ? (
                   <>
@@ -1115,12 +1115,12 @@ function BasicSection({ form, photoPreview, photoError, onPickPhoto }: {
     <div className="flex flex-col gap-6 md:flex-row">
       {/* Photo */}
       <div className="shrink-0 md:w-44">
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
           {photoPreview ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={photoPreview} alt="Employee photo preview" className="h-44 w-full object-cover" />
           ) : (
-            <div className="flex h-44 w-full items-center justify-center text-slate-300 dark:text-slate-600">
+            <div className="flex h-44 w-full items-center justify-center text-slate-300">
               <svg className="h-20 w-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
@@ -1128,7 +1128,7 @@ function BasicSection({ form, photoPreview, photoError, onPickPhoto }: {
           )}
         </div>
 
-        <label className="mt-2 flex cursor-pointer items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100">
+        <label className="mt-2 flex cursor-pointer items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800">
           {photoPreview ? "Change photo" : "Choose photo"}
           <input
             type="file"
@@ -1142,7 +1142,7 @@ function BasicSection({ form, photoPreview, photoError, onPickPhoto }: {
           <button
             type="button"
             onClick={() => onPickPhoto(null)}
-            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
           >
             Remove
           </button>
@@ -1150,7 +1150,7 @@ function BasicSection({ form, photoPreview, photoError, onPickPhoto }: {
 
         {photoError
           ? <p className="mt-1 text-xs text-red-500">{photoError}</p>
-          : <p className="mt-1 text-center text-[11px] text-slate-400 dark:text-slate-500">JPG, PNG or WEBP · max 2 MB</p>}
+          : <p className="mt-1 text-center text-[11px] text-slate-400">JPG, PNG or WEBP · max 2 MB</p>}
       </div>
 
       {/* Fields */}
@@ -1262,7 +1262,7 @@ function WorkSection({ form, companies, departments, positions, employmentTypes,
         <Hint>Worksites and their designated workplace are set under Locations.</Hint>
       </div>
 
-      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-5">
         <GroupTitle>Employment Details</GroupTitle>
         <Grid>
           <Field label="Employment Status *" error={E.employment_type_id?.message}>
@@ -1321,13 +1321,13 @@ function WorkSection({ form, companies, departments, positions, employmentTypes,
               placeholder="Notes about this employee's engagement…"
             />
           </Field>
-          <p className="mt-1 text-right text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-1 text-right text-xs text-slate-400">
             {(form.watch("remarks") ?? "").length}/300
           </p>
         </div>
       </div>
 
-      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-5">
         <GroupTitle>Other Information</GroupTitle>
         <Grid>
           <Field label="Biometric ID" error={E.biometric_user_id?.message}>
@@ -1349,7 +1349,7 @@ function WorkSection({ form, companies, departments, positions, employmentTypes,
         </Hint>
       </div>
 
-      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-5">
         <GroupTitle>Attendance Request Approval</GroupTitle>
         <ApprovalLevels supervisorName={supervisorName} />
       </div>
@@ -1376,33 +1376,33 @@ function LocationsSection({ form, branches, locations, onAdd, onRemove, onWorkpl
     <div className="space-y-4">
       {E.branch_id?.message && <p className="text-xs text-red-500">*{E.branch_id.message}</p>}
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+      <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full min-w-[640px] text-sm">
-          <thead className="bg-slate-50 dark:bg-slate-800/60">
+          <thead className="bg-slate-50">
             <tr>
               {["Location", "Code", "Latitude & Longitude", "Designated Workplace", ""].map((h) => (
-                <th key={h} className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <th key={h} className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <tbody className="divide-y divide-slate-100">
             {locations.map((l, i) => {
               const b = byId(l.branch_id);
               const coords = b?.latitude && b?.longitude ? `${b.latitude}, ${b.longitude}` : "—";
               return (
                 <tr key={l.branch_id}>
-                  <td className="px-4 py-2.5 font-medium text-slate-700 dark:text-slate-300">
+                  <td className="px-4 py-2.5 font-medium text-slate-700">
                     {b?.name ?? b?.title}
                     {i === 0 && (
-                      <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                      <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
                         Primary
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-slate-500 dark:text-slate-400">{b?.code ?? "—"}</td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-slate-500 dark:text-slate-400">{coords}</td>
+                  <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{b?.code ?? "—"}</td>
+                  <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{coords}</td>
                   <td className="px-4 py-2.5">
                     <Input
                       value={l.designated_workplace}
@@ -1414,7 +1414,7 @@ function LocationsSection({ form, branches, locations, onAdd, onRemove, onWorkpl
                     <button
                       type="button"
                       onClick={() => onRemove(l.branch_id)}
-                      className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600 dark:border-slate-700 dark:hover:bg-slate-800"
+                      className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600"
                     >
                       Remove
                     </button>
@@ -1452,7 +1452,7 @@ function LocationsSection({ form, branches, locations, onAdd, onRemove, onWorkpl
         Remove it and the next one is promoted. Latitude and longitude come from the branch record.
       </Hint>
 
-      <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-4">
         <GroupTitle>Home Address</GroupTitle>
         <Grid>
           <Field label="City"><Input {...form.register("city")} /></Field>
@@ -1517,21 +1517,21 @@ function ScheduleSection({ form, workSchedules, days, onDay }: {
             </Field>
           </Grid>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full min-w-[760px] text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-800/60">
+              <thead className="bg-slate-50">
                 <tr>
                   {["Day", "Shift/Core From", "Shift/Core To", "Break Start", "Break End", "Is Rest Day"].map((h) => (
-                    <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-100">
                 {days.map((d, i) => (
-                  <tr key={DAY_NAMES[i]} className={d.is_rest_day ? "bg-slate-50/60 dark:bg-slate-800/30" : ""}>
-                    <td className="px-3 py-2 font-medium text-slate-700 dark:text-slate-300">{DAY_NAMES[i]}</td>
+                  <tr key={DAY_NAMES[i]} className={d.is_rest_day ? "bg-slate-50/60" : ""}>
+                    <td className="px-3 py-2 font-medium text-slate-700">{DAY_NAMES[i]}</td>
                     {(["time_in", "time_out", "break_start", "break_end"] as const).map((k) => (
                       <td key={k} className="px-3 py-2">
                         <Input
@@ -1627,13 +1627,13 @@ function PayrollSection({ form, employeeType, employmentTypeName, dateHired, dat
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-900/20">
-        <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">What is this?</p>
-        <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+        <p className="text-xs font-semibold text-amber-800">What is this?</p>
+        <p className="mt-1 text-xs text-amber-700">
           A read-only summary of the values payroll computes from. Everything here is set in
           Work Information and Salary History — change it there, not here.
         </p>
-        <p className="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">
+        <p className="mt-1 text-xs font-semibold text-red-600">
           Warning: these values determine what this employee is paid.
         </p>
       </div>
@@ -1654,7 +1654,7 @@ function PayrollSection({ form, employeeType, employmentTypeName, dateHired, dat
         <Hint>Status date is the regularization date, or the hire date if not yet regular.</Hint>
       </div>
 
-      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-5">
         <GroupTitle>Current Salary (read-only)</GroupTitle>
         <Grid>
           <Field label="Basic Monthly">
@@ -1676,7 +1676,7 @@ function PayrollSection({ form, employeeType, employmentTypeName, dateHired, dat
       </div>
 
       {/* Employment Details */}
-      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-5">
         <GroupTitle>Employment Details</GroupTitle>
         <Grid>
           <Field label="Work Days Per Year">
@@ -1684,9 +1684,9 @@ function PayrollSection({ form, employeeType, employmentTypeName, dateHired, dat
           </Field>
           <Field label="Cost Center"><Input {...form.register("cost_center")} /></Field>
           <Field label="Regional Operating HQ (ROHQ)">
-            <label className="flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 dark:border-slate-700">
+            <label className="flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3">
               <input type="checkbox" className="h-4 w-4 rounded accent-slate-900" {...form.register("is_rohq")} />
-              <span className="text-sm text-slate-700 dark:text-slate-300">Employee is ROHQ</span>
+              <span className="text-sm text-slate-700">Employee is ROHQ</span>
             </label>
           </Field>
         </Grid>
@@ -1694,7 +1694,7 @@ function PayrollSection({ form, employeeType, employmentTypeName, dateHired, dat
       </div>
 
       {/* Bank Details */}
-      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-5">
         <GroupTitle>Bank Details</GroupTitle>
         <Grid>
           <Field label="Bank"><Input {...form.register("bank_name")} placeholder="BDO, BPI…" /></Field>
@@ -1713,13 +1713,13 @@ function PayrollSection({ form, employeeType, employmentTypeName, dateHired, dat
       </div>
 
       {/* Compensation and Benefits */}
-      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-5">
         <GroupTitle>Compensation and Benefits (Salary)</GroupTitle>
         <Grid>
           <Field label="Minimum Wage Earner">
-            <label className="flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 dark:border-slate-700">
+            <label className="flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3">
               <input type="checkbox" className="h-4 w-4 rounded accent-slate-900" {...form.register("is_minimum_wage_earner")} />
-              <span className="text-sm text-slate-700 dark:text-slate-300">Yes</span>
+              <span className="text-sm text-slate-700">Yes</span>
             </label>
           </Field>
           <Field label="Daily Allowance"><Input type="number" step="0.01" min="0" {...form.register("daily_allowance")} placeholder="0.00" /></Field>
@@ -1754,7 +1754,7 @@ function PayrollSection({ form, employeeType, employmentTypeName, dateHired, dat
       </div>
 
       {/* Government Contribution */}
-      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-5">
         <GroupTitle>Government Contribution</GroupTitle>
         <Grid>
           <Field label="SSS Contribution">
@@ -1794,12 +1794,12 @@ function PayrollSection({ form, employeeType, employmentTypeName, dateHired, dat
       </div>
 
       {/* Previous Employment */}
-      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-5">
         <GroupTitle>Previous Employment Details (From Last Employer)</GroupTitle>
 
-        <label className="mb-4 flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-3 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+        <label className="mb-4 flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-3 transition hover:bg-slate-50">
           <input type="checkbox" className="h-4 w-4 rounded accent-slate-900" {...form.register("has_previous_employment")} />
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          <span className="text-sm font-medium text-slate-700">
             Has previous employment this year
           </span>
         </label>
@@ -1860,11 +1860,11 @@ function SalarySection({ rows, onAdd, onRemove, onChange }: {
             </td>
             <td className="px-3 py-2">
               {i === currentIdx && r.basic_monthly.trim() ? (
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                   Current
                 </span>
               ) : (
-                <span className="text-xs text-slate-400 dark:text-slate-500">Historical</span>
+                <span className="text-xs text-slate-400">Historical</span>
               )}
             </td>
             <td className="px-3 py-2 text-right"><RemoveButton onClick={() => onRemove(i)} /></td>
@@ -1889,8 +1889,8 @@ function LeaveSection({ leaveTypes, selected, onToggle, onOpening }: {
 }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900 dark:bg-blue-900/20">
-        <p className="text-xs text-blue-800 dark:text-blue-300">
+      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+        <p className="text-xs text-blue-800">
           Leave balances belong to a saved employee, so the plans chosen here are assigned the
           moment the employee is registered. Usage appears afterwards under Leaves.
         </p>
@@ -1909,8 +1909,8 @@ function LeaveSection({ leaveTypes, selected, onToggle, onOpening }: {
                   onChange={() => onToggle(t.id)}
                 />
               </td>
-              <td className="px-3 py-2 font-medium text-slate-700 dark:text-slate-300">{t.name}</td>
-              <td className="px-3 py-2 font-mono text-xs text-slate-500 dark:text-slate-400">{t.code}</td>
+              <td className="px-3 py-2 font-medium text-slate-700">{t.name}</td>
+              <td className="px-3 py-2 font-mono text-xs text-slate-500">{t.code}</td>
               <td className="px-3 py-2">
                 <Input
                   type="number"
@@ -2128,26 +2128,26 @@ function EducationSection({ rows, onAdd, onRemove, onChange }: {
       <button
         type="button"
         onClick={onAdd}
-        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
       >
         Add Educational Background
       </button>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+      <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full min-w-[720px] text-sm">
-          <thead className="bg-slate-50 dark:bg-slate-800/60">
+          <thead className="bg-slate-50">
             <tr>
               {["Education Type", "School", "From", "To", "Degree", ""].map((h) => (
-                <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <tbody className="divide-y divide-slate-100">
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+                <td colSpan={6} className="px-3 py-6 text-center text-xs text-slate-400">
                   No entries yet.
                 </td>
               </tr>
@@ -2177,7 +2177,7 @@ function EducationSection({ rows, onAdd, onRemove, onChange }: {
                   <button
                     type="button"
                     onClick={() => onRemove(i)}
-                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600 dark:border-slate-700 dark:hover:bg-slate-800"
+                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600"
                   >
                     Remove
                   </button>
@@ -2209,26 +2209,26 @@ function PerformanceSection({ rows, onAdd, onRemove, onChange }: {
       <button
         type="button"
         onClick={onAdd}
-        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
       >
         Add Performance Goal
       </button>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+      <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full min-w-[680px] text-sm">
-          <thead className="bg-slate-50 dark:bg-slate-800/60">
+          <thead className="bg-slate-50">
             <tr>
               {["Goal", "Due Date", "Feedback", ""].map((h) => (
-                <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <tbody className="divide-y divide-slate-100">
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-3 py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+                <td colSpan={4} className="px-3 py-6 text-center text-xs text-slate-400">
                   No goals yet.
                 </td>
               </tr>
@@ -2253,7 +2253,7 @@ function PerformanceSection({ rows, onAdd, onRemove, onChange }: {
                   <button
                     type="button"
                     onClick={() => onRemove(i)}
-                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600 dark:border-slate-700 dark:hover:bg-slate-800"
+                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600"
                   >
                     Remove
                   </button>
@@ -2284,7 +2284,7 @@ function AddButton({ onClick, children }: { onClick: () => void; children: React
     <button
       type="button"
       onClick={onClick}
-      className="mb-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+      className="mb-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
     >
       {children}
     </button>
@@ -2296,7 +2296,7 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600 dark:border-slate-700 dark:hover:bg-slate-800"
+      className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600"
     >
       Remove
     </button>
@@ -2306,21 +2306,21 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
 function RowTable({ headers, empty, children }: { headers: string[]; empty: string; children: React.ReactNode }) {
   const hasRows = Array.isArray(children) ? children.length > 0 : Boolean(children);
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+    <div className="overflow-x-auto rounded-xl border border-slate-200">
       <table className="w-full min-w-[640px] text-sm">
-        <thead className="bg-slate-50 dark:bg-slate-800/60">
+        <thead className="bg-slate-50">
           <tr>
             {headers.map((h) => (
-              <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
                 {h}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+        <tbody className="divide-y divide-slate-100">
           {!hasRows ? (
             <tr>
-              <td colSpan={headers.length} className="px-3 py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+              <td colSpan={headers.length} className="px-3 py-6 text-center text-xs text-slate-400">
                 {empty}
               </td>
             </tr>
@@ -2361,7 +2361,7 @@ function ContactSection({
     <div className="space-y-6">
       <div>
         <GroupTitle>Primary Contact Number</GroupTitle>
-        <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mb-3 text-xs text-slate-500">
           A primary contact can only be a mobile number.
         </p>
         <div className="max-w-sm">
@@ -2389,7 +2389,7 @@ function ContactSection({
       </div>
 
       {/* Alternate phone numbers */}
-      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-5">
         <GroupTitle>Alternate Phone Numbers</GroupTitle>
         <AddButton onClick={onAddPhone}>Add New Phone</AddButton>
         <RowTable headers={["Title", "Contact No.", "Contact Name", ""]} empty="No alternate phones yet.">
@@ -2406,7 +2406,7 @@ function ContactSection({
       </div>
 
       {/* Emails */}
-      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-5">
         <GroupTitle>Emails</GroupTitle>
         <AddButton onClick={onAddEmail}>Add New Email</AddButton>
         <RowTable headers={["Email Address", "Primary", ""]} empty="No emails yet.">
@@ -2432,7 +2432,7 @@ function ContactSection({
       </div>
 
       {/* Addresses */}
-      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-5">
         <GroupTitle>Addresses</GroupTitle>
         <AddButton onClick={onAddAddr}>Add New Address</AddButton>
         <RowTable headers={["Type", "Address", "City", "Province", "Postal", ""]} empty="No addresses yet.">
@@ -2456,32 +2456,32 @@ function ContactSection({
         <Hint>Address is required for a row to save. The first address is the primary one.</Hint>
       </div>
 
-      <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-5">
         <GroupTitle>Emergency Contact Numbers</GroupTitle>
 
         <button
           type="button"
           onClick={onAdd}
-          className="mb-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+          className="mb-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
         >
           Add New Emergency Contact
         </button>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full min-w-[720px] text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-800/60">
+            <thead className="bg-slate-50">
               <tr>
                 {["Contact No.", "Contact Name", "Relationship", "Address", ""].map((h) => (
-                  <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100">
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+                  <td colSpan={5} className="px-3 py-6 text-center text-xs text-slate-400">
                     No emergency contacts yet.
                   </td>
                 </tr>
@@ -2505,7 +2505,7 @@ function ContactSection({
                     <button
                       type="button"
                       onClick={() => onRemove(i)}
-                      className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600 dark:border-slate-700 dark:hover:bg-slate-800"
+                      className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600"
                     >
                       Remove
                     </button>
@@ -2525,11 +2525,11 @@ function ContactSection({
 function PortalSection({ form, createAccount }: { form: FF; createAccount: boolean | undefined }) {
   return (
     <div className="space-y-4">
-      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-4 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-4 transition hover:bg-slate-50">
         <input type="checkbox" className="h-4 w-4 rounded accent-slate-900" {...form.register("create_account")} />
         <div>
-          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Create portal account</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Generates a temporary password the employee uses to log in for the first time.</p>
+          <p className="text-sm font-semibold text-slate-800">Create portal account</p>
+          <p className="text-xs text-slate-500">Generates a temporary password the employee uses to log in for the first time.</p>
         </div>
       </label>
 
@@ -2567,37 +2567,37 @@ function SuccessScreen({ result, onAnother }: { result: RegistrationResult; onAn
   return (
     <div className="mx-auto max-w-lg space-y-6 py-10">
       <div className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
           <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Employee Registered</h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Record created successfully.</p>
+        <h2 className="text-xl font-bold text-slate-800">Employee Registered</h2>
+        <p className="mt-1 text-sm text-slate-500">Record created successfully.</p>
       </div>
 
       {result.warnings && result.warnings.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-900/20">
-          <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-xs font-semibold text-amber-800">
             The employee was created, but these sections did not save:
           </p>
-          <ul className="mt-1 list-disc pl-5 text-xs text-amber-700 dark:text-amber-400">
+          <ul className="mt-1 list-disc pl-5 text-xs text-amber-700">
             {result.warnings.map((w) => <li key={w}>{w}</li>)}
           </ul>
-          <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">Add them from the employee profile.</p>
+          <p className="mt-1 text-xs text-amber-700">Add them from the employee profile.</p>
         </div>
       )}
 
-      <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white dark:divide-slate-800 dark:border-slate-700 dark:bg-slate-900">
+      <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
         <ResultRow label="Name" value={result.employeeName} />
         <ResultRow label="Employee No." value={result.employeeNo} mono />
         {result.tempPassword && (
           <div className="flex items-center justify-between px-5 py-3.5">
             <div>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Temporary Password</p>
-              <p className="mt-0.5 font-mono text-sm font-semibold tracking-widest text-slate-800 dark:text-slate-100">{result.tempPassword}</p>
+              <p className="text-xs font-medium text-slate-500">Temporary Password</p>
+              <p className="mt-0.5 font-mono text-sm font-semibold tracking-widest text-slate-800">{result.tempPassword}</p>
             </div>
-            <button onClick={copy} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800">
+            <button onClick={copy} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50">
               {copied ? "Copied" : "Copy"}
             </button>
           </div>
@@ -2606,10 +2606,10 @@ function SuccessScreen({ result, onAnother }: { result: RegistrationResult; onAn
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Link href={`/employees/${result.employeeId}`} className="flex flex-1 items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100">
+        <Link href={`/employees/${result.employeeId}`} className="flex flex-1 items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
           View Profile
         </Link>
-        <button onClick={onAnother} className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+        <button onClick={onAnother} className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
           Register Another
         </button>
       </div>
@@ -2620,15 +2620,15 @@ function SuccessScreen({ result, onAnother }: { result: RegistrationResult; onAn
 function ResultRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-center justify-between px-5 py-3.5">
-      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
-      <p className={`text-sm font-semibold text-slate-800 dark:text-slate-100 ${mono ? "font-mono" : ""}`}>{value}</p>
+      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className={`text-sm font-semibold text-slate-800 ${mono ? "font-mono" : ""}`}>{value}</p>
     </div>
   );
 }
 
 // ── primitives ────────────────────────────────────────────────────────────────
 
-const baseCls = "w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 outline-none focus:border-slate-500 dark:focus:border-slate-400 focus:ring-2 focus:ring-slate-100 dark:focus:ring-slate-700 transition disabled:opacity-50 disabled:cursor-not-allowed";
+const baseCls = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed";
 
 const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   (props, ref) => <input ref={ref} className={baseCls} {...props} />,
@@ -2645,7 +2645,7 @@ function Grid({ children }: { children: React.ReactNode }) {
 }
 
 function Hint({ children }: { children: React.ReactNode }) {
-  return <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">{children}</p>;
+  return <p className="mt-3 text-xs text-slate-400">{children}</p>;
 }
 
 /**
@@ -2661,24 +2661,24 @@ function ApprovalLevels({ supervisorName }: { supervisorName?: string }) {
     { level: "Level 3", person: "HR Administrator" },
   ];
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+    <div className="overflow-hidden rounded-xl border border-slate-200">
       <table className="w-full text-sm">
-        <thead className="bg-slate-50 dark:bg-slate-800/60">
+        <thead className="bg-slate-50">
           <tr>
-            <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Level</th>
-            <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Person</th>
+            <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Level</th>
+            <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Person</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+        <tbody className="divide-y divide-slate-100">
           {levels.map((l) => (
             <tr key={l.level}>
-              <td className="px-4 py-2.5 font-medium text-slate-700 dark:text-slate-300">{l.level}</td>
-              <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400">{l.person}</td>
+              <td className="px-4 py-2.5 font-medium text-slate-700">{l.level}</td>
+              <td className="px-4 py-2.5 text-slate-600">{l.person}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="border-t border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-500">
+      <p className="border-t border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-400">
         Derived from the immediate supervisor and role permissions — not editable per employee.
       </p>
     </div>
@@ -2687,7 +2687,7 @@ function ApprovalLevels({ supervisorName }: { supervisorName?: string }) {
 
 function GroupTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+    <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
       {children}
     </h3>
   );
@@ -2696,7 +2696,7 @@ function GroupTitle({ children }: { children: React.ReactNode }) {
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">{label}</label>
+      <label className="mb-1 block text-xs font-medium text-slate-500">{label}</label>
       {children}
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>

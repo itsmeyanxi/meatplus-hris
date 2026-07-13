@@ -67,20 +67,20 @@ export default function PayrollAccessPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Payroll User Access</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+        <h1 className="text-xl font-bold text-slate-800">Payroll User Access</h1>
+        <p className="mt-1 text-sm text-slate-500">
           Who may work on payroll, and for which company. Leave a user off this list and they keep
           ordinary employee access only.
         </p>
-        <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+        <p className="mt-1 text-xs text-slate-400">
           Access is granted per company code. A user can hold payroll access in one company and none
           in another.
         </p>
       </div>
 
       {/* Grant form */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
-        <h2 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <h2 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-500">
           Add Payroll User Access
         </h2>
 
@@ -114,11 +114,11 @@ export default function PayrollAccessPage() {
         </div>
 
         {role && ROLE_BLURB[role] && (
-          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{ROLE_BLURB[role]}</p>
+          <p className="mt-3 text-xs text-slate-500">{ROLE_BLURB[role]}</p>
         )}
 
         {error && (
-          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
             {error}
           </p>
         )}
@@ -128,7 +128,7 @@ export default function PayrollAccessPage() {
             type="button"
             disabled={!canSubmit}
             onClick={() => grant.mutate()}
-            className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+            className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
           >
             {grant.isPending ? "Granting…" : "Add Payroll User Access"}
           </button>
@@ -136,25 +136,25 @@ export default function PayrollAccessPage() {
       </div>
 
       {/* Grants */}
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+      <div className="overflow-x-auto rounded-2xl border border-slate-200">
         <table className="w-full min-w-[720px] text-sm">
-          <thead className="bg-slate-50 dark:bg-slate-800/60">
+          <thead className="bg-slate-50">
             <tr>
               {["Payroll Company Code", "Linked HR Company", "User", "Payroll User Status", "Payroll Role", ""].map((h) => (
-                <th key={h} className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <th key={h} className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
+          <tbody className="divide-y divide-slate-100 bg-white">
             {isLoading && (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-xs text-slate-400">Loading…</td></tr>
             )}
 
             {!isLoading && (grants?.length ?? 0) === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-xs text-slate-400 dark:text-slate-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-xs text-slate-400">
                   No payroll access granted yet.
                 </td>
               </tr>
@@ -162,26 +162,26 @@ export default function PayrollAccessPage() {
 
             {grants?.map((g) => (
               <tr key={`${g.user_id}-${g.company_id}-${g.payroll_role}`}>
-                <td className="px-4 py-2.5 font-mono text-xs text-slate-700 dark:text-slate-300">{g.company_code}</td>
-                <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400">{g.company_name}</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-slate-700">{g.company_code}</td>
+                <td className="px-4 py-2.5 text-slate-600">{g.company_name}</td>
                 <td className="px-4 py-2.5">
-                  <div className="font-medium text-slate-800 dark:text-slate-100">{g.user_name}</div>
-                  <div className="text-xs text-slate-400 dark:text-slate-500">{g.user_email}</div>
+                  <div className="font-medium text-slate-800">{g.user_name}</div>
+                  <div className="text-xs text-slate-400">{g.user_email}</div>
                 </td>
                 <td className="px-4 py-2.5">
                   {g.is_active ? (
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">Active</span>
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Active</span>
                   ) : (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">Inactive</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">Inactive</span>
                   )}
                 </td>
-                <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">{g.payroll_role}</td>
+                <td className="px-4 py-2.5 text-slate-700">{g.payroll_role}</td>
                 <td className="px-4 py-2.5 text-right">
                   <button
                     type="button"
                     onClick={() => revoke.mutate(g)}
                     disabled={revoke.isPending}
-                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600 disabled:opacity-50"
                   >
                     Revoke
                   </button>
@@ -192,7 +192,7 @@ export default function PayrollAccessPage() {
         </table>
       </div>
 
-      <p className="text-xs text-slate-400 dark:text-slate-500">
+      <p className="text-xs text-slate-400">
         Roles are the ones that actually hold payroll permissions, read from the permission tables —
         not a separate list that could drift from what the seeder grants.
       </p>
@@ -201,7 +201,7 @@ export default function PayrollAccessPage() {
 }
 
 const inputCls =
-  "w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 outline-none focus:border-slate-500 dark:focus:border-slate-400 focus:ring-2 focus:ring-slate-100 dark:focus:ring-slate-700 transition";
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100 transition";
 
 function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return <select className={inputCls} {...props} />;
@@ -210,7 +210,7 @@ function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">{label}</label>
+      <label className="mb-1 block text-xs font-medium text-slate-500">{label}</label>
       {children}
     </div>
   );
