@@ -155,7 +155,7 @@ const ASSIGNABLE_ROLES: Role[] = [
 
 type SectionKey =
   | "basic" | "work" | "locations" | "schedule"
-  | "government" | "visa" | "education" | "training" | "performance"
+  | "government" | "visa" | "education" | "performance"
   | "contact" | "dependents" | "benefits" | "leave" | "salary" | "payroll" | "portal";
 
 type SectionDef = {
@@ -181,7 +181,6 @@ const IconLocation    = () => icon("M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l
 const IconSchedule    = () => icon("M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z");
 const IconGovernment  = () => icon("M12 3l9 6H3l9-6zM5 10v8m4-8v8m6-8v8m4-8v8M3 21h18");
 const IconEducation   = () => icon("M12 14l9-5-9-5-9 5 9 5zm0 0v7m-6-3.5V12l6 3 6-3v5.5");
-const IconTraining    = () => icon("M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.958a1 1 0 00.95.69h4.163c.969 0 1.371 1.24.588 1.81l-3.368 2.447a1 1 0 00-.364 1.118l1.287 3.958c.3.922-.755 1.688-1.539 1.118l-3.367-2.447a1 1 0 00-1.176 0l-3.367 2.447c-.784.57-1.838-.196-1.539-1.118l1.287-3.958a1 1 0 00-.364-1.118L2.012 9.385c-.783-.57-.38-1.81.588-1.81h4.163a1 1 0 00.95-.69l1.286-3.958z");
 const IconPerformance = () => icon("M3 3v18h18M7 15l3-3 3 3 5-6");
 const IconVisa        = () => icon("M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L12 19v-5.5L21 16z");
 const IconPayroll     = () => icon("M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z");
@@ -232,22 +231,6 @@ export default function EmployeeRegistrationPage() {
   const removeEdu = (i: number) => setEduRows((r) => r.filter((_, n) => n !== i));
   const setEdu    = (i: number, patch: Partial<EduRow>) =>
     setEduRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
-
-  // Training records (UI shell — captured on the page but not yet persisted).
-  type TrainingRow = {
-    training_date: string; name: string; instructor: string; nature: string;
-    cost: string; returning_service_period: string; corresponding_amount: string;
-    notes: string; start: string; end: string;
-  };
-  const blankTraining: TrainingRow = {
-    training_date: "", name: "", instructor: "", nature: "", cost: "",
-    returning_service_period: "", corresponding_amount: "", notes: "", start: "", end: "",
-  };
-  const [trainingRows, setTrainingRows] = useState<TrainingRow[]>([]);
-  const addTraining    = () => setTrainingRows((r) => [...r, { ...blankTraining }]);
-  const removeTraining = (i: number) => setTrainingRows((r) => r.filter((_, n) => n !== i));
-  const setTraining    = (i: number, patch: Partial<TrainingRow>) =>
-    setTrainingRows((r) => r.map((row, n) => (n === i ? { ...row, ...patch } : row)));
 
   // Performance goals: goal text, optional due date and feedback.
   type GoalRow = { goal: string; due_date: string; feedback: string };
@@ -489,9 +472,6 @@ export default function EmployeeRegistrationPage() {
     { key: "education", label: "Educational Background", description: "School, degree & years attended",
       icon: <IconEducation />,
       isComplete: () => eduRows.some((r) => r.level && r.school) },
-    { key: "training", label: "Training", description: "Seminars & trainings attended",
-      icon: <IconTraining />,
-      isComplete: () => trainingRows.some((r) => r.name.trim()) },
     { key: "performance", label: "Performance Management", description: "Goals, due dates & feedback",
       icon: <IconPerformance />,
       isComplete: () => goalRows.some((r) => r.goal.trim()) },
@@ -869,13 +849,13 @@ export default function EmployeeRegistrationPage() {
     return (
       <SuccessScreen
         result={result}
-        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setTrainingRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setVisaRows([]); setDepRows([]); setBenRows([]); setLeavePlans({}); setSalRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
+        onAnother={() => { setResult(null); form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setVisaRows([]); setDepRows([]); setBenRows([]); setLeavePlans({}); setSalRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setActive("basic"); }}
       />
     );
   }
 
   const toggle = (key: SectionKey) => setActive((prev) => (prev === key ? null : key));
-  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setTrainingRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setVisaRows([]); setDepRows([]); setBenRows([]); setLeavePlans({}); setSalRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
+  const reset  = () => { form.reset(); clearPhoto(); setLocations([]); setEduRows([]); setGoalRows([]); setEmgRows([]); setPhoneRows([]); setEmailRows([]); setAddrRows([]); setVisaRows([]); setDepRows([]); setBenRows([]); setLeavePlans({}); setSalRows([]); setScheduleDays(Array.from({ length: 7 }, () => ({ ...emptyDay }))); setServerError(null); setActive("basic"); };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -1017,9 +997,6 @@ export default function EmployeeRegistrationPage() {
                     )}
                     {section.key === "education"   && (
                       <EducationSection rows={eduRows} onAdd={addEdu} onRemove={removeEdu} onChange={setEdu} />
-                    )}
-                    {section.key === "training"    && (
-                      <TrainingSection rows={trainingRows} onAdd={addTraining} onRemove={removeTraining} onChange={setTraining} />
                     )}
                     {section.key === "performance" && (
                       <PerformanceSection rows={goalRows} onAdd={addGoal} onRemove={removeGoal} onChange={setGoal} />
@@ -2214,88 +2191,6 @@ function EducationSection({ rows, onAdd, onRemove, onChange }: {
       <Hint>
         Education Type and School are both needed for a row to save; incomplete rows are skipped.
         Year To must not be earlier than Year From.
-      </Hint>
-    </div>
-  );
-}
-
-type TrainingRow = {
-  training_date: string; name: string; instructor: string; nature: string;
-  cost: string; returning_service_period: string; corresponding_amount: string;
-  notes: string; start: string; end: string;
-};
-
-function TrainingSection({ rows, onAdd, onRemove, onChange }: {
-  rows: TrainingRow[];
-  onAdd: () => void;
-  onRemove: (i: number) => void;
-  onChange: (i: number, patch: Partial<TrainingRow>) => void;
-}) {
-  const HEADERS = [
-    "Training Date", "Training Name", "Instructor / Institution", "Nature of Training",
-    "Training Cost", "Returning Service Period", "Corresponding Amount", "Training Notes",
-    "Start of Training", "End of Training", "",
-  ];
-  return (
-    <div className="space-y-4">
-      <button
-        type="button"
-        onClick={onAdd}
-        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-      >
-        Add Training
-      </button>
-
-      <div className="overflow-x-auto rounded-xl border border-slate-200">
-        <table className="w-full min-w-[1200px] text-sm">
-          <thead className="bg-slate-50">
-            <tr>
-              {HEADERS.map((h, idx) => (
-                <th key={idx} className="whitespace-nowrap px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={11} className="px-3 py-6 text-center text-xs text-slate-400">
-                  No entries yet.
-                </td>
-              </tr>
-            )}
-
-            {rows.map((r, i) => (
-              <tr key={i}>
-                <td className="px-3 py-2"><Input type="date" value={r.training_date} onChange={(e) => onChange(i, { training_date: e.target.value })} /></td>
-                <td className="px-3 py-2"><Input value={r.name} onChange={(e) => onChange(i, { name: e.target.value })} /></td>
-                <td className="px-3 py-2"><Input value={r.instructor} onChange={(e) => onChange(i, { instructor: e.target.value })} /></td>
-                <td className="px-3 py-2"><Input value={r.nature} onChange={(e) => onChange(i, { nature: e.target.value })} /></td>
-                <td className="px-3 py-2"><Input type="number" placeholder="0.00" value={r.cost} onChange={(e) => onChange(i, { cost: e.target.value })} /></td>
-                <td className="px-3 py-2"><Input value={r.returning_service_period} onChange={(e) => onChange(i, { returning_service_period: e.target.value })} /></td>
-                <td className="px-3 py-2"><Input type="number" placeholder="0.00" value={r.corresponding_amount} onChange={(e) => onChange(i, { corresponding_amount: e.target.value })} /></td>
-                <td className="px-3 py-2"><Input value={r.notes} onChange={(e) => onChange(i, { notes: e.target.value })} /></td>
-                <td className="px-3 py-2"><Input type="date" value={r.start} onChange={(e) => onChange(i, { start: e.target.value })} /></td>
-                <td className="px-3 py-2"><Input type="date" value={r.end} onChange={(e) => onChange(i, { end: e.target.value })} /></td>
-                <td className="px-3 py-2 text-right">
-                  <button
-                    type="button"
-                    onClick={() => onRemove(i)}
-                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600"
-                  >
-                    Remove
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <Hint>
-        Captured for the 201 file. Training records aren’t saved on registration yet — persistence
-        comes in a later pass.
       </Hint>
     </div>
   );
