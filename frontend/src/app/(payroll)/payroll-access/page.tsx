@@ -8,6 +8,16 @@ import { AdvancesSection } from "@/components/payroll/AdvancesSection";
 import { TrainingSection } from "@/components/payroll/TrainingSection";
 import { AssetsSection } from "@/components/payroll/AssetsSection";
 import { SectionShell } from "@/components/payroll/SectionShell";
+import {
+  MemoSection,
+  SeminarsSection,
+  EmploymentRecordSection,
+  MovementSection,
+  DocumentsSection,
+  MedicalRecordsSection,
+  RequirementsSection,
+  AccessLevelSection,
+} from "@/components/payroll/EmployeeProfileSections";
 
 const ROLE_BLURB: Record<string, string> = {
   payroll_officer: "Run, approve and post payroll; manage compensation",
@@ -23,6 +33,14 @@ const IconAccess = () => svg("M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2
 const IconAdvances = () => svg("M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z");
 const IconTraining = () => svg("M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.958a1 1 0 00.95.69h4.163c.969 0 1.371 1.24.588 1.81l-3.368 2.447a1 1 0 00-.364 1.118l1.287 3.958c.3.922-.755 1.688-1.539 1.118l-3.367-2.447a1 1 0 00-1.176 0l-3.367 2.447c-.784.57-1.838-.196-1.539-1.118l1.287-3.958a1 1 0 00-.364-1.118L2.012 9.385c-.783-.57-.38-1.81.588-1.81h4.163a1 1 0 00.95-.69l1.286-3.958z");
 const IconAssets = () => svg("M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4");
+const IconMemo = () => svg("M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z");
+const IconSeminars = () => svg("M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z");
+const IconEmployment = () => svg("M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z");
+const IconMovement = () => svg("M13 7a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0110-4.472M16 11l3 3 3-3m-3 3V4");
+const IconDocuments = () => svg("M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z");
+const IconMedical = () => svg("M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z");
+const IconRequirements = () => svg("M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4");
+const IconKey = () => svg("M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z");
 
 export default function PayrollAccessPage() {
   const qc = useQueryClient();
@@ -254,6 +272,46 @@ export default function PayrollAccessPage() {
           description="Company items issued to the employee"
         >
           <AssetsSection />
+        </SectionShell>
+
+        {/* 05 — Memo */}
+        <SectionShell index={5} icon={<IconMemo />} title="Memo" description="Disciplinary actions, offenses & infractions">
+          <MemoSection />
+        </SectionShell>
+
+        {/* 06 — Seminars Attended / Service Training Attended */}
+        <SectionShell index={6} icon={<IconSeminars />} title="Seminars Attended / Service Training Attended" description="Courses and service trainings">
+          <SeminarsSection />
+        </SectionShell>
+
+        {/* 07 — Employment Record */}
+        <SectionShell index={7} icon={<IconEmployment />} title="Employment Record" description="Previous positions, companies & industries">
+          <EmploymentRecordSection />
+        </SectionShell>
+
+        {/* 08 — Movement */}
+        <SectionShell index={8} icon={<IconMovement />} title="Movement" description="Promotions, transfers & other movements">
+          <MovementSection />
+        </SectionShell>
+
+        {/* 09 — Documents */}
+        <SectionShell index={9} icon={<IconDocuments />} title="Documents" description="Uploaded employee documents">
+          <DocumentsSection />
+        </SectionShell>
+
+        {/* 10 — Medical records */}
+        <SectionShell index={10} icon={<IconMedical />} title="Medical Records" description="Medical files & classifications">
+          <MedicalRecordsSection />
+        </SectionShell>
+
+        {/* 11 — Requirements */}
+        <SectionShell index={11} icon={<IconRequirements />} title="Requirements" description="Pre-employment requirements checklist">
+          <RequirementsSection />
+        </SectionShell>
+
+        {/* 12 — Access Level */}
+        <SectionShell index={12} icon={<IconKey />} title="Access Level" description="System login and access level">
+          <AccessLevelSection />
         </SectionShell>
       </div>
 
