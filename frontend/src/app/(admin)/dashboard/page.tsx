@@ -11,6 +11,7 @@ import { payrollApi } from "@/lib/payroll";
 import { ROLE_LABELS } from "@/lib/users";
 import { getMyAccessRequests } from "@/lib/access-requests";
 import { PageHeader } from "@/components/ui";
+import { TimeClockCard } from "@/components/TimeClockCard";
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 
@@ -224,6 +225,9 @@ export default function DashboardPage() {
         </div>
         <div className="absolute -right-12 -top-12 h-64 w-64 rounded-full bg-slate-800 opacity-50" />
       </section>
+
+      {/* ── Web time clock (anyone linked to an employee record) ── */}
+      {hasEmployee && <TimeClockCard />}
 
       {/* ── Role-specific views ── */}
       {viewGroup === "admin"      && <AdminView      {...sharedProps} payrollRuns={recentRuns} personal={personalProps} />}

@@ -195,6 +195,40 @@ export const myAttendanceApi = {
   },
 };
 
+// ── Web time clock (self-service: clock IN / OUT from the dashboard) ──────────
+
+export type TimeClockPunch = {
+  id: number;
+  direction: "in" | "out";
+  logged_at: string;
+  source: "biometric" | "web" | "mobile" | "manual";
+};
+
+export type TimeClockStatus = {
+  state: "in" | "out"; // "in" = currently clocked in
+  clocked_in_at: string | null;
+  last_punch_at: string | null;
+  server_time: string;
+  punches: TimeClockPunch[];
+};
+
+export const myTimeClockApi = {
+  today: async (): Promise<TimeClockStatus> => {
+    const { data } = await api.get<{ data: TimeClockStatus }>("/api/v1/my/time-clock");
+    return data.data;
+  },
+  punch: async (
+    direction: "in" | "out",
+    coords?: { lat: number; lng: number },
+  ): Promise<{ data: TimeClockStatus; message: string }> => {
+    const { data } = await api.post<{ data: TimeClockStatus; message: string }>(
+      "/api/v1/my/time-clock",
+      { direction, ...(coords ?? {}) },
+    );
+    return data;
+  },
+};
+
 export const employeeSchedulesApi = {
   list: async (employeeId: number): Promise<ScheduleAssignment[]> => {
     const { data } = await api.get<Listed<ScheduleAssignment>>(
