@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { inputCls } from "@/components/employees/ChildList";
+import { PasswordField, isPasswordValid } from "@/components/PasswordField";
 import { ROLE_LABELS, usersApi, type Role, type StoreUserInput } from "@/lib/users";
 
 export default function NewUserPage() {
@@ -47,10 +48,11 @@ export default function NewUserPage() {
           <label className="mb-1 block text-xs font-medium text-slate-600">Email *</label>
           <input type="email" className={inputCls} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
         </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">Initial password * (≥ 8 chars)</label>
-          <input type="text" className={inputCls} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={8} />
-        </div>
+        <PasswordField
+          label="Initial password"
+          value={form.password}
+          onChange={(v) => setForm({ ...form, password: v })}
+        />
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-600">Role *</label>
           <select className={inputCls} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
@@ -62,7 +64,7 @@ export default function NewUserPage() {
 
         <div className="flex justify-end gap-2">
           <button type="button" onClick={() => router.back()} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100">Cancel</button>
-          <button type="submit" disabled={create.isPending} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
+          <button type="submit" disabled={create.isPending || !isPasswordValid(form.password)} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
             {create.isPending ? "Creating…" : "Create user"}
           </button>
         </div>

@@ -4,6 +4,7 @@ namespace App\Http\Requests\Users;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class StoreUserRequest extends FormRequest
 {
@@ -17,7 +18,8 @@ class StoreUserRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
-            'password' => ['required', 'string', 'min:8', 'max:64'],
+            // 8-20 chars with at least one lowercase, uppercase, number and symbol.
+            'password' => ['required', 'string', 'max:20', Password::min(8)->mixedCase()->numbers()->symbols()],
             'role' => ['required', 'string', Rule::in([
                 'hr_admin', 'it_admin', 'payroll_officer', 'dept_head', 'employee',
                 'supervisor', 'team_lead', 'dept_admin', 'transport_access',
