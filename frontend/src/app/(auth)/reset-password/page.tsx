@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { resetPassword } from "@/lib/auth";
+import { PasswordField, isPasswordValid } from "@/components/PasswordField";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -69,21 +70,7 @@ function ResetPasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="password" className="mb-1 block text-sm font-medium">
-          New password
-        </label>
-        <input
-          id="password"
-          type="password"
-          required
-          minLength={8}
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
-        />
-      </div>
+      <PasswordField label="New password" value={password} onChange={setPassword} />
       <div>
         <label htmlFor="confirmation" className="mb-1 block text-sm font-medium">
           Confirm new password
@@ -103,7 +90,7 @@ function ResetPasswordForm() {
       )}
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || !isPasswordValid(password)}
         className="w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
       >
         {loading ? "Saving…" : "Set new password"}

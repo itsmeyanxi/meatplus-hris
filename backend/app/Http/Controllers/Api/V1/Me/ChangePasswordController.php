@@ -15,7 +15,7 @@ class ChangePasswordController extends Controller
     {
         $data = $request->validate([
             'current_password' => ['required', 'string'],
-            'password'         => ['required', 'string', Password::min(8)->mixedCase()->numbers(), 'confirmed'],
+            'password'         => ['required', 'string', 'max:20', 'confirmed', Password::defaults()],
         ]);
 
         if (! Hash::check($data['current_password'], $request->user()->password)) {

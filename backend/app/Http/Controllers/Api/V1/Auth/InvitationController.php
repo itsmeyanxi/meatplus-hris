@@ -142,7 +142,7 @@ class InvitationController extends Controller
 
         $request->validate([
             'username'              => ['required', 'string', 'min:3', 'max:40', 'alpha_dash', 'unique:users,username'],
-            'password'              => ['required', 'string', 'min:8', 'confirmed'],
+            'password'              => ['required', 'string', 'max:20', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
 
         $employee = $invitation->employee;

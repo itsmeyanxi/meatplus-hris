@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { changePassword, getMe } from "@/lib/auth";
+import { PasswordField, isPasswordValid } from "@/components/PasswordField";
 import { getRoles, ROLE_LABELS } from "@/lib/users";
 import { AppButton } from "@/components/ui";
 import { inputCls, labelCls } from "@/lib/form-classes";
@@ -335,11 +336,8 @@ function ChangePasswordForm() {
         <input type="password" className={inputCls} placeholder="••••••••" value={form.current_password} onChange={set("current_password")} required autoComplete="current-password" />
         {fieldErrors.current_password && <p className="mt-1 text-xs text-red-500">{fieldErrors.current_password[0]}</p>}
       </div>
-      <div>
-        <label className={labelCls}>New password</label>
-        <input type="password" className={inputCls} placeholder="••••••••" value={form.password} onChange={set("password")} required autoComplete="new-password" />
-        {fieldErrors.password && <p className="mt-1 text-xs text-red-500">{fieldErrors.password[0]}</p>}
-      </div>
+      <PasswordField label="New password" value={form.password} onChange={(v) => setForm((f) => ({ ...f, password: v }))} />
+      {fieldErrors.password && <p className="-mt-2 text-xs text-red-500">{fieldErrors.password[0]}</p>}
       <div>
         <label className={labelCls}>Confirm new password</label>
         <input type="password" className={inputCls} placeholder="••••••••" value={form.password_confirmation} onChange={set("password_confirmation")} required autoComplete="new-password" />
@@ -355,7 +353,7 @@ function ChangePasswordForm() {
       )}
 
       <div className="pt-1">
-        <AppButton type="submit" disabled={mutation.isPending} className="w-full justify-center">
+        <AppButton type="submit" disabled={mutation.isPending || !isPasswordValid(form.password)} className="w-full justify-center">
           {mutation.isPending ? "Updating…" : "Update password"}
         </AppButton>
       </div>

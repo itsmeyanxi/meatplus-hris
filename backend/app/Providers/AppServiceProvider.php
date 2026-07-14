@@ -6,6 +6,7 @@ use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 use Spatie\Permission\PermissionRegistrar;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +20,11 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // One password policy for the whole app: at least one lowercase, uppercase,
+        // number and symbol. Length min is 8 here; the 20-char max is applied
+        // alongside via a 'max:20' rule at each call site.
+        Password::defaults(fn () => Password::min(8)->mixedCase()->numbers()->symbols());
+
         Gate::before(function ($user, string $ability) {
             if (method_exists($user, 'hasPermissionTo') && $user->hasPermissionTo($ability)) {
                 return true;

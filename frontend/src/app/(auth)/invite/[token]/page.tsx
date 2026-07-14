@@ -3,9 +3,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { invitationsApi } from "@/lib/invitations";
+import { PasswordField } from "@/components/PasswordField";
 
 const schema = z
   .object({
@@ -14,7 +15,14 @@ const schema = z
       .min(3, "At least 3 characters")
       .max(40, "At most 40 characters")
       .regex(/^[a-zA-Z0-9_-]+$/, "Letters, numbers, _ and - only"),
-    password: z.string().min(8, "At least 8 characters"),
+    password: z
+      .string()
+      .min(8, "At least 8 characters")
+      .max(20, "At most 20 characters")
+      .regex(/[a-z]/, "Include a lowercase letter")
+      .regex(/[A-Z]/, "Include a capital letter")
+      .regex(/[0-9]/, "Include a number")
+      .regex(/[^A-Za-z0-9]/, "Include a special character"),
     password_confirmation: z.string().min(1, "Confirm your password"),
   })
   .refine((d) => d.password === d.password_confirmation, {
@@ -42,6 +50,7 @@ export default function InviteAcceptPage() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
@@ -139,21 +148,17 @@ export default function InviteAcceptPage() {
             )}
           </div>
 
-          <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
-              {...register("password")}
-            />
-            {errors.password && (
-              <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>
+          <Controller
+            name="password"
+            control={control}
+            defaultValue=""
+            render={({ field }) => (
+              <PasswordField label="Password" value={field.value ?? ""} onChange={field.onChange} />
             )}
-          </div>
+          />
+          {errors.password && (
+            <p className="-mt-2 text-xs text-red-600">{errors.password.message}</p>
+          )}
 
           <div>
             <label htmlFor="password_confirmation" className="mb-1 block text-sm font-medium">
