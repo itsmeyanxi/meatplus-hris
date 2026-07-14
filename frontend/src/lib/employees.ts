@@ -92,12 +92,11 @@ export type ImportResult = {
   errors: { row: number; message: string }[];
 };
 
-export async function importEmployees(file: File): Promise<ImportResult> {
+export async function importEmployees(file: File, companyId?: number | ""): Promise<ImportResult> {
   const fd = new FormData();
   fd.append("file", file);
-  const { data } = await api.post<ImportResult>("/api/v1/employees/import", fd, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  if (companyId) fd.append("company_id", String(companyId));
+  const { data } = await api.post<ImportResult>("/api/v1/employees/import", fd);
   return data;
 }
 

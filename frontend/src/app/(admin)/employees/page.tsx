@@ -446,7 +446,7 @@ export default function EmployeesPage() {
       )}
 
       {showImport && (
-        <ImportModal onClose={() => setShowImport(false)} onDone={() => qc.invalidateQueries({ queryKey: ["employees"] })} />
+        <ImportModal companies={companies ?? []} onClose={() => setShowImport(false)} onDone={() => qc.invalidateQueries({ queryKey: ["employees"] })} />
       )}
 
       {/* Record preview drawer */}
@@ -572,13 +572,14 @@ function Td({ children }: { children: React.ReactNode }) {
   return <td className="px-4 py-3 align-top">{children}</td>;
 }
 
-function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+function ImportModal({ companies, onClose, onDone }: { companies: { id: number; name?: string }[]; onClose: () => void; onDone: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [companyId, setCompanyId] = useState<number | "">("");
   const [result, setResult] = useState<ImportResult | null>(null);
 
   const upload = useMutation({
-    mutationFn: () => importEmployees(file!),
+    mutationFn: () => importEmployees(file!, companyId),
     onSuccess: (res) => {
       setResult(res);
       if (res.created > 0 || res.updated > 0) onDone();
@@ -590,7 +591,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
         <h2 className="text-lg font-semibold text-slate-900">Import employees</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Upload a CSV or Excel (.xlsx) file. Columns: Employee ID, Last Name, Middle Name, First Name, Gender, Civil
+          Upload a CSV or Excel (.xlsx / .xls) file. Columns: Employee ID, Last Name, Middle Name, First Name, Gender, Civil
           Status, Department, Location, Email, Position, Employment Type, Date Hired, Birth Date. Missing
           departments, locations, positions and employment types are created automatically. Existing employee IDs are
           updated (blank cells never overwrite existing data); new IDs are created.
@@ -603,8 +604,18 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
           Download template
         </a>
         {!result && (
-          <div className="mt-4">
-            <input ref={fileRef} type="file" accept=".csv,.xlsx,text/csv"
+          <div className="mt-4 space-y-3">
+            {companies.length > 1 && (
+              <div>
+                <label className={labelCls}>Import into company</label>
+                <select className={inputCls} value={companyId} onChange={(e) => setCompanyId(e.target.value === "" ? "" : Number(e.target.value))}>
+                  <option value="">Current company</option>
+                  {companies.map((c) => <option key={c.id} value={c.id}>{c.name ?? `Company ${c.id}`}</option>)}
+                </select>
+                <p className="mt-1 text-xs text-slate-400">Pick the company these employees belong to — no need to switch your active company.</p>
+              </div>
+            )}
+            <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,text/csv"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800" />
             {file && <p className="mt-2 text-xs text-slate-500">Selected: {file.name}</p>}
