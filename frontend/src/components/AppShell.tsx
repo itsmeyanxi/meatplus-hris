@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { getMe, logout, switchCompany } from "@/lib/auth";
 import { getRoles, ROLE_LABELS } from "@/lib/users";
 import { getCompanies } from "@/lib/companies";
@@ -324,8 +324,9 @@ export function AppShell({
         )}
 
         {/* Desktop top bar */}
-        <div className="sticky top-0 z-20 hidden items-center justify-end gap-1 border-b border-slate-200/80 bg-white/80 px-6 py-2 backdrop-blur lg:flex">
+        <div className="sticky top-0 z-20 hidden items-center justify-end gap-2 border-b border-slate-200/80 bg-white/80 px-6 py-2 backdrop-blur lg:flex">
           <NotificationBell />
+          <ProfileMenu name={data?.user.name ?? ""} email={data?.user.email ?? ""} hasEmployee={hasEmployee} onLogout={handleLogout} />
         </div>
 
         <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur lg:hidden">
@@ -338,11 +339,9 @@ export function AppShell({
                 </h1>
                 <p className="mt-0.5 text-xs text-slate-500">{companyName}</p>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
                 <NotificationBell />
-                <AppButton onClick={handleLogout} variant="secondary" className="shrink-0">
-                  Log out
-                </AppButton>
+                <ProfileMenu name={data?.user.name ?? ""} email={data?.user.email ?? ""} hasEmployee={hasEmployee} onLogout={handleLogout} />
               </div>
             </div>
 
@@ -395,6 +394,111 @@ function AccessDenied() {
       >
         Back to dashboard
       </Link>
+    </div>
+  );
+}
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "U";
+  const first = parts[0][0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] ?? "" : "";
+  return (first + last).toUpperCase();
+}
+
+/** Avatar + dropdown menu (profile, attendance, change password, log out). */
+function ProfileMenu({
+  name,
+  email,
+  hasEmployee,
+  onLogout,
+}: {
+  name: string;
+  email: string;
+  hasEmployee: boolean;
+  onLogout: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const rowCls = "flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50";
+  const avatar = (size: string) => (
+    <div className={`flex ${size} shrink-0 items-center justify-center rounded-full bg-slate-900 font-semibold text-white`}>
+      {initialsOf(name)}
+    </div>
+  );
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="rounded-full ring-2 ring-white transition hover:opacity-90"
+        title={name}
+        aria-label="Account menu"
+      >
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+          {initialsOf(name)}
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-40 mt-2 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
+          <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
+            {avatar("h-10 w-10 text-sm")}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-800">{name || "—"}</p>
+              <p className="truncate text-xs text-slate-400">{email}</p>
+            </div>
+          </div>
+
+          <div className="py-1">
+            <Link href="/account" className={rowCls} onClick={() => setOpen(false)}>
+              <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              My Profile
+            </Link>
+            {hasEmployee && (
+              <Link href="/my-attendance" className={rowCls} onClick={() => setOpen(false)}>
+                <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 16l2 2 4-4" />
+                </svg>
+                My Attendance
+              </Link>
+            )}
+            <Link href="/account" className={rowCls} onClick={() => setOpen(false)}>
+              <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+              Change Password
+            </Link>
+          </div>
+
+          <div className="border-t border-slate-100 py-1">
+            <button
+              type="button"
+              onClick={() => { setOpen(false); onLogout(); }}
+              className={`${rowCls} text-red-600 hover:bg-red-50`}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Log out
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
