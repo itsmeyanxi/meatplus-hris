@@ -112,7 +112,9 @@ export function AppShell({
   });
 
   // Exclude the home company from the switcher — once you leave, you can't go back.
-  const switchableCompanies = companiesData?.filter((c) => c.id !== originalCompanyId) ?? [];
+  // Show every company the account can reach, including the home company so it
+  // can be returned to.
+  const switchableCompanies = companiesData ?? [];
 
   const handleSwitchCompany = async (id: number) => {
     if (id === data?.user.active_company?.id) { setCompanyOpen(false); return; }

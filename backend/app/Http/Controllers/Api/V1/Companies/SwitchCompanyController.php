@@ -35,16 +35,10 @@ class SwitchCompanyController extends Controller
             }
         }
 
-        // On first switch, lock in the home company so it can never be returned to.
+        // Remember the home company (for reference), but switching back to it is
+        // allowed — users need to be able to return to where they started.
         if ($user->original_company_id === null) {
             $user->original_company_id = $user->active_company_id;
-        }
-
-        // Block switching back to the original/home company.
-        if ($targetId === $user->original_company_id) {
-            return response()->json([
-                'message' => 'You cannot switch back to your original company.',
-            ], 403);
         }
 
         $user->forceFill(['active_company_id' => $targetId])->save();
