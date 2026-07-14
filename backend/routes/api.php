@@ -67,6 +67,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', SetPermissionsTeam::class])->group(function () {
         Route::get('me', MeController::class);
         Route::get('my/pending-summary', PendingSummaryController::class);
+        Route::get('my/team', \App\Http\Controllers\Api\V1\Me\TeamController::class);
         Route::post('my/change-password', ChangePasswordController::class);
         Route::get('my/notifications', [NotificationController::class, 'index']);
         Route::post('my/notifications/read-all', [NotificationController::class, 'markAllRead']);
