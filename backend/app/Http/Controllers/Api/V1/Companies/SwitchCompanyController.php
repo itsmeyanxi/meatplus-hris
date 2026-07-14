@@ -18,9 +18,12 @@ class SwitchCompanyController extends Controller
         $user     = $request->user();
         $targetId = (int) $data['company_id'];
 
+        // Captured in the CURRENT (home) team, before we change the team below.
+        $isRealItAdmin = $user->hasRole('it_admin');
+
         // IT accounts are any user who currently has it_admin OR who has
         // previously switched away (original_company_id is set).
-        $isItAccount = $user->hasRole('it_admin') || $user->original_company_id !== null;
+        $isItAccount = $isRealItAdmin || $user->original_company_id !== null;
 
         if (! $isItAccount) {
             // Regular users must be a member of the target company.
@@ -48,10 +51,14 @@ class SwitchCompanyController extends Controller
 
         setPermissionsTeamId($targetId);
 
-        // Ensure the user has at least the employee role in the target company.
-        // This intentionally does NOT grant it_admin — IT accounts operate as
-        // regular employees when outside their home company.
-        if (! $user->hasRole('employee')) {
+        // IT admins keep full admin access in every company they switch to, so
+        // switching never strips their roles. Everyone else gets at least the
+        // employee role in the target company.
+        if ($isRealItAdmin) {
+            if (! $user->hasRole('it_admin')) {
+                $user->assignRole('it_admin');
+            }
+        } elseif (! $user->hasRole('employee')) {
             $user->assignRole('employee');
         }
 
