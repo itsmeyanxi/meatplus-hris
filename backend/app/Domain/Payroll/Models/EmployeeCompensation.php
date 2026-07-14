@@ -6,10 +6,22 @@ use App\Domain\HRIS\Models\Employee;
 use App\Domain\Identity\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class EmployeeCompensation extends Model
 {
     use BelongsToCompany;
+    use LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['basic_monthly', 'allowance_monthly', 'effective_from', 'is_active'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('compensation');
+    }
 
     // "compensation" is uncountable to the inflector, so pin the table name.
     protected $table = 'employee_compensations';

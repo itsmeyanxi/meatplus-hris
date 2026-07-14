@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AppButton, TableShell } from "@/components/ui";
 import { inputCls, labelCls } from "@/lib/form-classes";
 import { assetsApi, type Asset, type AssetInput } from "@/lib/employee-relations";
+import { referenceApi } from "@/lib/reference";
 
 const COLS = [
   "Item",
@@ -124,6 +125,11 @@ function AddAssetModal({
   onClose: () => void;
   onAdd: (a: AssetInput) => void;
 }) {
+  const { data: categories } = useQuery({
+    queryKey: ["reference", "asset_type"],
+    queryFn: () => referenceApi.list("asset_type"),
+  });
+  const activeCategories = (categories ?? []).filter((c) => c.is_active);
   const [f, setF] = useState({
     item: "",
     category: "",
@@ -163,7 +169,14 @@ function AddAssetModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Category</label>
-              <input className={inputCls} value={f.category} onChange={(e) => set("category", e.target.value)} placeholder="e.g. IT Equipment" />
+              {activeCategories.length > 0 ? (
+                <select className={inputCls} value={f.category} onChange={(e) => set("category", e.target.value)}>
+                  <option value="">Select category…</option>
+                  {activeCategories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
+              ) : (
+                <input className={inputCls} value={f.category} onChange={(e) => set("category", e.target.value)} placeholder="Add categories under Maintenance › Assets" />
+              )}
             </div>
             <div>
               <label className={labelCls}>Condition</label>
