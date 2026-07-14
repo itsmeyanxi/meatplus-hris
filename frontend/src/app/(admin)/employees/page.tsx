@@ -177,7 +177,7 @@ export default function EmployeesPage() {
               </svg>
               Export
             </button>
-            <Link href="/employees/new"
+            <Link href="/employee-registration"
               className="inline-flex items-center rounded-xl border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800">
               + New employee
             </Link>
@@ -349,7 +349,7 @@ export default function EmployeesPage() {
               <tr>
                 <td colSpan={COLS} className="px-4 py-6 text-center text-slate-500">
                   No employees yet.{" "}
-                  <Link href="/employees/new" className="text-slate-900 underline">Add the first one</Link>.
+                  <Link href="/employee-registration" className="text-slate-900 underline">Add the first one</Link>.
                 </td>
               </tr>
             )}
