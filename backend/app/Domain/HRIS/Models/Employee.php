@@ -152,6 +152,11 @@ class Employee extends Model
         return $this->hasMany(EmployeeAsset::class);
     }
 
+    public function records(): HasMany
+    {
+        return $this->hasMany(EmployeeRecord::class);
+    }
+
     public function emergencyContacts(): HasMany
     {
         return $this->hasMany(EmployeeEmergencyContact::class);

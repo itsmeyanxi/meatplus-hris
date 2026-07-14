@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\V1\Employees\ContactChannelController;
 use App\Http\Controllers\Api\V1\Employees\ContractController;
 use App\Http\Controllers\Api\V1\Employees\DependentController;
 use App\Http\Controllers\Api\V1\Employees\EmployeeAssetController;
+use App\Http\Controllers\Api\V1\Employees\EmployeeRecordController;
 use App\Http\Controllers\Api\V1\Employees\EducationController;
 use App\Http\Controllers\Api\V1\Employees\EmergencyContactController;
 use App\Http\Controllers\Api\V1\Employees\EmployeeController;
@@ -109,6 +110,12 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('employees.dependents', DependentController::class)->scoped();
         Route::apiResource('employees.assets', EmployeeAssetController::class)
             ->scoped()->only(['index', 'store', 'update', 'destroy']);
+
+        // Generic per-employee records (advances, training, memos, seminars, …)
+        Route::get('employees/{employee}/records/{type}', [EmployeeRecordController::class, 'index']);
+        Route::post('employees/{employee}/records/{type}', [EmployeeRecordController::class, 'store']);
+        Route::put('employees/{employee}/records/{type}/{record}', [EmployeeRecordController::class, 'update']);
+        Route::delete('employees/{employee}/records/{type}/{record}', [EmployeeRecordController::class, 'destroy']);
         Route::apiResource('employees.emergency-contacts', EmergencyContactController::class)
             ->scoped()->parameters(['emergency-contacts' => 'emergencyContact']);
         Route::apiResource('employees.education', EducationController::class)

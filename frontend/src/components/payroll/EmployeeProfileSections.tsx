@@ -1,21 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { AppButton, TableShell } from "@/components/ui";
 import { inputCls, labelCls } from "@/lib/form-classes";
+import {
+  employeeRecordsApi,
+  type EmployeeRecordType,
+  type RecordRow,
+} from "@/lib/employee-records";
 
-// UI shells only — none of these persist to the server yet. Each mirrors a Sprout
-// employee-profile section so the layout is in place; wiring is a later pass.
+// ── Generic record table + add modal (persisted per-employee) ────────────────
 
-const PreviewNote = () => (
-  <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-4 py-2.5 text-xs text-amber-800">
-    Preview only — not saved to the server yet.
-  </div>
-);
-
-// ── Generic record table + add modal ────────────────────────────────────────
-
-type Field = {
+export type Field = {
   key: string;
   label: string;
   type?: "text" | "date" | "number" | "select";
@@ -23,22 +21,43 @@ type Field = {
   full?: boolean;
 };
 
-function RecordSection({
+export function RecordSection({
+  employeeId,
+  type,
   addLabel,
   fields,
   minWidth = "min-w-[700px]",
 }: {
+  employeeId: number;
+  type: EmployeeRecordType;
   addLabel: string;
   fields: Field[];
   minWidth?: string;
 }) {
-  const [rows, setRows] = useState<Record<string, string>[]>([]);
+  const qc = useQueryClient();
+  const key = ["employee", employeeId, "records", type];
   const [show, setShow] = useState(false);
-  const requiredKey = fields[0]?.key;
+
+  const { data: rows, isLoading } = useQuery({
+    queryKey: key,
+    queryFn: () => employeeRecordsApi.list(employeeId, type),
+    enabled: !!employeeId,
+  });
+
+  const create = useMutation({
+    mutationFn: (data: Record<string, unknown>) => employeeRecordsApi.create(employeeId, type, data),
+    onSuccess: () => { toast.success("Saved."); qc.invalidateQueries({ queryKey: key }); setShow(false); },
+    onError: () => toast.error("Could not save."),
+  });
+
+  const destroy = useMutation({
+    mutationFn: (id: number) => employeeRecordsApi.destroy(employeeId, type, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+    onError: () => toast.error("Could not remove."),
+  });
 
   return (
     <div className="space-y-4">
-      <PreviewNote />
       <div>
         <AppButton onClick={() => setShow(true)}>+ {addLabel}</AppButton>
       </div>
@@ -51,23 +70,32 @@ function RecordSection({
                 {fields.map((f) => (
                   <th key={f.key} className="whitespace-nowrap px-4 py-3">{f.label}</th>
                 ))}
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={fields.length} className="px-4 py-8 text-center text-xs text-slate-400">
-                    No records yet.
-                  </td>
-                </tr>
+              {isLoading ? (
+                <tr><td colSpan={fields.length + 1} className="px-4 py-8 text-center text-xs text-slate-400">Loading…</td></tr>
+              ) : (rows?.length ?? 0) === 0 ? (
+                <tr><td colSpan={fields.length + 1} className="px-4 py-8 text-center text-xs text-slate-400">No records yet.</td></tr>
               ) : (
-                rows.map((r, i) => (
-                  <tr key={i} className="hover:bg-slate-50/60">
+                rows!.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-50/60">
                     {fields.map((f, j) => (
                       <td key={f.key} className={`whitespace-nowrap px-4 py-2.5 ${j === 0 ? "font-medium text-slate-800" : "text-slate-600"}`}>
-                        {r[f.key] || "—"}
+                        {String((r as RecordRow)[f.key] ?? "") || "—"}
                       </td>
                     ))}
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => destroy.mutate(r.id)}
+                        disabled={destroy.isPending}
+                        className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-red-600 disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -80,12 +108,9 @@ function RecordSection({
         <RecordModal
           title={addLabel}
           fields={fields}
-          requiredKey={requiredKey}
+          saving={create.isPending}
           onClose={() => setShow(false)}
-          onAdd={(row) => {
-            setRows((p) => [...p, row]);
-            setShow(false);
-          }}
+          onAdd={(row) => create.mutate(row)}
         />
       )}
     </div>
@@ -95,19 +120,20 @@ function RecordSection({
 function RecordModal({
   title,
   fields,
-  requiredKey,
+  saving,
   onClose,
   onAdd,
 }: {
   title: string;
   fields: Field[];
-  requiredKey?: string;
+  saving: boolean;
   onClose: () => void;
   onAdd: (row: Record<string, string>) => void;
 }) {
   const [f, setF] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.map((x) => [x.key, x.type === "select" && x.options ? x.options[0] : ""])),
   );
+  const requiredKey = fields[0]?.key;
   const canAdd = !requiredKey || (f[requiredKey] ?? "").trim().length > 0;
 
   return (
@@ -124,12 +150,7 @@ function RecordModal({
                   {fd.options?.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               ) : (
-                <input
-                  className={inputCls}
-                  type={fd.type ?? "text"}
-                  value={f[fd.key]}
-                  onChange={(e) => setF((s) => ({ ...s, [fd.key]: e.target.value }))}
-                />
+                <input className={inputCls} type={fd.type ?? "text"} value={f[fd.key]} onChange={(e) => setF((s) => ({ ...s, [fd.key]: e.target.value }))} />
               )}
             </div>
           ))}
@@ -137,7 +158,7 @@ function RecordModal({
 
         <div className="mt-6 flex justify-end gap-2">
           <AppButton type="button" variant="secondary" onClick={onClose}>Cancel</AppButton>
-          <AppButton type="button" onClick={() => onAdd(f)} disabled={!canAdd}>Add</AppButton>
+          <AppButton type="button" onClick={() => onAdd(f)} disabled={!canAdd || saving}>{saving ? "Saving…" : "Add"}</AppButton>
         </div>
       </div>
     </div>
@@ -146,8 +167,10 @@ function RecordModal({
 
 // ── Configured record sections ──────────────────────────────────────────────
 
-export const MemoSection = () => (
+export const MemoSection = ({ employeeId }: { employeeId: number }) => (
   <RecordSection
+    employeeId={employeeId}
+    type="memo"
     addLabel="Add Memo"
     minWidth="min-w-[950px]"
     fields={[
@@ -161,8 +184,10 @@ export const MemoSection = () => (
   />
 );
 
-export const SeminarsSection = () => (
+export const SeminarsSection = ({ employeeId }: { employeeId: number }) => (
   <RecordSection
+    employeeId={employeeId}
+    type="seminar"
     addLabel="Add Course"
     fields={[
       { key: "course", label: "Course/Training", full: true },
@@ -171,22 +196,10 @@ export const SeminarsSection = () => (
   />
 );
 
-export const EmploymentRecordSection = () => (
+export const MovementSection = ({ employeeId }: { employeeId: number }) => (
   <RecordSection
-    addLabel="Add Employment Record"
-    minWidth="min-w-[800px]"
-    fields={[
-      { key: "position", label: "Position" },
-      { key: "company", label: "Company" },
-      { key: "industry", label: "Industry" },
-      { key: "from", label: "From", type: "date" },
-      { key: "to", label: "To", type: "date" },
-    ]}
-  />
-);
-
-export const MovementSection = () => (
-  <RecordSection
+    employeeId={employeeId}
+    type="movement"
     addLabel="Add Movement"
     minWidth="min-w-[900px]"
     fields={[
@@ -199,8 +212,10 @@ export const MovementSection = () => (
   />
 );
 
-export const MedicalRecordsSection = () => (
+export const MedicalRecordsSection = ({ employeeId }: { employeeId: number }) => (
   <RecordSection
+    employeeId={employeeId}
+    type="medical_record"
     addLabel="Add Medical Record"
     minWidth="min-w-[800px]"
     fields={[
@@ -212,22 +227,17 @@ export const MedicalRecordsSection = () => (
   />
 );
 
-// ── Documents (upload shell) ────────────────────────────────────────────────
+// ── Documents (upload shell — file storage is a later pass) ──────────────────
 
 export function DocumentsSection() {
   const [files, setFiles] = useState<string[]>([]);
   return (
     <div className="space-y-4">
-      <PreviewNote />
+      <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-4 py-2.5 text-xs text-amber-800">
+        Preview only — file upload/storage isn&apos;t wired yet.
+      </div>
       <label className="block cursor-pointer rounded-xl border-2 border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500 transition hover:border-slate-400 hover:bg-slate-50">
-        <input
-          type="file"
-          className="hidden"
-          onChange={(e) => {
-            const n = e.target.files?.[0]?.name;
-            if (n) setFiles((p) => [...p, n]);
-          }}
-        />
+        <input type="file" className="hidden" onChange={(e) => { const n = e.target.files?.[0]?.name; if (n) setFiles((p) => [...p, n]); }} />
         Click to upload a document
       </label>
       {files.length > 0 && (
@@ -246,54 +256,64 @@ export function DocumentsSection() {
   );
 }
 
-// ── Requirements (checklist) ────────────────────────────────────────────────
+// ── Requirements (checklist, persisted as one record) ────────────────────────
 
 const REQUIREMENTS = [
-  "Copy of Resume",
-  "2pcs of 2x2 picture",
-  "2pcs of 1x1 picture",
-  "Photocopy of Birth certificate",
-  "Photocopy of Birth certificate of dependents",
-  "Photocopy of Marriage Contract",
-  "Photocopy of 2 valid ID",
-  "Photocopy of SSS ID",
-  "Photocopy of Philhealth ID",
-  "Photocopy of TIN ID",
-  "Photocopy of Pag-ibig ID/number",
-  "Photocopy of latest BIR 2316",
-  "NBI Clearance",
-  "Copies of Certificate of Employment",
-  "Copy of Transcript of Records",
-  "Copy of Diploma",
-  "Copy of License (PRC, etc)",
-  "Copy of Passport",
-  "Copy of ACR/AEP/VISA",
-  "Pre-employment medical examination",
-  "Employee Information Sheet",
-  "ATM application",
-  "Philhealth form (PMRF)",
-  "Pag-ibig MDF printout from ONLINE MEMBERSHIP",
-  "Pag-ibig RTMRLD form (merging form)",
-  "BIR 1902 (without TIN #)",
-  "BIR 2305 & 1905 forms",
-  "Employment Contract",
-  "ID application form",
-  "Orientation Module",
-  "New Hire First Day Checklist",
-  "Waiver for non submission of BIR 2316",
-  "Promissory Note",
+  "Copy of Resume", "2pcs of 2x2 picture", "2pcs of 1x1 picture", "Photocopy of Birth certificate",
+  "Photocopy of Birth certificate of dependents", "Photocopy of Marriage Contract", "Photocopy of 2 valid ID",
+  "Photocopy of SSS ID", "Photocopy of Philhealth ID", "Photocopy of TIN ID", "Photocopy of Pag-ibig ID/number",
+  "Photocopy of latest BIR 2316", "NBI Clearance", "Copies of Certificate of Employment", "Copy of Transcript of Records",
+  "Copy of Diploma", "Copy of License (PRC, etc)", "Copy of Passport", "Copy of ACR/AEP/VISA",
+  "Pre-employment medical examination", "Employee Information Sheet", "ATM application", "Philhealth form (PMRF)",
+  "Pag-ibig MDF printout from ONLINE MEMBERSHIP", "Pag-ibig RTMRLD form (merging form)", "BIR 1902 (without TIN #)",
+  "BIR 2305 & 1905 forms", "Employment Contract", "ID application form", "Orientation Module",
+  "New Hire First Day Checklist", "Waiver for non submission of BIR 2316", "Promissory Note",
   "Employment requirements Form (signed and checked)",
 ];
 
-export function RequirementsSection() {
-  const [state, setState] = useState<Record<string, { done: boolean; notes: string }>>({});
+type ReqState = Record<string, { done: boolean; notes: string }>;
+
+export function RequirementsSection({ employeeId }: { employeeId: number }) {
+  const qc = useQueryClient();
+  const key = ["employee", employeeId, "records", "requirements"];
+  const [state, setState] = useState<ReqState>({});
+  const [recordId, setRecordId] = useState<number | null>(null);
+
+  const { data: rows } = useQuery({
+    queryKey: key,
+    queryFn: () => employeeRecordsApi.list(employeeId, "requirements"),
+    enabled: !!employeeId,
+  });
+
+  // Load the single saved checklist record (if any) into local state.
+  useEffect(() => {
+    if (!rows) return;
+    const rec = rows[0] as (RecordRow & { items?: ReqState }) | undefined;
+    // Sync the loaded checklist into editable local state (runs on data load only).
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setRecordId(rec?.id ?? null);
+    setState((rec?.items as ReqState) ?? {});
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [rows]);
+
   const get = (name: string) => state[name] ?? { done: false, notes: "" };
   const patch = (name: string, p: Partial<{ done: boolean; notes: string }>) =>
     setState((s) => ({ ...s, [name]: { ...get(name), ...p } }));
 
+  const save = useMutation({
+    mutationFn: () =>
+      recordId
+        ? employeeRecordsApi.update(employeeId, "requirements", recordId, { items: state })
+        : employeeRecordsApi.create(employeeId, "requirements", { items: state }),
+    onSuccess: () => { toast.success("Requirements saved."); qc.invalidateQueries({ queryKey: key }); },
+    onError: () => toast.error("Could not save requirements."),
+  });
+
   return (
     <div className="space-y-4">
-      <PreviewNote />
+      <div className="flex justify-end">
+        <AppButton onClick={() => save.mutate()} disabled={save.isPending}>{save.isPending ? "Saving…" : "Save requirements"}</AppButton>
+      </div>
       <TableShell>
         <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-slate-50">
@@ -307,80 +327,17 @@ export function RequirementsSection() {
             {REQUIREMENTS.map((name) => (
               <tr key={name} className="hover:bg-slate-50/60">
                 <td className="px-4 py-2.5">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300"
-                    checked={get(name).done}
-                    onChange={(e) => patch(name, { done: e.target.checked })}
-                  />
+                  <input type="checkbox" className="h-4 w-4 rounded border-slate-300" checked={get(name).done} onChange={(e) => patch(name, { done: e.target.checked })} />
                 </td>
                 <td className="px-4 py-2.5 text-slate-700">{name}</td>
                 <td className="px-4 py-2.5">
-                  <input
-                    className={inputCls}
-                    value={get(name).notes}
-                    onChange={(e) => patch(name, { notes: e.target.value })}
-                  />
+                  <input className={inputCls} value={get(name).notes} onChange={(e) => patch(name, { notes: e.target.value })} />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </TableShell>
-    </div>
-  );
-}
-
-// ── Access Level (form shell) ───────────────────────────────────────────────
-
-const ACCESS_LEVELS = [
-  "Employee",
-  "Super Admin2",
-  "Supervisor/Manager",
-  "Team Lead",
-  "Admin Dept. Access",
-  "Payroll Access",
-  "Transport Access",
-  "Sales Employee",
-  "Timekeeper",
-  "HR Coordinator",
-  "Super Admin",
-  "Garahe Access Teamlead/Timekeep",
-  "Super admin and Timekeeping",
-];
-
-export function AccessLevelSection() {
-  const [f, setF] = useState({ employee_code: "", login_name: "", user_level: "" });
-  const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
-
-  return (
-    <div className="space-y-4">
-      <PreviewNote />
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <div className="space-y-4">
-          <div>
-            <label className={labelCls}>Employee Code</label>
-            <input className={inputCls} value={f.employee_code} onChange={(e) => set("employee_code", e.target.value)} />
-          </div>
-          <div>
-            <label className={labelCls}>User Level</label>
-            <select className={inputCls} value={f.user_level} onChange={(e) => set("user_level", e.target.value)}>
-              <option value="">Please select Access Level</option>
-              {ACCESS_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
-            </select>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <div>
-            <label className={labelCls}>Login Name <span className="text-red-500">*</span></label>
-            <input className={inputCls} value={f.login_name} onChange={(e) => set("login_name", e.target.value)} />
-          </div>
-          <div className="text-xs text-slate-500">
-            <p className="font-medium text-slate-600">Password</p>
-            <p className="mt-0.5">The user will receive a reset password link upon creation.</p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
