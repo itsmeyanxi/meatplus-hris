@@ -29,7 +29,7 @@ const NAV: NavItem[] = [
     ),
   },
 
-  // ── My Requests ─────────────────────────────────────────────────────────────
+  // ── My Requests (regular-employee self-service; requires an employee record) ──
   {
     href: "/my-attendance",
     label: "My Attendance",
@@ -44,9 +44,9 @@ const NAV: NavItem[] = [
   },
   {
     href: "/leaves",
-    label: "Leaves",
+    label: "My Leaves",
     group: "My Requests",
-    permissions: ["leave.file", "leave.view", "leave.approve.any", "leave.approve.self_dept", "leave.manage_types"],
+    requiresEmployee: true,
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.364l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -54,9 +54,33 @@ const NAV: NavItem[] = [
     )
   },
   {
-    href: "/overtimes",
-    label: "Overtimes",
+    href: "/certificates-of-attendance",
+    label: "My Certificate of Attendance",
     group: "My Requests",
+    requiresEmployee: true,
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5 3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    )
+  },
+  {
+    href: "/schedule-adjustments",
+    label: "My Schedule Adjustments",
+    group: "My Requests",
+    requiresEmployee: true,
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 14l2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
+    href: "/overtimes",
+    label: "My Overtimes",
+    group: "My Requests",
+    requiresEmployee: true,
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -65,8 +89,9 @@ const NAV: NavItem[] = [
   },
   {
     href: "/undertimes",
-    label: "Undertimes",
+    label: "My Undertimes",
     group: "My Requests",
+    requiresEmployee: true,
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -76,22 +101,12 @@ const NAV: NavItem[] = [
   },
   {
     href: "/official-businesses",
-    label: "Official Business",
+    label: "My Official Businesses",
     group: "My Requests",
+    requiresEmployee: true,
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-      </svg>
-    ),
-  },
-  {
-    href: "/schedule-adjustments",
-    label: "Schedule Adjustment",
-    group: "My Requests",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 14l2 2 4-4" />
       </svg>
     ),
   },
