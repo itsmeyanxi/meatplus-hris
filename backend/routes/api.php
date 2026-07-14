@@ -49,6 +49,7 @@ use App\Http\Controllers\Api\V1\Leave\LeaveBalanceController;
 use App\Http\Controllers\Api\V1\Leave\LeaveTypeController;
 use App\Http\Controllers\Api\V1\Lookups\LookupController;
 use App\Http\Controllers\Api\V1\MasterData\DepartmentController;
+use App\Http\Controllers\Api\V1\MasterData\ReferenceItemController;
 use App\Http\Controllers\Api\V1\MasterData\PositionController;
 use App\Http\Controllers\Api\V1\Users\UserController;
 use App\Http\Middleware\SetPermissionsTeam;
@@ -91,6 +92,12 @@ Route::prefix('v1')->group(function () {
         Route::post('positions', [PositionController::class, 'store']);
         Route::put('positions/{position}', [PositionController::class, 'update']);
         Route::delete('positions/{position}', [PositionController::class, 'destroy']);
+
+        // Generic reference lists (asset types, visa types, benefit types, work locations)
+        Route::get('reference/{category}', [ReferenceItemController::class, 'index']);
+        Route::post('reference/{category}', [ReferenceItemController::class, 'store']);
+        Route::put('reference/{category}/{referenceItem}', [ReferenceItemController::class, 'update']);
+        Route::delete('reference/{category}/{referenceItem}', [ReferenceItemController::class, 'destroy']);
 
         // Employees + nested resources (scoped binding ensures child belongs to parent)
         Route::get('employees/import/template', [EmployeeImportController::class, 'template']);
