@@ -1,0 +1,35 @@
+# Meatplus HRIS — reverse proxy with automatic HTTPS (Let's Encrypt).
+#
+# Caddy listens on 80/443, terminates TLS, and forwards to the Next.js frontend
+# on 3001. The frontend in turn proxies /api, /sanctum, /up to the backend on
+# 8000. The unauthenticated ZKTeco /iclock routes are NOT proxied here, so they
+# stay LAN-only (the device keeps pushing to 192.168.125.5:8000/iclock).
+#
+# Prereqs before running Caddy:
+#   - Stop Laragon's Apache (it currently holds ports 80/443).
+#   - Windows Firewall: allow inbound TCP 80 and 443.
+#   - Port 80 must be reachable from the internet for the ACME cert challenge.
+#
+# Run:      caddy run --config Caddyfile
+# Service:  caddy start   (or install as a Windows service via nssm / caddy-service)
+
+allcompanyhris.meatplus.ph {
+	encode gzip
+	reverse_proxy 127.0.0.1:3001
+
+	# Security headers (defense-in-depth; the app is now on the public internet).
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output file logs/caddy-access.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

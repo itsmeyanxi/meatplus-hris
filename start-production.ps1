@@ -1,0 +1,114 @@
+# Meatplus HRIS - PRODUCTION start script (self-hosted, no Render).
+#
+# Difference from start-servers.ps1 (dev):
+#   - Backend runs with the PRODUCTION env (.env.production -> .env), config cached.
+#   - Frontend runs the compiled build (`next start`), NOT `next dev`.
+#   - Optionally launches Caddy (reverse proxy + HTTPS) if caddy.exe is on PATH.
+#
+# One-time before first run:
+#   cd frontend; npm ci; npm run build      (compile the production frontend)
+#   Stop Laragon Apache so Caddy can take 80/443.
+#
+# Register at logon with:  .\register-autostart.ps1  (point it at THIS script)
+
+$ErrorActionPreference = 'Stop'
+
+$root        = $PSScriptRoot
+$backendDir  = Join-Path $root 'backend'
+$frontendDir = Join-Path $root 'frontend'
+$logDir      = Join-Path $root 'logs'
+$backendPort  = 8000
+$frontendPort = 3001
+
+New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+
+function Find-LaragonDir {
+    param($Parent, $Pattern)
+    $dir = Get-ChildItem -Path $Parent -Directory |
+        Where-Object { $_.Name -like $Pattern } | Sort-Object Name -Descending | Select-Object -First 1
+    if ($null -eq $dir) { throw "No directory matching '$Pattern' under $Parent" }
+    return $dir.FullName
+}
+function Test-PortInUse { param([int]$Port)
+    return ($null -ne (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue))
+}
+
+$phpDir  = Find-LaragonDir -Parent 'C:\laragon\bin\php'    -Pattern 'php-*'
+$nodeDir = Find-LaragonDir -Parent 'C:\laragon\bin\nodejs' -Pattern 'node-*'
+$env:PATH = "$phpDir;$nodeDir;$env:PATH"
+
+# --- Activate production env (one-time backup of the current .env) ---
+$envFile  = Join-Path $backendDir '.env'
+$envProd  = Join-Path $backendDir '.env.production'
+$envBak   = Join-Path $backendDir '.env.dev-supabase.bak'
+if (-not (Test-Path $envProd)) { throw ".env.production not found - create it first." }
+if (-not (Test-Path $envBak) -and (Test-Path $envFile)) {
+    Copy-Item $envFile $envBak
+    Write-Host "Backed up current .env -> .env.dev-supabase.bak"
+}
+Copy-Item $envProd $envFile -Force
+Write-Host "Activated production env (.env.production -> .env)"
+
+# --- Cache config/routes for production performance ---
+Push-Location $backendDir
+& (Join-Path $phpDir 'php.exe') artisan config:cache | Out-Null
+& (Join-Path $phpDir 'php.exe') artisan route:cache  | Out-Null
+Pop-Location
+Write-Host "Cached config + routes."
+
+# --- Backend (Laravel API) -> 127.0.0.1:8000 ---
+# --host=0.0.0.0 so the LAN ZKTeco device can still push to <lan-ip>:8000/iclock.
+if (Test-PortInUse -Port $backendPort) {
+    Write-Host "Backend already on port $backendPort - skipping."
+} else {
+    Write-Host "Starting backend (production) on $backendPort..."
+    Start-Process -FilePath (Join-Path $phpDir 'php.exe') `
+        -ArgumentList 'artisan','serve','--host=0.0.0.0',"--port=$backendPort" `
+        -WorkingDirectory $backendDir -WindowStyle Minimized `
+        -RedirectStandardOutput (Join-Path $logDir 'backend.log') `
+        -RedirectStandardError  (Join-Path $logDir 'backend.err.log')
+}
+
+Write-Host -NoNewline 'Waiting for backend'
+$ready = $false
+foreach ($i in 1..30) {
+    try { if ((Invoke-WebRequest "http://127.0.0.1:$backendPort/up" -UseBasicParsing -TimeoutSec 3).StatusCode -eq 200) { $ready = $true; break } } catch {}
+    Write-Host -NoNewline '.'; Start-Sleep -Seconds 2
+}
+Write-Host ''; if ($ready) { Write-Host 'Backend is up.' } else { Write-Warning "Backend not answering - see $logDir\backend.err.log" }
+
+# --- Frontend (Next.js compiled build) -> 127.0.0.1:3001 ---
+if (-not (Test-Path (Join-Path $frontendDir '.next'))) {
+    throw "No frontend build found (.next). Run: cd frontend; npm run build"
+}
+if (Test-PortInUse -Port $frontendPort) {
+    Write-Host "Frontend already on port $frontendPort - skipping."
+} else {
+    Write-Host "Starting frontend (production) on $frontendPort..."
+    Start-Process -FilePath (Join-Path $nodeDir 'npm.cmd') `
+        -ArgumentList 'run','start','--','-p',"$frontendPort",'-H','0.0.0.0' `
+        -WorkingDirectory $frontendDir -WindowStyle Minimized `
+        -RedirectStandardOutput (Join-Path $logDir 'frontend.log') `
+        -RedirectStandardError  (Join-Path $logDir 'frontend.err.log')
+}
+
+# --- Caddy (reverse proxy + HTTPS) if installed ---
+$caddy = (Get-Command caddy.exe -ErrorAction SilentlyContinue)
+if ($caddy) {
+    if (Test-PortInUse -Port 443) {
+        Write-Warning "Port 443 already in use (Laragon Apache?). Stop it before Caddy can bind."
+    } else {
+        Write-Host "Starting Caddy (80/443)..."
+        Start-Process -FilePath $caddy.Source -ArgumentList 'run','--config','Caddyfile' `
+            -WorkingDirectory $root -WindowStyle Minimized `
+            -RedirectStandardOutput (Join-Path $logDir 'caddy.log') `
+            -RedirectStandardError  (Join-Path $logDir 'caddy.err.log')
+    }
+} else {
+    Write-Warning "caddy.exe not found on PATH - install Caddy, then HTTPS/reverse-proxy will start here."
+}
+
+Write-Host ''
+Write-Host "Meatplus HRIS (production) started."
+Write-Host "Local check: http://localhost:$frontendPort   Public (after DNS): https://allcompanyhris.meatplus.ph"
+Write-Host "Logs: $logDir"

@@ -17,6 +17,28 @@ office PC directly — no Render, no monthly cost, no cold-start sleep.
 
 ---
 
+## Status — PC-side prep done (2026-07-14)
+Decisions: **DB = local Laragon Postgres** · **Exposure = port forwarding**.
+Already prepared on the PC (safe, reversible; live Render site untouched):
+- [x] Local Postgres `meatplus_hris` on `:5433` — exact mirror of Supabase (71 tables).
+- [x] Strong password set on the `postgres` role (stored in `.env.production`).
+- [x] `backend/.env.production` created — `APP_ENV=production`, `APP_DEBUG=false`,
+      `APP_URL=https://…`, Sanctum domain, `SESSION_SECURE_COOKIE=true`, DB → local `:5433`.
+      Same `APP_KEY` preserved (encrypted fields stay readable). Verified: Laravel
+      connects to the local DB and all migrations show **Ran**.
+- [x] `frontend/.env.local` → `BACKEND_URL=http://127.0.0.1:8000`.
+- [x] `Caddyfile` (repo root) — auto-HTTPS reverse proxy → 3001, security headers.
+- [x] `start-production.ps1` — activates prod env, caches config, runs compiled
+      frontend (`next start`) + backend + Caddy.
+- [x] Production frontend build (`npm run build`).
+
+**Remaining — human-only steps (see phases below):** confirm ISP allows inbound
+80/443 (Phase 0), stop Laragon Apache + install Caddy as a service (Phase 2),
+router port-forward 80/443 (Phase 3), GoDaddy DNS A-record cut-over (Phase 4),
+harden local Postgres `pg_hba.conf` trust→scram (Phase 6).
+
+---
+
 ## Phase 0 — Feasibility checks (do these FIRST, before touching anything)
 - [ ] **Confirm the IP is static** with Eastern Telecoms (ask: "is 202.175.255.85
       a fixed/static IP on our account?"). If it can change, you'll also need
