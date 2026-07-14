@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Reports;
 
 use App\Domain\Attendance\Models\DailyTimeRecord;
+use App\Domain\Attendance\Models\OvertimeRequest;
 use App\Domain\Leave\Models\LeaveApplication;
 use App\Domain\Payroll\Models\Payslip;
 use App\Http\Controllers\Controller;
@@ -108,6 +109,49 @@ class ReportController extends Controller
         $suffix = $request->date_from ? "_{$request->date_from}_to_{$request->date_to}" : '';
 
         return $this->csvResponse(implode("\n", $lines), "leave_report{$suffix}.csv");
+    }
+
+    public function overtime(Request $request): Response
+    {
+        abort_unless($request->user()->can('attendance.view'), 403);
+
+        $request->validate([
+            'date_from' => ['nullable', 'date'],
+            'date_to'   => ['nullable', 'date'],
+            'status'    => ['nullable', 'string'],
+        ]);
+
+        $rows = OvertimeRequest::query()
+            ->with('employee:id,employee_no,first_name,last_name')
+            ->when($request->date_from, fn ($q) => $q->where('date', '>=', $request->date_from))
+            ->when($request->date_to,   fn ($q) => $q->where('date', '<=', $request->date_to))
+            ->when($request->status,    fn ($q) => $q->where('status', $request->status))
+            ->orderBy('date', 'desc')
+            ->get();
+
+        $lines = [];
+        $lines[] = implode(',', [
+            'Employee No', 'Name', 'Date', 'Start', 'End',
+            'Hours', 'Classification', 'Status', 'Reason',
+        ]);
+
+        foreach ($rows as $r) {
+            $lines[] = implode(',', [
+                $r->employee?->employee_no ?? '',
+                $this->csv(($r->employee?->last_name ?? '') . ', ' . ($r->employee?->first_name ?? '')),
+                $r->date?->toDateString() ?? '',
+                $r->start_time,
+                $r->end_time,
+                $r->requested_hours ?? '',
+                $this->csv($r->classification ?? ''),
+                $r->status,
+                $this->csv($r->reason ?? ''),
+            ]);
+        }
+
+        $suffix = $request->date_from ? "_{$request->date_from}_to_{$request->date_to}" : '';
+
+        return $this->csvResponse(implode("\n", $lines), "overtime_report{$suffix}.csv");
     }
 
     /** GET /api/v1/reports/payroll/{payrollRunId} */

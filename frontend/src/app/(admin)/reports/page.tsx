@@ -8,6 +8,7 @@ import {
   downloadEmployeeRoster,
   downloadDtrReport,
   downloadLeaveReport,
+  downloadOvertimeReport,
   downloadPayrollReport,
 } from "@/lib/reports";
 import { getLookup, listEmployees } from "@/lib/employees";
@@ -23,6 +24,7 @@ export default function ReportsPage() {
         <EmployeeRosterCard />
         <DtrReportCard />
         <LeaveReportCard />
+        <OvertimeReportCard />
         <PayrollReportCard />
       </div>
     </div>
@@ -339,6 +341,54 @@ function LeaveReportCard() {
                 {e.full_name}
               </option>
             ))}
+          </select>
+        </label>
+      </div>
+      <DownloadButton onClick={download} loading={loading}>
+        Download CSV
+      </DownloadButton>
+    </ReportCard>
+  );
+}
+
+// Overtime ─────────────────────────────────────────────────────────────────────
+
+function OvertimeReportCard() {
+  const today = new Date().toISOString().slice(0, 10);
+  const firstOfMonth = today.slice(0, 7) + "-01";
+  const [from, setFrom] = useState(firstOfMonth);
+  const [to, setTo] = useState(today);
+  const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const download = async () => {
+    setLoading(true);
+    try {
+      await downloadOvertimeReport({ date_from: from, date_to: to, status: status || undefined });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <ReportCard title="Overtime Report" description="Overtime requests within a date range, filterable by status.">
+      <div className="flex gap-2 flex-wrap">
+        <label className="block">
+          <span className="text-xs text-slate-500">From</span>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={fieldCls} />
+        </label>
+        <label className="block">
+          <span className="text-xs text-slate-500">To</span>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={fieldCls} />
+        </label>
+        <label className="block">
+          <span className="text-xs text-slate-500">Status</span>
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className={fieldCls}>
+            <option value="">All</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="cancelled">Cancelled</option>
           </select>
         </label>
       </div>
