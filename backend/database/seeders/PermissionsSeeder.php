@@ -113,8 +113,17 @@ class PermissionsSeeder extends Seeder
             ],
         ];
 
+        // Roles are shared across all companies. Create them with NO team so they
+        // exist in every company's context; only the ASSIGNMENTS (model_has_roles)
+        // are team-scoped. Otherwise roles created here would belong to a single
+        // company and vanish when a user switches to another.
+        app(\Spatie\Permission\PermissionRegistrar::class)->setPermissionsTeamId(null);
+
         foreach ($rolePermissions as $roleName => $perms) {
             $role = Role::findOrCreate($roleName, 'web');
+            if ($role->company_id !== null) {
+                $role->forceFill(['company_id' => null])->save();
+            }
             $role->syncPermissions($perms);
         }
 
