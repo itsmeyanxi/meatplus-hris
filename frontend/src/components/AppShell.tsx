@@ -14,6 +14,10 @@ export type NavItem = {
   href: string;
   label: string;
   icon: ReactNode;
+  // Optional section header this item sits under in the sidebar. Items sharing a
+  // group render together beneath that heading; items with no group render at the
+  // top with no heading.
+  group?: string;
   // Item shows only if the user has one of these roles (if set)…
   roles?: string[];
   // …and one of these permissions (if set). No gate = visible to everyone.
@@ -137,6 +141,17 @@ export function AppShell({
   };
   const visibleNav = nav.filter(isAllowed);
 
+  // Bucket the visible items into ordered sections by their `group`, keeping the
+  // order in which groups first appear. Items with no group form a leading,
+  // header-less section.
+  const navGroups: { label: string; items: NavItem[] }[] = [];
+  for (const item of visibleNav) {
+    const label = item.group ?? "";
+    const existing = navGroups.find((g) => g.label === label);
+    if (existing) existing.items.push(item);
+    else navGroups.push({ label, items: [item] });
+  }
+
   // Page-level guard: if the current route maps to a nav item the user can't
   // access, block it here (defense-in-depth + clean UX). Backend still enforces.
   const currentItem = nav.find(
@@ -225,30 +240,44 @@ export function AppShell({
           {/* Back to the other module */}
           {BackToModule && !isCollapsed && <div className="px-1">{BackToModule}</div>}
 
-          {/* Navigation Links */}
+          {/* Navigation Links, grouped into sections */}
           <nav className="space-y-1">
-            {visibleNav.map((item) => {
-              const active = pathname === item.href || pathname.startsWith(item.href + "/");
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  title={isCollapsed ? item.label : undefined}
-                  className={
-                    active
-                      ? `flex items-center rounded-xl border border-slate-900 bg-slate-900 py-2 text-sm font-medium text-white shadow-sm transition-all ${
-                          isCollapsed ? "justify-center px-0" : "px-2.5 gap-2.5"
-                        }`
-                      : `flex items-center rounded-xl py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 ${
-                          isCollapsed ? "justify-center px-0" : "px-2.5 gap-2.5"
-                        }`
-                  }
-                >
-                  <span className="shrink-0 scale-95">{item.icon}</span>
-                  {!isCollapsed && <span className="transition-opacity duration-200 truncate">{item.label}</span>}
-                </Link>
-              );
-            })}
+            {navGroups.map((groupDef, gi) => (
+              <div key={groupDef.label || `_${gi}`} className={gi > 0 ? "pt-3" : undefined}>
+                {groupDef.label &&
+                  (isCollapsed ? (
+                    gi > 0 && <div className="mx-2 mb-1 border-t border-slate-200/70" />
+                  ) : (
+                    <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      {groupDef.label}
+                    </p>
+                  ))}
+                <div className="space-y-1">
+                  {groupDef.items.map((item) => {
+                    const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        title={isCollapsed ? item.label : undefined}
+                        className={
+                          active
+                            ? `flex items-center rounded-xl border border-slate-900 bg-slate-900 py-2 text-sm font-medium text-white shadow-sm transition-all ${
+                                isCollapsed ? "justify-center px-0" : "px-2.5 gap-2.5"
+                              }`
+                            : `flex items-center rounded-xl py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 ${
+                                isCollapsed ? "justify-center px-0" : "px-2.5 gap-2.5"
+                              }`
+                        }
+                      >
+                        <span className="shrink-0 scale-95">{item.icon}</span>
+                        {!isCollapsed && <span className="transition-opacity duration-200 truncate">{item.label}</span>}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </nav>
         </div>
 
