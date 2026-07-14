@@ -4,9 +4,11 @@ namespace App\Domain\HRIS\Services;
 
 use App\Domain\HRIS\Models\Department;
 use App\Domain\HRIS\Models\Employee;
+use App\Domain\HRIS\Models\EmployeeGovernmentId;
 use App\Domain\HRIS\Models\EmploymentType;
 use App\Domain\HRIS\Models\Position;
 use App\Domain\Identity\Models\Branch;
+use App\Domain\Payroll\Models\EmployeeCompensation;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
@@ -33,9 +35,24 @@ class EmployeeImportService
         'location' => ['location', 'branch', 'site', 'office'],
         'email' => ['email', 'email address', 'e-mail'],
         'position' => ['position', 'job title', 'title', 'designation', 'role'],
-        'employment_type' => ['employment type', 'employment_type', 'emp type', 'type'],
+        'employment_type' => ['employment type', 'employment_type', 'emp type', 'type', 'employee type'],
         'date_hired' => ['date hired', 'date_hired', 'hire date', 'hired', 'date of hire'],
         'birth_date' => ['birth date', 'birth_date', 'date of birth', 'dob', 'birthday'],
+        // Government IDs (stored encrypted).
+        'sss' => ['sss', 'sss no', 'sss number', 'sss no.'],
+        'tin' => ['tin', 'tin no', 'tin number', 'tin no.'],
+        'philhealth' => ['philhealth', 'philhealth no', 'phic', 'philhealth no.'],
+        'pagibig' => ['pag-ibig no', 'pag-ibig no.', 'pagibig', 'pag-ibig', 'hdmf', 'pagibig no'],
+        'passport' => ['passport no', 'passport no.', 'passport', 'passport number'],
+        'prc' => ['prc no', 'prc no.', 'prc', 'prc number', 'prc license'],
+        // Compensation.
+        'base_salary' => ['base salary', 'basic salary', 'basic', 'basic monthly', 'monthly rate', 'salary'],
+        'de_minimis' => ['de minimis', 'de-minimis'],
+        'transportation' => ['transportation'],
+        'meal' => ['meal'],
+        'communication' => ['communication'],
+        'travel' => ['travel'],
+        'allowance_others' => ['others', 'other allowance'],
     ];
 
     /** @var array<string,int> name(lower) => id */
@@ -136,20 +153,73 @@ class EmployeeImportService
                     } else {
                         $skipped++; // already up to date
                     }
+                    $employee = $existing;
                 } else {
-                    Employee::create($present + [
+                    $employee = Employee::create($present + [
                         'company_id' => $companyId,
                         'employee_no' => $employeeNo,
                         'is_active' => true,
                     ]);
                     $created++;
                 }
+
+                $this->applyGovernmentIds($employee, $get);
+                $this->applyCompensation($employee, $companyId, $get);
             } catch (\Throwable $e) {
                 $errors[] = ['row' => $line, 'message' => $e->getMessage()];
             }
         }
 
         return ['created' => $created, 'updated' => $updated, 'skipped' => $skipped, 'total' => count($rows), 'errors' => $errors];
+    }
+
+    /** Write the government IDs present in the row (encrypted by the model). */
+    private function applyGovernmentIds(Employee $employee, callable $get): void
+    {
+        $clean = fn (string $v) => ($t = preg_replace('/\s+/', '', $v)) === '' ? null : $t;
+        $gov = array_filter([
+            'tin' => $clean($get('tin')),
+            'sss_no' => $clean($get('sss')),
+            'philhealth_no' => $clean($get('philhealth')),
+            'pagibig_no' => $clean($get('pagibig')),
+            'passport_no' => $clean($get('passport')),
+            'prc_no' => $clean($get('prc')),
+        ], fn ($v) => $v !== null);
+
+        if ($gov) {
+            EmployeeGovernmentId::updateOrCreate(['employee_id' => $employee->id], $gov);
+        }
+    }
+
+    /** Create an active compensation row from base salary + allowances, once. */
+    private function applyCompensation(Employee $employee, int $companyId, callable $get): void
+    {
+        $money = function (string $v): float {
+            $v = preg_replace('/[^0-9.\-]/', '', $v);
+            return $v === '' ? 0.0 : (float) $v;
+        };
+
+        $basic = $money($get('base_salary'));
+        if ($basic <= 0) {
+            return;
+        }
+        if (EmployeeCompensation::withoutGlobalScopes()->where('employee_id', $employee->id)->where('is_active', true)->exists()) {
+            return; // don't add a second active salary
+        }
+
+        $allowance = 0.0;
+        foreach (['de_minimis', 'transportation', 'meal', 'communication', 'travel', 'allowance_others'] as $a) {
+            $allowance += $money($get($a));
+        }
+
+        EmployeeCompensation::create([
+            'company_id' => $companyId,
+            'employee_id' => $employee->id,
+            'basic_monthly' => $basic,
+            'allowance_monthly' => $allowance,
+            'effective_from' => $employee->date_hired?->toDateString() ?? now()->toDateString(),
+            'is_active' => true,
+        ]);
     }
 
     /** @return array<int,array<int,string>> */
