@@ -37,6 +37,23 @@ $phpDir  = Find-LaragonDir -Parent 'C:\laragon\bin\php'    -Pattern 'php-*'
 $nodeDir = Find-LaragonDir -Parent 'C:\laragon\bin\nodejs' -Pattern 'node-*'
 $env:PATH = "$phpDir;$nodeDir;$env:PATH"
 
+# --- Ensure the local database (Laragon PostgreSQL 17) is up on 5433 ---
+# Laragon's Postgres is NOT a Windows service, so a reboot/power outage leaves it
+# down. Start it here (in this interactive logon session) so the whole stack
+# recovers. A separate PostgreSQL-18 service owns 5432; ours must be 5433.
+if (-not (Get-NetTCPConnection -State Listen -LocalPort 5433 -ErrorAction SilentlyContinue)) {
+    Write-Host "Local Postgres (5433) is down - starting it..."
+    $pgctl  = 'C:\laragon\bin\postgresql\pgsql\bin\pg_ctl.exe'
+    $pgdata = 'C:\laragon\data\postgresql-17'
+    $pidf   = Join-Path $pgdata 'postmaster.pid'
+    if (Test-Path $pidf) { cmd /c "del /f /q `"$pidf`"" | Out-Null }  # clear stale pid from crash
+    Start-Process -FilePath $pgctl -ArgumentList 'start','-D',"`"$pgdata`"",'-o','"-p 5433"','-l',"`"$pgdata\startup.log`""
+    foreach ($i in 1..30) { if (Get-NetTCPConnection -State Listen -LocalPort 5433 -ErrorAction SilentlyContinue) { break }; Start-Sleep 2 }
+    if (Get-NetTCPConnection -State Listen -LocalPort 5433 -ErrorAction SilentlyContinue) { Write-Host "Postgres 5433 is up." } else { Write-Warning "Postgres 5433 did not start - check $pgdata\startup.log" }
+} else {
+    Write-Host "Local Postgres (5433) already running."
+}
+
 # --- Activate production env (one-time backup of the current .env) ---
 $envFile  = Join-Path $backendDir '.env'
 $envProd  = Join-Path $backendDir '.env.production'
