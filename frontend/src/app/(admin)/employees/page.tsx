@@ -455,68 +455,73 @@ export default function EmployeesPage() {
       {previewEmployee && (
         <>
           <div className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm transition-opacity" onClick={() => setPreviewEmployee(null)} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l border-slate-200 bg-white p-6 shadow-2xl flex flex-col justify-between transform transition-transform animate-in slide-in-from-right duration-200">
-            <div>
-              <div className="flex items-start justify-between border-b border-slate-100 pb-4">
-                <div>
-                  <p className="font-mono text-xs font-semibold tracking-wider text-slate-400 uppercase">Employee Details</p>
-                  <h2 className="text-xl font-bold text-slate-900 mt-0.5">{previewEmployee.full_name}</h2>
-                  <p className="text-sm font-mono text-slate-500 mt-0.5">ID: {previewEmployee.employee_no}</p>
-                </div>
-                <button onClick={() => setPreviewEmployee(null)}
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition" aria-label="Close">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-slate-200 bg-white shadow-2xl animate-in slide-in-from-right duration-200">
+            {/* Header — avatar + name + company + badges for instant identification */}
+            <div className="flex items-start gap-4 border-b border-slate-100 p-6">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-xl font-semibold text-white shadow-sm">
+                {empInitials(previewEmployee.first_name, previewEmployee.last_name)}
               </div>
-              <div className="mt-6 space-y-5">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Status</label>
-                    <div className="mt-1">
-                      <StatusBadge active={previewEmployee.is_active}>{previewEmployee.is_active ? "Active" : "Inactive"}</StatusBadge>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Access</label>
-                    <div className="mt-1"><AccessBadge status={previewEmployee.login_status} /></div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Date Hired</label>
-                    <p className="mt-1 text-sm font-medium text-slate-800">{previewEmployee.date_hired ?? "—"}</p>
-                  </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="truncate text-xl font-bold text-slate-900">{previewEmployee.full_name}</h2>
+                  {previewEmployee.company && (
+                    <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600" title={previewEmployee.company.name}>
+                      {previewEmployee.company.code}
+                    </span>
+                  )}
                 </div>
-                <div className="border-t border-slate-50 pt-4">
-                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Department</label>
-                  <p className="mt-1 text-base font-semibold text-slate-900">{previewEmployee.department?.name ?? "—"}</p>
-                </div>
-                <div className="border-t border-slate-50 pt-4">
-                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Job Position</label>
-                  <p className="mt-1 text-base font-medium text-slate-800">{previewEmployee.position?.title ?? "—"}</p>
-                </div>
-                <div className="border-t border-slate-50 pt-4">
-                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Employment Type</label>
-                  <p className="mt-1 text-sm font-medium text-slate-800">{previewEmployee.employment_type?.name ?? "—"}</p>
+                <p className="mt-0.5 font-mono text-sm text-slate-500">#{previewEmployee.employee_no}</p>
+                {previewEmployee.position?.title && (
+                  <p className="mt-1 text-sm text-slate-600">{previewEmployee.position.title}</p>
+                )}
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  <StatusBadge active={previewEmployee.is_active}>{previewEmployee.is_active ? "Active" : "Inactive"}</StatusBadge>
+                  <AccessBadge status={previewEmployee.login_status} />
                 </div>
               </div>
+              <button onClick={() => setPreviewEmployee(null)}
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <div className="border-t border-slate-100 pt-4 flex gap-2">
+
+            {/* Body — grouped, scannable sections */}
+            <div className="flex-1 space-y-6 overflow-y-auto p-6">
+              <PreviewSection title="Employment">
+                <PreviewField label="Department" value={previewEmployee.department?.name} strong />
+                <PreviewField label="Position" value={previewEmployee.position?.title} />
+                <PreviewField label="Employment Type" value={previewEmployee.employment_type?.name} />
+                <PreviewField label="Location" value={previewEmployee.branch?.name} />
+                <PreviewField label="Company" value={previewEmployee.company?.name} />
+                <PreviewField label="Date Hired" value={previewEmployee.date_hired} />
+              </PreviewSection>
+
+              <PreviewSection title="Personal">
+                <PreviewField label="Gender" value={previewEmployee.gender} capitalize />
+                <PreviewField label="Civil Status" value={previewEmployee.civil_status} capitalize />
+              </PreviewSection>
+
+              <PreviewSection title="Contact">
+                <PreviewField label="Company Email" value={previewEmployee.email_company} full mono />
+                <PreviewField label="Personal Email" value={previewEmployee.email_personal} full mono />
+              </PreviewSection>
+            </div>
+
+            {/* Footer actions */}
+            <div className="flex gap-2 border-t border-slate-100 p-4">
               <Link href={`/employees/${previewEmployee.id}`}
-                className="flex-1 inline-flex items-center justify-center rounded-xl border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 text-center">
-                View Profile
+                className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-900 bg-slate-900 px-3 py-2 text-center text-sm font-medium text-white shadow-sm transition hover:bg-slate-800">
+                View Full Profile
               </Link>
               <AppButton variant="secondary" onClick={() => router.push(`/employees/${previewEmployee.id}/edit`)}
                 className="flex items-center gap-1.5">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
                 Edit
               </AppButton>
-              <button onClick={() => setPreviewEmployee(null)}
-                className="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-xl transition">
-                Close
-              </button>
             </div>
           </div>
         </>
@@ -563,6 +568,43 @@ function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }
         </svg>
       </button>
     </span>
+  );
+}
+
+function empInitials(first?: string | null, last?: string | null): string {
+  const i = `${(first ?? "").trim()[0] ?? ""}${(last ?? "").trim()[0] ?? ""}`.toUpperCase();
+  return i || "?";
+}
+
+function PreviewSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h3>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3.5">{children}</dl>
+    </div>
+  );
+}
+
+function PreviewField({
+  label, value, strong, full, mono, capitalize,
+}: {
+  label: string;
+  value?: string | null;
+  strong?: boolean;
+  full?: boolean;
+  mono?: boolean;
+  capitalize?: boolean;
+}) {
+  return (
+    <div className={full ? "col-span-2 min-w-0" : "min-w-0"}>
+      <dt className="text-xs text-slate-400">{label}</dt>
+      <dd
+        className={`mt-0.5 truncate text-sm ${strong ? "font-semibold text-slate-900" : "font-medium text-slate-700"} ${mono ? "font-mono text-xs" : ""} ${capitalize ? "capitalize" : ""}`}
+        title={value ?? undefined}
+      >
+        {value || "—"}
+      </dd>
+    </div>
   );
 }
 
