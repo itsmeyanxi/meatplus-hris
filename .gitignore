@@ -66,3 +66,6 @@ employee_list_*.csv
 
 # Database backups (contain employee PII — never commit)
 backups/
+
+# Downloaded binaries (Caddy, etc.)
+tools/

@@ -92,20 +92,25 @@ if (Test-PortInUse -Port $frontendPort) {
         -RedirectStandardError  (Join-Path $logDir 'frontend.err.log')
 }
 
-# --- Caddy (reverse proxy + HTTPS) if installed ---
-$caddy = (Get-Command caddy.exe -ErrorAction SilentlyContinue)
-if ($caddy) {
+# --- Caddy (reverse proxy + HTTPS) ---
+# Prefer the bundled copy in tools\, fall back to one on PATH.
+$caddyExe = Join-Path $root 'tools\caddy.exe'
+if (-not (Test-Path $caddyExe)) {
+    $onPath = Get-Command caddy.exe -ErrorAction SilentlyContinue
+    $caddyExe = if ($onPath) { $onPath.Source } else { $null }
+}
+if ($caddyExe -and (Test-Path $caddyExe)) {
     if (Test-PortInUse -Port 443) {
         Write-Warning "Port 443 already in use (Laragon Apache?). Stop it before Caddy can bind."
     } else {
-        Write-Host "Starting Caddy (80/443)..."
-        Start-Process -FilePath $caddy.Source -ArgumentList 'run','--config','Caddyfile' `
+        Write-Host "Starting Caddy (80/443) from $caddyExe ..."
+        Start-Process -FilePath $caddyExe -ArgumentList 'run','--config','Caddyfile' `
             -WorkingDirectory $root -WindowStyle Minimized `
             -RedirectStandardOutput (Join-Path $logDir 'caddy.log') `
             -RedirectStandardError  (Join-Path $logDir 'caddy.err.log')
     }
 } else {
-    Write-Warning "caddy.exe not found on PATH - install Caddy, then HTTPS/reverse-proxy will start here."
+    Write-Warning "caddy.exe not found (expected in tools\ or on PATH) - HTTPS/reverse-proxy will not start."
 }
 
 Write-Host ''
