@@ -48,6 +48,15 @@ class PermissionsSeeder extends Seeder
                 'access_request.view', 'access_request.approve.hr',
                 'device.manage',
             ],
+            // HR Officer: full HR operations (employees, attendance, leave) but WITHOUT
+            // system administration — no user/role management, device management, or audit.
+            'hr_officer' => [
+                'employee.view', 'employee.create', 'employee.update',
+                'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',
+                'leave.view', 'leave.file', 'leave.approve.any', 'leave.manage_types',
+                'compensation.view',
+                'access_request.view', 'access_request.approve.hr',
+            ],
             // IT is the top-level administrator: full access to every function of the system.
             'it_admin' => $permissions,
             'payroll_officer' => [

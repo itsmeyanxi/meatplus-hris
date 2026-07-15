@@ -48,7 +48,7 @@ type ViewGroup = "admin" | "hr" | "payroll" | "manager" | "timekeeper" | "dept_a
 
 function getViewGroup(roles: string[]): ViewGroup {
   if (roles.includes("it_admin")) return "admin";
-  if (roles.some((r) => ["hr_admin", "hr_coordinator"].includes(r))) return "hr";
+  if (roles.some((r) => ["hr_admin", "hr_officer", "hr_coordinator"].includes(r))) return "hr";
   if (roles.includes("payroll_officer")) return "payroll";
   if (roles.some((r) => ["dept_head", "supervisor", "team_lead", "garahe_teamlead"].includes(r))) return "manager";
   if (roles.includes("timekeeper")) return "timekeeper";
