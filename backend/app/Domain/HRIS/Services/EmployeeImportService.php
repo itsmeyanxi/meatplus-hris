@@ -38,6 +38,8 @@ class EmployeeImportService
         'employment_type' => ['employment type', 'employment_type', 'emp type', 'type', 'employee type'],
         'date_hired' => ['date hired', 'date_hired', 'hire date', 'hired', 'date of hire'],
         'birth_date' => ['birth date', 'birth_date', 'date of birth', 'dob', 'birthday'],
+        // Biometric device PIN — matches the terminal's user ID so punches map.
+        'biometric_user_id' => ['biometric id', 'biometric_user_id', 'biometric user id', 'device pin', 'device id', 'biometric', 'bio id'],
         // Government IDs (stored encrypted).
         'sss' => ['sss', 'sss no', 'sss number', 'sss no.'],
         'tin' => ['tin', 'tin no', 'tin number', 'tin no.'],
@@ -123,6 +125,9 @@ class EmployeeImportService
                 }
                 if (($b = $get('location')) !== '') {
                     $present['branch_id'] = $this->resolveBranch($companyId, $b);
+                }
+                if (($bio = $get('biometric_user_id')) !== '') {
+                    $present['biometric_user_id'] = $bio;
                 }
                 if (($email = $get('email')) !== '') {
                     $present['email_company'] = $email;
