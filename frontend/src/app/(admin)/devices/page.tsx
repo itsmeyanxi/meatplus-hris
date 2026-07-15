@@ -309,15 +309,17 @@ function DeviceFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="dialog" aria-modal>
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-        <h2 className="text-lg font-semibold text-slate-900">{editing ? "Edit device" : "Add device"}</h2>
-        <form
-          className="mt-4 space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit();
-          }}
-        >
+      <form
+        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit();
+        }}
+      >
+        <div className="shrink-0 border-b border-slate-100 px-6 py-4">
+          <h2 className="text-lg font-semibold text-slate-900">{editing ? "Edit device" : "Add device"}</h2>
+        </div>
+        <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
           <div>
             <label className={labelCls}>Name</label>
             <input className={inputCls} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Main Entrance" required />
@@ -398,12 +400,12 @@ function DeviceFormModal({
             </span>
           </label>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <AppButton type="button" variant="secondary" onClick={onClose}>Cancel</AppButton>
-            <AppButton type="submit" disabled={saving}>{saving ? "Saving…" : editing ? "Save changes" : "Add device"}</AppButton>
-          </div>
-        </form>
-      </div>
+        </div>
+        <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 px-6 py-4">
+          <AppButton type="button" variant="secondary" onClick={onClose}>Cancel</AppButton>
+          <AppButton type="submit" disabled={saving}>{saving ? "Saving…" : editing ? "Save changes" : "Add device"}</AppButton>
+        </div>
+      </form>
     </div>
   );
 }
