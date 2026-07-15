@@ -6,19 +6,21 @@ import { myTimeClockApi, type TimeClockStatus } from "@/lib/attendance";
 
 const TZ = "Asia/Manila";
 
-// Always render Manila wall-clock, regardless of the viewer's device timezone.
-function fmtTime(iso: string, withSeconds = false): string {
-  return new Date(iso).toLocaleTimeString("en-US", {
-    timeZone: TZ,
-    hour: "2-digit",
-    minute: "2-digit",
-    ...(withSeconds ? { second: "2-digit" } : {}),
-    hour12: true,
-  });
+// Punch timestamps are stored as Manila wall-clock but the app's DB timezone is
+// UTC, so the API tags them +00:00. Read the literal clock straight from the
+// string — never convert timezones — matching how the rest of the app renders
+// punch times. (Converting would shift every punch by +8 hours.)
+function fmtTime(iso: string): string {
+  const m = /T(\d{2}):(\d{2})/.exec(iso);
+  if (!m) return "";
+  let h = Number(m[1]);
+  const ap = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return `${String(h).padStart(2, "0")}:${m[2]} ${ap}`;
 }
 function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
-    timeZone: TZ,
+  const dt = new Date(iso.slice(0, 10) + "T00:00:00");
+  return dt.toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -79,8 +81,18 @@ export function TimeClockCard() {
     }
   }, [status?.server_time]);
   useEffect(() => {
+    // server_time carries the correct +08:00 offset, so this real epoch converts
+    // cleanly to Manila for the live ticking clock.
     const tick = () =>
-      setNowLabel(fmtTime(new Date(Date.now() + offsetRef.current).toISOString(), true));
+      setNowLabel(
+        new Date(Date.now() + offsetRef.current).toLocaleTimeString("en-US", {
+          timeZone: TZ,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true,
+        }),
+      );
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
