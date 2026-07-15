@@ -11,6 +11,7 @@ export type Device = {
   use_server_time: boolean;
   username: string;
   is_active: boolean;
+  company_id: number;
   branch_id: number | null;
   last_synced_at: string | null;
   last_event_at: string | null;
@@ -26,8 +27,12 @@ export type DeviceInput = {
   username: string;
   password?: string; // blank on edit = keep stored credential
   serial_no?: string | null;
+  company_id?: number;
+  branch_id?: number | null;
   is_active: boolean;
 };
+
+export type DeviceLookup = { id: number; name: string; code?: string };
 
 export type DeviceInfo = {
   name: string | null;
@@ -84,5 +89,14 @@ export const devicesApi = {
   users: async (id: number): Promise<EnrolledUser[]> => {
     const { data } = await api.get<{ ok: boolean; users: EnrolledUser[] }>(`${base}/${id}/users`);
     return data.users;
+  },
+  // Lookups for the company/branch selectors (tenancy-checked server-side).
+  companies: async (): Promise<DeviceLookup[]> => {
+    const { data } = await api.get<Listed<DeviceLookup>>("/api/v1/lookups/companies");
+    return data.data;
+  },
+  branches: async (companyId: number): Promise<DeviceLookup[]> => {
+    const { data } = await api.get<Listed<DeviceLookup>>(`/api/v1/lookups/branches?company_id=${companyId}`);
+    return data.data;
   },
 };

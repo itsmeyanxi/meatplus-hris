@@ -20,6 +20,8 @@ export default function DevicesPage() {
   const { confirm, dialog } = useConfirm();
 
   const { data: devices, isLoading, isError } = useQuery({ queryKey: QK, queryFn: devicesApi.list });
+  const { data: companies } = useQuery({ queryKey: ["lookups", "companies"], queryFn: devicesApi.companies });
+  const companyName = (id: number) => companies?.find((c) => c.id === id)?.name ?? "—";
 
   const [editing, setEditing] = useState<Device | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -43,6 +45,8 @@ export default function DevicesPage() {
       username: d.username,
       password: "", // blank = keep
       serial_no: d.serial_no ?? "",
+      company_id: d.company_id,
+      branch_id: d.branch_id ?? null,
       is_active: d.is_active,
     });
     setShowForm(true);
@@ -134,7 +138,7 @@ export default function DevicesPage() {
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-4 py-3">Device</th>
-                <th className="px-4 py-3">Address</th>
+                <th className="px-4 py-3">Company</th>
                 <th className="px-4 py-3">Serial</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Last sync</th>
@@ -145,8 +149,8 @@ export default function DevicesPage() {
               {devices.map((d) => (
                 <tr key={d.id} className="hover:bg-slate-50/60">
                   <td className="px-4 py-3 font-medium text-slate-800">{d.name}</td>
-                  <td className="px-4 py-3 font-mono text-slate-600">{d.ip_address}:{d.port}</td>
-                  <td className="px-4 py-3 text-slate-500">{d.serial_no ?? "—"}</td>
+                  <td className="px-4 py-3 text-slate-600">{companyName(d.company_id)}</td>
+                  <td className="px-4 py-3 font-mono text-slate-500">{d.serial_no ?? "—"}</td>
                   <td className="px-4 py-3"><StatusBadge active={d.is_active}>{d.is_active ? "Active" : "Disabled"}</StatusBadge></td>
                   <td className="px-4 py-3 text-slate-500">{fmt(d.last_synced_at)}</td>
                   <td className="px-4 py-3">
@@ -296,6 +300,13 @@ function DeviceFormModal({
 }) {
   const set = <K extends keyof DeviceInput>(k: K, v: DeviceInput[K]) => setForm({ ...form, [k]: v });
 
+  const { data: companies } = useQuery({ queryKey: ["lookups", "companies"], queryFn: devicesApi.companies });
+  const { data: branches } = useQuery({
+    queryKey: ["lookups", "branches", form.company_id],
+    queryFn: () => devicesApi.branches(form.company_id as number),
+    enabled: !!form.company_id,
+  });
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="dialog" aria-modal>
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
@@ -310,6 +321,33 @@ function DeviceFormModal({
           <div>
             <label className={labelCls}>Name</label>
             <input className={inputCls} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Main Entrance" required />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Company</label>
+              <select
+                className={inputCls}
+                value={form.company_id ?? ""}
+                onChange={(e) => setForm({ ...form, company_id: Number(e.target.value), branch_id: null })}
+                required
+              >
+                <option value="" disabled>Select company…</option>
+                {companies?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <p className="mt-1 text-xs text-slate-400">Which location/company this terminal belongs to.</p>
+            </div>
+            <div>
+              <label className={labelCls}>Branch (optional)</label>
+              <select
+                className={inputCls}
+                value={form.branch_id ?? ""}
+                onChange={(e) => set("branch_id", e.target.value ? Number(e.target.value) : null)}
+                disabled={!form.company_id}
+              >
+                <option value="">—</option>
+                {branches?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">

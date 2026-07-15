@@ -21,6 +21,7 @@ class AttendanceDeviceResource extends JsonResource
             'username' => $this->username,
             // password is never exposed
             'is_active' => $this->is_active,
+            'company_id' => $this->company_id,
             'branch_id' => $this->branch_id,
             'last_synced_at' => $this->last_synced_at?->toIso8601String(),
             'last_event_at' => $this->last_event_at?->toIso8601String(),

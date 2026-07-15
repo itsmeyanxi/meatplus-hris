@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\V1\Attendance;
 use App\Domain\Attendance\Models\AttendanceDevice;
 use App\Domain\Attendance\Services\Biometric\BiometricSyncService;
 use App\Domain\Attendance\Services\Biometric\HikvisionIsapiClient;
+use App\Domain\Identity\Models\Company;
+use App\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendance\AttendanceDeviceRequest;
 use App\Http\Resources\Attendance\AttendanceDeviceResource;
@@ -26,7 +28,7 @@ class AttendanceDeviceController extends Controller
     public function store(AttendanceDeviceRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $data['company_id'] = $request->user()->active_company_id;
+        $data['company_id'] = $this->resolveCompanyId($request->user(), $data['company_id'] ?? null);
         $data['port'] = $data['port'] ?? 80;
         $data['timezone'] = $data['timezone'] ?? 'Asia/Manila';
 
@@ -51,9 +53,41 @@ class AttendanceDeviceController extends Controller
             unset($data['password']);
         }
 
+        // Only reassign company when explicitly chosen and permitted; a blank/absent
+        // value must not null out the existing company (NOT NULL) or move it silently.
+        if (! empty($data['company_id'])) {
+            $data['company_id'] = $this->resolveCompanyId($request->user(), (int) $data['company_id']);
+        } else {
+            unset($data['company_id']);
+        }
+
         $attendanceDevice->update($data);
 
         return new AttendanceDeviceResource($attendanceDevice->fresh());
+    }
+
+    /** Companies this user may assign a device to: all for it_admin, else their own. */
+    private function allowedCompanyIds(User $user): array
+    {
+        return $user->hasRole('it_admin')
+            ? Company::query()->pluck('id')->all()
+            : $user->companies()->pluck('companies.id')->all();
+    }
+
+    /** Resolve the target company: the requested one if permitted, else the active company. */
+    private function resolveCompanyId(User $user, ?int $requested): int
+    {
+        if (! $requested) {
+            return $user->active_company_id;
+        }
+
+        abort_unless(
+            in_array($requested, $this->allowedCompanyIds($user), true),
+            403,
+            'You cannot assign a device to that company.',
+        );
+
+        return $requested;
     }
 
     public function destroy(Request $request, AttendanceDevice $attendanceDevice): JsonResponse
