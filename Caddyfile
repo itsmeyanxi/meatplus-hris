@@ -1,25 +1,25 @@
-# Meatplus HRIS — reverse proxy with automatic HTTPS (Let's Encrypt).
+# Meatplus HRIS — reverse proxy (HTTP-FIRST, port 80 only).
 #
-# Caddy listens on 80/443, terminates TLS, and forwards to the Next.js frontend
-# on 3001. The frontend in turn proxies /api, /sanctum, /up to the backend on
-# 8000. The unauthenticated ZKTeco /iclock routes are NOT proxied here, so they
-# stay LAN-only (the device keeps pushing to 192.168.125.5:8000/iclock).
+# The leading "http://" forces plain HTTP on port 80 — Caddy will NOT try to
+# fetch a TLS certificate or use 443. This is the staged "go live over HTTP now,
+# add HTTPS later" setup, since port 80 is already forwarded but 443 is not.
 #
-# Prereqs before running Caddy:
-#   - Stop Laragon's Apache (it currently holds ports 80/443).
-#   - Windows Firewall: allow inbound TCP 80 and 443.
-#   - Port 80 must be reachable from the internet for the ACME cert challenge.
+# TO UPGRADE TO HTTPS LATER: forward 443 on the router, then change the site
+# address below from "http://allcompanyhris.meatplus.ph" to just
+# "allcompanyhris.meatplus.ph" and re-add the Strict-Transport-Security header.
+# Caddy will then auto-fetch a Let's Encrypt certificate. Also flip
+# SESSION_SECURE_COOKIE back to true and APP_URL back to https in .env.production.
 #
-# Run:      caddy run --config Caddyfile
-# Service:  caddy start   (or install as a Windows service via nssm / caddy-service)
+# The frontend (3001) proxies /api, /sanctum, /up to the backend (8000). The
+# ZKTeco /iclock routes are NOT proxied here, so they stay LAN-only.
+#
+# Run:  tools\caddy.exe run --config Caddyfile   (start-production.ps1 does this)
 
-allcompanyhris.meatplus.ph {
+http://allcompanyhris.meatplus.ph {
 	encode gzip
 	reverse_proxy 127.0.0.1:3001
 
-	# Security headers (defense-in-depth; the app is now on the public internet).
 	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "SAMEORIGIN"
 		Referrer-Policy "strict-origin-when-cross-origin"
