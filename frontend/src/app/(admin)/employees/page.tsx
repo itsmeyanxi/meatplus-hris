@@ -155,7 +155,7 @@ export default function EmployeesPage() {
     setEmpNo(""); setName(""); setDepartmentId(""); setCompanyId(""); setPage(1);
   };
 
-  const COLS = 12; // checkbox + 10 data cols + access
+  const COLS = 13; // checkbox + Company + 10 data cols + access
 
   return (
     <div className="relative space-y-4">
@@ -318,6 +318,7 @@ export default function EmployeesPage() {
                 </th>
               )}
               <Th>Employee #</Th>
+              <Th>Company</Th>
               <Th>Last Name</Th>
               <Th>First Name</Th>
               <Th>Department</Th>
@@ -379,6 +380,7 @@ export default function EmployeesPage() {
                     </Td>
                   )}
                   <Td><span className="font-mono text-slate-900 font-medium">{emp.employee_no}</span></Td>
+                  <Td>{emp.company?.code ?? emp.company?.name ?? "—"}</Td>
                   <Td><span className="font-medium text-slate-900">{emp.last_name ?? "—"}</span></Td>
                   <Td><span className="font-medium text-slate-900">{emp.first_name ?? "—"}</span></Td>
                   <Td>{emp.department?.name ?? "—"}</Td>
