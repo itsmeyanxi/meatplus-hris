@@ -81,10 +81,10 @@ class ReportController extends Controller
         $rows = LeaveApplication::query()
             ->with('employee:id,employee_no,first_name,last_name')
             ->with('leaveType:id,name')
-            ->when($request->date_from, fn ($q) => $q->where('start_date', '>=', $request->date_from))
-            ->when($request->date_to,   fn ($q) => $q->where('end_date', '<=', $request->date_to))
+            ->when($request->date_from, fn ($q) => $q->where('date_from', '>=', $request->date_from))
+            ->when($request->date_to,   fn ($q) => $q->where('date_to', '<=', $request->date_to))
             ->when($request->status,    fn ($q) => $q->where('status', $request->status))
-            ->orderBy('start_date', 'desc')
+            ->orderBy('date_from', 'desc')
             ->get();
 
         $lines = [];
@@ -98,9 +98,9 @@ class ReportController extends Controller
                 $r->employee?->employee_no ?? '',
                 $this->csv(($r->employee?->last_name ?? '') . ', ' . ($r->employee?->first_name ?? '')),
                 $this->csv($r->leaveType?->name ?? ''),
-                $r->start_date,
-                $r->end_date,
-                $r->total_days ?? '',
+                $r->date_from?->toDateString() ?? '',
+                $r->date_to?->toDateString() ?? '',
+                $r->days_count ?? '',
                 $r->status,
                 $this->csv($r->decision_remarks ?? ''),
             ]);
