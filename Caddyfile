@@ -17,13 +17,23 @@
 
 http://allcompanyhris.meatplus.ph {
 	encode gzip
-	reverse_proxy 127.0.0.1:3001
 
-	header {
-		X-Content-Type-Options "nosniff"
-		X-Frame-Options "SAMEORIGIN"
-		Referrer-Policy "strict-origin-when-cross-origin"
-		-Server
+	# Biometric ADMS/iclock push (ZKTeco terminals) -> backend on 8000.
+	# Reachable from the internet so remote-branch devices can push, but the
+	# backend serial-allowlists devices (unapproved serials are rejected).
+	handle /iclock/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	# Everything else -> the Next.js frontend (which proxies /api to the backend).
+	handle {
+		header {
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "SAMEORIGIN"
+			Referrer-Policy "strict-origin-when-cross-origin"
+			-Server
+		}
+		reverse_proxy 127.0.0.1:3001
 	}
 
 	log {

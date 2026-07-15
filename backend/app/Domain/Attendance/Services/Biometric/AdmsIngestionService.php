@@ -63,6 +63,22 @@ class AdmsIngestionService
         }
 
         $device = $this->resolveDevice($sn);
+
+        // Serial allowlist. Only devices an admin has activated (and assigned to
+        // the correct company) may push punches. Unknown serials are recorded as
+        // pending so the admin can see and approve them, but their data is
+        // rejected here — this is what makes exposing /iclock to the internet
+        // safe against forged punches from unknown terminals.
+        if (! $device->is_active) {
+            $device->forceFill(['last_event_at' => now()])->save();
+            \Illuminate\Support\Facades\Log::warning(
+                "ADMS: rejected punches from unapproved device serial '{$sn}'. "
+                ."Approve it under Attendance Devices (set its company + activate) to accept."
+            );
+
+            return 0;
+        }
+
         $tz = $device->tz();
         $deviceKey = substr($sn ?: 'ZK-'.$device->id, 0, 50);
 
@@ -158,15 +174,15 @@ class AdmsIngestionService
         return AttendanceDevice::firstOrCreate(
             ['serial_no' => $sn],
             [
-                'company_id' => Company::query()->orderBy('id')->value('id'),
-                'name' => "ZKTeco {$sn}",
+                'company_id' => Company::query()->orderBy('id')->value('id'), // placeholder until an admin assigns the real one
+                'name' => "PENDING - ZKTeco {$sn}",
                 'vendor' => 'zkteco',
                 'ip_address' => '0.0.0.0', // push device — no inbound IP needed
                 'port' => 80,
                 'timezone' => 'Asia/Manila',
                 'username' => 'adms',
                 'password' => 'adms',
-                'is_active' => true,
+                'is_active' => false, // pending: an admin must approve + set the company before punches are accepted
             ],
         );
     }
