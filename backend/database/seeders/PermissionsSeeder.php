@@ -53,7 +53,7 @@ class PermissionsSeeder extends Seeder
             'hr_officer' => [
                 'employee.view', 'employee.create', 'employee.update',
                 'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',
-                'leave.view', 'leave.file', 'leave.approve.any', 'leave.manage_types',
+                'leave.view', 'leave.file', 'leave.manage_types',
                 'compensation.view',
                 'access_request.view', 'access_request.approve.hr',
             ],
@@ -82,13 +82,13 @@ class PermissionsSeeder extends Seeder
                 'employee.view',
                 'attendance.view', 'attendance.view.any',
                 'attendance.approve.any', 'attendance.approve.self_dept',
-                'leave.view', 'leave.approve.any',
+                'leave.view',
                 'access_request.view', 'access_request.approve.supervisor',
             ],
             'team_lead' => [
                 'employee.view',
                 'attendance.view', 'attendance.approve.self_dept',
-                'leave.view', 'leave.file', 'leave.approve.self_dept',
+                'leave.view', 'leave.file',
                 'access_request.view', 'access_request.approve.supervisor',
             ],
             'dept_admin' => [
@@ -111,14 +111,14 @@ class PermissionsSeeder extends Seeder
             'hr_coordinator' => [
                 'employee.view',
                 'attendance.view', 'attendance.view.any',
-                'leave.view', 'leave.file', 'leave.approve.any',
+                'leave.view', 'leave.file',
                 'access_request.view', 'access_request.approve.hr',
             ],
             'garahe_teamlead' => [
                 'employee.view',
                 'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',
                 'attendance.approve.self_dept',
-                'leave.view', 'leave.file', 'leave.approve.self_dept',
+                'leave.view', 'leave.file',
             ],
         ];
 
