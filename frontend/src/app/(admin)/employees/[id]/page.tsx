@@ -26,13 +26,20 @@ export default function EmployeeOverviewPage() {
       <div className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-lg font-bold text-white">
-              {data.first_name?.[0]}{data.last_name?.[0]}
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-lg font-bold text-white shadow-sm">
+              {(data.first_name?.[0] ?? "") + (data.last_name?.[0] ?? "") || "?"}
             </div>
             <div>
-              <p className="text-lg font-semibold text-slate-900">{data.full_name}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-lg font-semibold text-slate-900">{data.full_name}</p>
+                {data.company && (
+                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600" title={data.company.name}>
+                    {data.company.code}
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-slate-500">{data.position?.title ?? "—"} · {data.department?.name ?? "—"}</p>
-              <p className="mt-0.5 text-xs font-mono text-slate-400">{data.employee_no}</p>
+              <p className="mt-0.5 font-mono text-xs text-slate-400">#{data.employee_no}</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
@@ -54,15 +61,15 @@ export default function EmployeeOverviewPage() {
           <Field label="Last name" value={data.last_name} />
           <Field label="Suffix" value={data.suffix} />
           <Field label="Birth date" value={data.birth_date} />
-          <Field label="Gender" value={data.gender} />
-          <Field label="Civil status" value={data.civil_status} />
-          <Field label="Nationality" value={data.nationality} />
+          <Field label="Gender" value={data.gender} capitalize />
+          <Field label="Civil status" value={data.civil_status} capitalize />
+          <Field label="Nationality" value={data.nationality} capitalize />
         </Section>
 
         {/* Contact */}
         <Section title="Contact">
-          <Field label="Company email" value={data.email_company} />
-          <Field label="Personal email" value={data.email_personal} />
+          <Field label="Company email" value={data.email_company} mono />
+          <Field label="Personal email" value={data.email_personal} mono />
           <Field label="Mobile" value={data.mobile} />
           <Field label="Home phone" value={data.phone_home} />
           <div className="pt-2 border-t border-slate-100">
@@ -102,17 +109,26 @@ export default function EmployeeOverviewPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5">
-      <h3 className="mb-4 text-sm font-semibold text-slate-700">{title}</h3>
-      <div className="space-y-0.5">{children}</div>
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h3>
+      <dl className="space-y-3">{children}</dl>
     </section>
   );
 }
 
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
+function Field({
+  label, value, mono, capitalize,
+}: {
+  label: string;
+  value: string | null | undefined;
+  mono?: boolean;
+  capitalize?: boolean;
+}) {
   return (
-    <div className="flex justify-between gap-4 border-b border-slate-50 py-2 text-sm last:border-b-0">
-      <span className="shrink-0 text-slate-400">{label}</span>
-      <span className="text-right font-medium text-slate-800">{value || "—"}</span>
+    <div className="min-w-0">
+      <dt className="text-xs text-slate-400">{label}</dt>
+      <dd className={`mt-0.5 break-words text-sm font-medium text-slate-800 ${mono ? "font-mono text-xs" : ""} ${capitalize ? "capitalize" : ""}`}>
+        {value || "—"}
+      </dd>
     </div>
   );
 }
