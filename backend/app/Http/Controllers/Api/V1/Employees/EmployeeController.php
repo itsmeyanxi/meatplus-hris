@@ -150,7 +150,7 @@ class EmployeeController extends Controller
         abort_unless($request->user()->can('employee.view'), 403);
 
         $employee->load([
-            'branch', 'department', 'position', 'employmentType', 'manager',
+            'branch', 'department', 'position', 'employmentType', 'manager', 'compensation',
         ]);
 
         return new EmployeeResource($employee);
@@ -163,12 +163,17 @@ class EmployeeController extends Controller
     {
         abort_unless($request->user()->can('employee.update'), 403);
 
-        // 1. Validates the incoming Next.js payload values against UpdateEmployeeRequest rules
-        // 2. Mass-updates the matching columns in your MySQL database table safely
-        $employee->update($request->validated());
-        
-        // 3. Eager-loads relationships back up so your frontend dashboard re-renders with fresh metadata
-        $employee->load(['branch', 'department', 'position', 'employmentType', 'manager']);
+        $data = $request->validated();
+
+        // Only senior HR / IT (employee.view.sensitive) may change the confidential
+        // classification; strip it for anyone else so a normal update can't flip it.
+        if (array_key_exists('is_confidential', $data) && ! $request->user()->can('employee.view.sensitive')) {
+            unset($data['is_confidential']);
+        }
+
+        $employee->update($data);
+
+        $employee->load(['branch', 'department', 'position', 'employmentType', 'manager', 'compensation']);
 
         // 4. Returns the updated data model wrapped cleanly inside your JSON API collection
         return new EmployeeResource($employee);

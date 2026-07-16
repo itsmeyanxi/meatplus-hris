@@ -5,8 +5,11 @@ import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { getEmployee } from "@/lib/employees";
+import { getMe } from "@/lib/auth";
 
-const TABS = [
+// `sensitive` tabs require employee.view.sensitive (senior HR / IT) — hidden from
+// HR Officers and other regular roles.
+const TABS: { slug: string; label: string; sensitive?: boolean }[] = [
   { slug: "", label: "Overview" },
   { slug: "attendance", label: "Attendance" },
   { slug: "dependents", label: "Dependents" },
@@ -14,10 +17,10 @@ const TABS = [
   { slug: "education", label: "Education" },
   { slug: "employment-history", label: "Employment history" },
   { slug: "government-ids", label: "Gov't IDs" },
-  { slug: "bank-accounts", label: "Bank accounts" },
+  { slug: "bank-accounts", label: "Bank accounts", sensitive: true },
   { slug: "contracts", label: "Contracts" },
   { slug: "records", label: "201 Records" },
-] as const;
+];
 
 export default function EmployeeDetailLayout({ children }: { children: ReactNode }) {
   const params = useParams<{ id: string }>();
@@ -31,6 +34,10 @@ export default function EmployeeDetailLayout({ children }: { children: ReactNode
     enabled: !!id,
     staleTime: 5 * 60_000,
   });
+
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const canSensitive = me?.user.permissions.includes("employee.view.sensitive") ?? false;
+  const tabs = TABS.filter((t) => !t.sensitive || canSensitive);
 
   return (
     <div className="space-y-6">
@@ -57,6 +64,11 @@ export default function EmployeeDetailLayout({ children }: { children: ReactNode
         </div>
         {data && (
           <div className="flex items-center gap-2">
+            {data.is_confidential && (
+              <span className="rounded-md bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800" title="Confidential payroll group — basic pay visible to senior HR / IT only">
+                Confidential
+              </span>
+            )}
             <span
               className={
                 data.is_active
@@ -77,7 +89,7 @@ export default function EmployeeDetailLayout({ children }: { children: ReactNode
       </div>
 
       <nav className="flex gap-1 border-b border-slate-200">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const href = tab.slug ? `${base}/${tab.slug}` : base;
           const active = tab.slug
             ? pathname.startsWith(href)

@@ -40,6 +40,9 @@ export type EmployeeDetail = EmployeeListItem & {
   date_regularized: string | null;
   date_separated: string | null;
   separation_reason: string | null;
+  is_confidential: boolean;
+  // Present only when the viewer is allowed to see it (confidential-aware on the server).
+  basic_pay?: string | number | null;
 };
 
 type AddressBlock = {

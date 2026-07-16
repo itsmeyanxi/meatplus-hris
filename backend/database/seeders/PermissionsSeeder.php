@@ -21,6 +21,7 @@ class PermissionsSeeder extends Seeder
 
         $permissions = [
             'employee.view', 'employee.create', 'employee.update', 'employee.delete',
+            'employee.view.sensitive', // confidential employees' pay + bank accounts (senior HR/IT only)
             'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',
             'attendance.approve.any', 'attendance.approve.self_dept',
             'leave.view', 'leave.file', 'leave.approve.self_dept', 'leave.approve.any', 'leave.manage_types',
@@ -40,7 +41,7 @@ class PermissionsSeeder extends Seeder
 
         $rolePermissions = [
             'hr_admin' => [
-                'employee.view', 'employee.create', 'employee.update',
+                'employee.view', 'employee.create', 'employee.update', 'employee.view.sensitive',
                 'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',
                 'leave.view', 'leave.file', 'leave.approve.any', 'leave.manage_types',
                 'compensation.view',

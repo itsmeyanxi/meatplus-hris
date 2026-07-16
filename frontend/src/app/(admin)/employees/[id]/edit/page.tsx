@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useParams } from "next/navigation";
 import { useState } from "react";
 import { getEmployee, updateEmployee, getLookup, type EmployeeCreateInput } from "@/lib/employees";
+import { getMe } from "@/lib/auth";
 
 export default function EditEmployeePage() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function EditEmployeePage() {
     employment_type_id: 0,
     date_hired: "", date_regularized: "",
     is_active: true,
+    is_confidential: false,
   });
 
   const [hydrated, setHydrated] = useState(false);
@@ -56,8 +58,12 @@ export default function EditEmployeePage() {
       date_hired: emp.date_hired ?? "",
       date_regularized: emp.date_regularized ?? "",
       is_active: emp.is_active,
+      is_confidential: emp.is_confidential,
     });
   }
+
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const canConfi = me?.user.permissions.includes("employee.view.sensitive") ?? false;
 
   const { data: departments = [] } = useQuery({ queryKey: ["lookup-departments"], queryFn: () => getLookup("departments"), staleTime: 300_000 });
   const { data: branches = [] } = useQuery({ queryKey: ["lookup-branches"], queryFn: () => getLookup("branches"), staleTime: 300_000 });
@@ -206,6 +212,24 @@ export default function EditEmployeePage() {
           </button>
           <span className="text-sm font-medium text-slate-700">{form.is_active ? "Active employee" : "Inactive / separated"}</span>
         </div>
+
+        {canConfi && (
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.is_confidential}
+              onClick={() => setForm((p) => ({ ...p, is_confidential: !p.is_confidential }))}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.is_confidential ? "bg-amber-600" : "bg-slate-300"}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.is_confidential ? "translate-x-6" : "translate-x-1"}`} />
+            </button>
+            <div>
+              <span className="text-sm font-medium text-slate-700">Payroll group: {form.is_confidential ? "Confidential" : "Non-confidential"}</span>
+              <p className="text-xs text-slate-400">Confidential-group pay is visible to senior HR / IT only (hidden from HR Officers).</p>
+            </div>
+          </div>
+        )}
       </FormSection>
 
       {/* ── Section: System ── */}

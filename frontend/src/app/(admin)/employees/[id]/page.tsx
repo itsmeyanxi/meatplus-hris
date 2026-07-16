@@ -37,6 +37,11 @@ export default function EmployeeOverviewPage() {
                     {data.company.code}
                   </span>
                 )}
+                {data.is_confidential && (
+                  <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700" title="Confidential payroll group — pay visible to senior HR / IT only">
+                    Confidential
+                  </span>
+                )}
               </div>
               <p className="text-sm text-slate-500">{data.position?.title ?? "—"} · {data.department?.name ?? "—"}</p>
               <p className="mt-0.5 font-mono text-xs text-slate-400">#{data.employee_no}</p>
@@ -84,6 +89,14 @@ export default function EmployeeOverviewPage() {
 
         {/* Employment */}
         <Section title="Employment">
+          {data.basic_pay != null && (
+            <div className="min-w-0 rounded-lg bg-emerald-50 px-2.5 py-1.5">
+              <dt className="text-xs text-emerald-700/70">Basic pay</dt>
+              <dd className="mt-0.5 text-sm font-semibold tabular-nums text-emerald-800">
+                ₱{Number(data.basic_pay).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </dd>
+            </div>
+          )}
           <Field label="Branch" value={data.branch?.name} />
           <Field label="Department" value={data.department?.name} />
           <Field label="Position" value={data.position?.title} />

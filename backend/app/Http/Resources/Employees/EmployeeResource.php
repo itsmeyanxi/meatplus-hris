@@ -80,6 +80,18 @@ class EmployeeResource extends JsonResource
 
             'employee_type' => $this->employee_type,
             'user_type' => $this->user_type,
+            'is_confidential' => (bool) $this->is_confidential,
+            // Basic pay: included only when compensation is loaded AND the viewer is
+            // allowed — for a confidential employee that means employee.view.sensitive
+            // (senior HR/IT), otherwise the normal compensation.view.
+            $this->mergeWhen(
+                $this->relationLoaded('compensation') && (
+                    $this->is_confidential
+                        ? (bool) $request->user()?->can('employee.view.sensitive')
+                        : (bool) $request->user()?->can('compensation.view')
+                ),
+                fn () => ['basic_pay' => optional($this->compensation)->basic_monthly]
+            ),
             'job_code' => $this->job_code,
             'job_grade' => $this->job_grade,
             'client_name' => $this->client_name,
