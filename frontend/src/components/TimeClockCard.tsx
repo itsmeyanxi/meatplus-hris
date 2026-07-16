@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { myTimeClockApi, type TimeClockStatus } from "@/lib/attendance";
+import { PunchLocation } from "@/components/attendance/PunchLocation";
 
 const TZ = "Asia/Manila";
 
@@ -54,7 +55,9 @@ export function TimeClockCard() {
   const punch = useMutation({
     mutationFn: async (direction: "in" | "out") => {
       const coords = await getCoords();
-      return myTimeClockApi.punch(direction, coords ?? undefined);
+      // Location is required — refuse the punch if the browser can't/won't provide it.
+      if (!coords) throw new Error("LOCATION_REQUIRED");
+      return myTimeClockApi.punch(direction, coords);
     },
     onMutate: () => setError(null),
     onSuccess: (res) => {
@@ -64,6 +67,12 @@ export function TimeClockCard() {
       qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
     onError: (e: unknown) => {
+      if ((e as Error)?.message === "LOCATION_REQUIRED") {
+        setError(
+          "Location is required to clock in or out. Please allow location access in your browser and try again.",
+        );
+        return;
+      }
       const msg =
         (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
         "Could not record your punch. Please try again.";
@@ -149,7 +158,7 @@ export function TimeClockCard() {
             {busy ? "Saving…" : isIn ? "Time Out" : "Time In"}
           </button>
           <p className="text-center text-xs text-slate-400 sm:text-right">
-            Records your location for verification
+            Location required — you&apos;ll be asked to allow it
           </p>
         </div>
       </div>
@@ -164,23 +173,25 @@ export function TimeClockCard() {
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
             Today&apos;s punches
           </p>
-          <ul className="flex flex-wrap gap-2">
+          <ul className="flex flex-col gap-2">
             {status.punches.map((p) => (
-              <li
-                key={p.id}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm ${
-                  p.direction === "in"
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                <strong>{p.direction === "in" ? "IN" : "OUT"}</strong>
-                {fmtTime(p.logged_at)}
-                {p.source !== "biometric" && (
-                  <span className="rounded bg-white/70 px-1 text-[10px] uppercase text-slate-400">
-                    {p.source}
-                  </span>
-                )}
+              <li key={p.id} className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm ${
+                    p.direction === "in"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  <strong>{p.direction === "in" ? "IN" : "OUT"}</strong>
+                  {fmtTime(p.logged_at)}
+                  {p.source !== "biometric" && (
+                    <span className="rounded bg-white/70 px-1 text-[10px] uppercase text-slate-400">
+                      {p.source}
+                    </span>
+                  )}
+                </span>
+                <PunchLocation lat={p.lat} lng={p.lng} geo={p.geo} />
               </li>
             ))}
           </ul>

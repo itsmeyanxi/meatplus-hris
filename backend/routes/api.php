@@ -87,6 +87,10 @@ Route::prefix('v1')->group(function () {
         Route::get('lookups/employment-types', [LookupController::class, 'employmentTypes']);
         Route::get('lookups/companies', [LookupController::class, 'companies']);
 
+        // Branch geofence administration (worksite GPS pin + radius)
+        Route::get('branches', [\App\Http\Controllers\Api\V1\Identity\BranchController::class, 'index']);
+        Route::patch('branches/{branch}', [\App\Http\Controllers\Api\V1\Identity\BranchController::class, 'update']);
+
         // Master data CRUD (departments + positions)
         Route::get('departments', [DepartmentController::class, 'index']);
         Route::post('departments', [DepartmentController::class, 'store']);

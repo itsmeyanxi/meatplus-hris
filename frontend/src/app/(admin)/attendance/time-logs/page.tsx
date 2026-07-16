@@ -5,6 +5,7 @@ import { useState } from "react";
 import { getMe } from "@/lib/auth";
 import { listEmployees } from "@/lib/employees";
 import { timeLogsApi, type TimeLog, type TimeLogInput } from "@/lib/attendance";
+import { PunchLocation } from "@/components/attendance/PunchLocation";
 import { AppButton, AppCard, PageHeader, TableShell } from "@/components/ui";
 import { inputCls, labelCls } from "@/lib/form-classes";
 
@@ -116,7 +117,7 @@ export default function TimeLogsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-slate-600">
-              {["Logged at", "Employee #", "Direction", "Source"].map((h) => (
+              {["Logged at", "Employee #", "Direction", "Source", "Location"].map((h) => (
                 <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">{h}</th>
               ))}
             </tr>
@@ -124,7 +125,7 @@ export default function TimeLogsPage() {
           <tbody>
             {items.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-16 text-center">
+                <td colSpan={5} className="px-4 py-16 text-center">
                   <p className="text-sm font-medium text-slate-700">No logs in this range</p>
                   <p className="mt-1 text-sm text-slate-500">Adjust the filter or add a manual log above.</p>
                 </td>
@@ -136,6 +137,7 @@ export default function TimeLogsPage() {
                 <td className="px-4 py-3 text-slate-600">{l.employee_id}</td>
                 <td className="px-4 py-3 capitalize text-slate-700">{l.direction.replace("_", " ")}</td>
                 <td className="px-4 py-3 text-slate-500">{l.source}</td>
+                <td className="px-4 py-3"><PunchLocation lat={l.lat} lng={l.lng} geo={l.geo} /></td>
               </tr>
             ))}
           </tbody>

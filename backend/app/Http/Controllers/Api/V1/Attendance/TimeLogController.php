@@ -17,7 +17,8 @@ class TimeLogController extends Controller
         $user = $request->user();
         abort_unless($user->can('attendance.view'), 403);
 
-        $q = TimeLog::query()->orderBy('logged_at');
+        // employee.branch feeds the geofence verdict in TimeLogResource.
+        $q = TimeLog::query()->with('employee.branch')->orderBy('logged_at');
 
         // HR (attendance.view.any) sees everyone; everyone else is locked to their own logs.
         if ($user->can('attendance.view.any')) {

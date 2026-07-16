@@ -16,7 +16,7 @@ class Branch extends Model
     protected $fillable = [
         'company_id', 'code', 'name',
         'address_line1', 'address_line2', 'city', 'province', 'postal_code', 'country',
-        'latitude', 'longitude',
+        'latitude', 'longitude', 'geofence_radius_m',
         'is_head_office', 'is_active',
     ];
 
@@ -27,6 +27,7 @@ class Branch extends Model
             'is_active' => 'boolean',
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
+            'geofence_radius_m' => 'integer',
         ];
     }
 }

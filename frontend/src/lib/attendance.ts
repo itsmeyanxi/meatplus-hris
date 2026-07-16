@@ -37,6 +37,15 @@ export type HolidayInput = {
   applicable_branch_id?: number | null;
 };
 
+// Geofence verdict for a located punch vs the employee's branch pin.
+// null when the punch has no coordinates or the branch has no pin set yet.
+export type GeoVerdict = {
+  distance_m: number;
+  radius_m: number;
+  outside: boolean;
+  branch_name: string;
+};
+
 export type TimeLog = {
   id: number;
   employee_id: number;
@@ -44,6 +53,9 @@ export type TimeLog = {
   direction: "in" | "out" | "break_out" | "break_in";
   source: "biometric" | "web" | "mobile" | "manual";
   device_id: string | null;
+  lat: number | null;
+  lng: number | null;
+  geo: GeoVerdict | null;
 };
 export type TimeLogInput = {
   employee_id: number;
@@ -202,6 +214,9 @@ export type TimeClockPunch = {
   direction: "in" | "out";
   logged_at: string;
   source: "biometric" | "web" | "mobile" | "manual";
+  lat: number | null;
+  lng: number | null;
+  geo: GeoVerdict | null;
 };
 
 export type TimeClockStatus = {
@@ -226,6 +241,40 @@ export const myTimeClockApi = {
       { direction, ...(coords ?? {}) },
     );
     return data;
+  },
+};
+
+// ── Branch geofence administration (worksite GPS pin + allowed radius) ────────
+
+export type BranchGeofence = {
+  id: number;
+  code: string | null;
+  name: string;
+  city: string | null;
+  province: string | null;
+  is_head_office: boolean;
+  is_active: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  geofence_radius_m: number | null;
+  effective_radius_m: number;
+  has_pin: boolean;
+};
+
+export type BranchGeofenceInput = {
+  latitude: number | null;
+  longitude: number | null;
+  geofence_radius_m: number | null;
+};
+
+export const branchesAdminApi = {
+  list: async (): Promise<BranchGeofence[]> => {
+    const { data } = await api.get<Listed<BranchGeofence>>("/api/v1/branches");
+    return data.data;
+  },
+  update: async (id: number, body: BranchGeofenceInput): Promise<BranchGeofence> => {
+    const { data } = await api.patch<{ data: BranchGeofence }>(`/api/v1/branches/${id}`, body);
+    return data.data;
   },
 };
 

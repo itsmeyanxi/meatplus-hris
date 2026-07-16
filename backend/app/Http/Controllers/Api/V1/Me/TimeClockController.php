@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\V1\Me;
 
 use App\Domain\Attendance\Models\TimeLog;
 use App\Domain\Attendance\Services\DtrComputer;
+use App\Domain\Attendance\Services\GeofenceService;
+use App\Domain\HRIS\Models\Employee;
 use App\Http\Controllers\Controller;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -30,7 +32,7 @@ class TimeClockController extends Controller
             return response()->json(['message' => 'Your account is not linked to an employee record.'], 422);
         }
 
-        return response()->json(['data' => $this->todayState($employee->id)]);
+        return response()->json(['data' => $this->todayState($employee)]);
     }
 
     public function store(Request $request, DtrComputer $dtr): JsonResponse
@@ -40,15 +42,20 @@ class TimeClockController extends Controller
             return response()->json(['message' => 'Your account is not linked to an employee record.'], 422);
         }
 
+        // Location is REQUIRED for a web punch — the front-end blocks the punch when
+        // the browser denies GPS, and this is the server-side backstop.
         $validated = $request->validate([
             'direction' => 'required|in:in,out',
-            'lat' => 'nullable|numeric|between:-90,90',
-            'lng' => 'nullable|numeric|between:-180,180',
+            'lat' => 'required|numeric|between:-90,90',
+            'lng' => 'required|numeric|between:-180,180',
+        ], [
+            'lat.required' => 'Location is required to clock in or out. Please allow location access and try again.',
+            'lng.required' => 'Location is required to clock in or out. Please allow location access and try again.',
         ]);
         $direction = $validated['direction'];
 
         // Sequence guard: can't clock in twice, or clock out without clocking in.
-        $state = $this->todayState($employee->id);
+        $state = $this->todayState($employee);
         if ($direction === 'in' && $state['state'] === 'in') {
             return response()->json(['message' => "You're already clocked in."], 422);
         }
@@ -81,7 +88,7 @@ class TimeClockController extends Controller
         }
 
         return response()->json([
-            'data' => $this->todayState($employee->id),
+            'data' => $this->todayState($employee),
             'message' => $direction === 'in' ? 'Clocked in.' : 'Clocked out.',
         ], 201);
     }
@@ -91,22 +98,25 @@ class TimeClockController extends Controller
      * Bypasses the company scope and keys off the (unique) employee id so it
      * works even when an admin's active company differs from the employee's.
      */
-    private function todayState(int $employeeId): array
+    private function todayState(Employee $employee): array
     {
         $start = CarbonImmutable::now(self::TZ)->startOfDay();
         $end = $start->endOfDay();
 
         $punches = TimeLog::withoutGlobalScopes()
-            ->where('employee_id', $employeeId)
+            ->where('employee_id', $employee->id)
             ->whereBetween('logged_at', [$start, $end])
             ->orderBy('logged_at')
-            ->get(['id', 'direction', 'logged_at', 'source']);
+            ->get(['id', 'direction', 'logged_at', 'source', 'lat', 'lng']);
 
         $last = $punches->last();
         $state = $last && $last->direction === 'in' ? 'in' : 'out';
         $clockedInAt = $state === 'in'
             ? optional($punches->where('direction', 'in')->last())->logged_at?->toIso8601String()
             : null;
+
+        $geofence = app(GeofenceService::class);
+        $branch = $employee->branch; // may be null; geofence stays null until it has a pin
 
         return [
             'state' => $state, // "in" = currently clocked in, "out" = not
@@ -118,6 +128,13 @@ class TimeClockController extends Controller
                 'direction' => $p->direction,
                 'logged_at' => $p->logged_at->toIso8601String(),
                 'source' => $p->source,
+                'lat' => $p->lat !== null ? (float) $p->lat : null,
+                'lng' => $p->lng !== null ? (float) $p->lng : null,
+                'geo' => $geofence->evaluate(
+                    $p->lat !== null ? (float) $p->lat : null,
+                    $p->lng !== null ? (float) $p->lng : null,
+                    $branch,
+                ),
             ])->values(),
         ];
     }
