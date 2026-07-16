@@ -7,7 +7,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { getMe, logout, switchCompany } from "@/lib/auth";
 import { getRoles, ROLE_LABELS } from "@/lib/users";
 import { getCompanies } from "@/lib/companies";
-import { AppButton } from "@/components/ui";
 import { NotificationBell } from "@/components/NotificationBell";
 
 export type NavItem = {
@@ -283,32 +282,17 @@ export function AppShell({
           </nav>
         </div>
 
-        <div className="mt-auto space-y-2.5">
-          {/* User profile & Logout footer info */}
-          <div className={`border border-slate-200 bg-slate-50 p-2.5 transition-all ${isCollapsed ? "rounded-xl text-center" : "rounded-xl"}`}>
-            {isCollapsed ? (
-              <button
-                onClick={handleLogout}
-                className="text-slate-500 hover:text-red-600 transition p-1"
-                title="Log out"
-              >
-                <svg className="w-4 h-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
-            ) : (
-              <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Signed in</p>
-                <p className="mt-0.5 break-all text-xs font-medium text-slate-900 line-clamp-2">
-                  {isLoading ? "Loading…" : data?.user.email}
-                </p>
-                <AppButton onClick={handleLogout} variant="secondary" className="mt-3 w-full text-xs py-1.5 h-auto">
-                  Log out
-                </AppButton>
-              </div>
-            )}
+        {/* Signed-in info. Logging out is done from the profile menu (top-right). */}
+        {!isCollapsed && (
+          <div className="mt-auto">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Signed in</p>
+              <p className="mt-0.5 break-all text-xs font-medium text-slate-900 line-clamp-2">
+                {isLoading ? "Loading…" : data?.user.email}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </aside>
 
       {/* MOBILE HEADER & MAIN CONTENT */}
