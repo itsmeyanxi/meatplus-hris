@@ -31,7 +31,8 @@ export type PrefillRequest = {
 
 type AnyReq = { id: number; status: RequestStatus; decision_remarks: string | null } & Record<string, unknown>;
 type ReqApi = {
-  list: (params?: ListFilters) => Promise<AnyReq[]>;
+  // list is paginated: it resolves to { data, meta }, NOT a bare array.
+  list: (params?: ListFilters) => Promise<{ data: AnyReq[] }>;
   cancel: (id: number) => Promise<AnyReq>;
 };
 const API = {
@@ -79,10 +80,12 @@ export function MyAttendanceRequests({
   }, [prefill]);
 
   const listKey = ["my-attendance-requests", type];
-  const { data: items = [] } = useQuery({
+  const { data: page } = useQuery({
     queryKey: listKey,
     queryFn: () => API[type].list(),
   });
+  // The endpoint is paginated ({ data, meta }); the UI only needs the rows.
+  const items = page?.data ?? [];
 
   const create = useMutation({
     mutationFn: () => submitRequest(type, form),
