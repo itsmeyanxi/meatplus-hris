@@ -282,17 +282,6 @@ export function AppShell({
           </nav>
         </div>
 
-        {/* Signed-in info. Logging out is done from the profile menu (top-right). */}
-        {!isCollapsed && (
-          <div className="mt-auto">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Signed in</p>
-              <p className="mt-0.5 break-all text-xs font-medium text-slate-900 line-clamp-2">
-                {isLoading ? "Loading…" : data?.user.email}
-              </p>
-            </div>
-          </div>
-        )}
       </aside>
 
       {/* MOBILE HEADER & MAIN CONTENT */}
