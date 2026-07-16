@@ -18,26 +18,14 @@
 http://allcompanyhris.meatplus.ph {
 	encode gzip
 
-	# Backend: API, Sanctum, health check, and the biometric ADMS/iclock push all
-	# go to a POOL of Laravel workers (php artisan serve on 8000..8003), load-
-	# balanced with health checks. artisan serve is single-request, so a slow call
-	# (e.g. a biometric DTR recompute) would block everything on one worker; the
-	# pool spreads load so users aren't blocked. Only HEALTHY workers get traffic
-	# (probed via /up), so running just ONE worker also works — that's the easy way
-	# to dial this back (set $backendWorkers = 1 in start-production.ps1).
-	@backend path /api/* /sanctum/* /up /iclock/*
-	handle @backend {
-		reverse_proxy 127.0.0.1:8000 127.0.0.1:8001 127.0.0.1:8002 127.0.0.1:8003 {
-			lb_policy round_robin
-			lb_try_duration 5s
-			fail_duration 15s
-			health_uri /up
-			health_interval 10s
-			health_timeout 3s
-		}
+	# Biometric ADMS/iclock push (ZKTeco terminals) -> backend on 8000.
+	# Reachable from the internet so remote-branch devices can push, but the
+	# backend serial-allowlists devices (unapproved serials are rejected).
+	handle /iclock/* {
+		reverse_proxy 127.0.0.1:8000
 	}
 
-	# Everything else -> the Next.js frontend.
+	# Everything else -> the Next.js frontend (which proxies /api to the backend).
 	handle {
 		header {
 			X-Content-Type-Options "nosniff"

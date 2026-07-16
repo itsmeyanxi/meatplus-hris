@@ -73,17 +73,25 @@ Push-Location $backendDir
 Pop-Location
 Write-Host "Cached config + routes."
 
-# --- Backend (Laravel API) -> 127.0.0.1:8000 ---
+# --- Backend (Laravel API) worker POOL -> 127.0.0.1:8000..(8000+N-1) ---
+# `php artisan serve` handles ONE request at a time, so a slow request (e.g. a
+# biometric DTR recompute) blocks everything on that process. Run a small pool and
+# let Caddy load-balance across them (health-checked). To go back to a single
+# backend, set $backendWorkers = 1 and restart — Caddy routes to whatever is up.
 # --host=0.0.0.0 so the LAN ZKTeco device can still push to <lan-ip>:8000/iclock.
-if (Test-PortInUse -Port $backendPort) {
-    Write-Host "Backend already on port $backendPort - skipping."
-} else {
-    Write-Host "Starting backend (production) on $backendPort..."
-    Start-Process -FilePath (Join-Path $phpDir 'php.exe') `
-        -ArgumentList 'artisan','serve','--host=0.0.0.0',"--port=$backendPort" `
-        -WorkingDirectory $backendDir -WindowStyle Minimized `
-        -RedirectStandardOutput (Join-Path $logDir 'backend.log') `
-        -RedirectStandardError  (Join-Path $logDir 'backend.err.log')
+$backendWorkers = 4
+for ($w = 0; $w -lt $backendWorkers; $w++) {
+    $port = $backendPort + $w
+    if (Test-PortInUse -Port $port) {
+        Write-Host "Backend worker on $port already running - skipping."
+    } else {
+        Write-Host "Starting backend worker on $port..."
+        Start-Process -FilePath (Join-Path $phpDir 'php.exe') `
+            -ArgumentList 'artisan','serve','--host=0.0.0.0',"--port=$port" `
+            -WorkingDirectory $backendDir -WindowStyle Minimized `
+            -RedirectStandardOutput (Join-Path $logDir "backend-$port.log") `
+            -RedirectStandardError  (Join-Path $logDir "backend-$port.err.log")
+    }
 }
 
 Write-Host -NoNewline 'Waiting for backend'
@@ -92,7 +100,7 @@ foreach ($i in 1..30) {
     try { if ((Invoke-WebRequest "http://127.0.0.1:$backendPort/up" -UseBasicParsing -TimeoutSec 3).StatusCode -eq 200) { $ready = $true; break } } catch {}
     Write-Host -NoNewline '.'; Start-Sleep -Seconds 2
 }
-Write-Host ''; if ($ready) { Write-Host 'Backend is up.' } else { Write-Warning "Backend not answering - see $logDir\backend.err.log" }
+Write-Host ''; if ($ready) { Write-Host "Backend pool up ($backendWorkers worker(s), ports $backendPort..$($backendPort + $backendWorkers - 1))." } else { Write-Warning "Backend not answering - see $logDir\backend-$backendPort.err.log" }
 
 # --- Frontend (Next.js compiled build) -> 127.0.0.1:3001 ---
 if (-not (Test-Path (Join-Path $frontendDir '.next'))) {
