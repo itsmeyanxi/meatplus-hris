@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { createEmployee, getLookup } from "@/lib/employees";
+import { useBranchTerm } from "@/lib/terminology";
 
 const schema = z.object({
   employee_no: z.string().min(1, "Required").max(30),
@@ -40,6 +41,7 @@ export default function NewEmployeePage() {
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
 
+  const branch = useBranchTerm();
   const { data: branches } = useQuery({ queryKey: ["branches"], queryFn: () => getLookup("branches") });
   const { data: departments } = useQuery({ queryKey: ["departments"], queryFn: () => getLookup("departments") });
   const { data: employmentTypes } = useQuery({ queryKey: ["employment-types"], queryFn: () => getLookup("employment-types") });
@@ -153,9 +155,9 @@ export default function NewEmployeePage() {
 
         <Section title="Employment">
           <Grid>
-            <Field label="Branch *" error={form.formState.errors.branch_id?.message}>
+            <Field label={`${branch.Singular} *`} error={form.formState.errors.branch_id?.message}>
               <select className={inputCls} {...form.register("branch_id")}>
-                <option value="">Select branch…</option>
+                <option value="">Select {branch.singular}…</option>
                 {branches?.map((b) => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { getMe, logout, switchCompany } from "@/lib/auth";
+import { branchTermFor, applyBranchTerm } from "@/lib/terminology";
 import { getRoles, ROLE_LABELS } from "@/lib/users";
 import { getCompanies } from "@/lib/companies";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -141,6 +142,9 @@ export function AppShell({
     return roleOk && permOk && employeeOk;
   };
   const visibleNav = nav.filter(isAllowed);
+  // Context-aware wording: PASEI's "branches" read as "agencies" in the nav.
+  const branchTerm = branchTermFor(data?.user.active_company?.code);
+  const navLabel = (label: string) => applyBranchTerm(label, branchTerm);
 
   // Bucket the visible items into ordered sections by their `group`, keeping the
   // order in which groups first appear. Items with no group form a leading,
@@ -260,7 +264,7 @@ export function AppShell({
                       <Link
                         key={item.href}
                         href={item.href}
-                        title={isCollapsed ? item.label : undefined}
+                        title={isCollapsed ? navLabel(item.label) : undefined}
                         className={
                           active
                             ? `flex items-center rounded-xl border border-slate-900 bg-slate-900 py-2 text-sm font-medium text-white shadow-sm transition-all ${
@@ -272,7 +276,7 @@ export function AppShell({
                         }
                       >
                         <span className="shrink-0 scale-95">{item.icon}</span>
-                        {!isCollapsed && <span className="transition-opacity duration-200 truncate">{item.label}</span>}
+                        {!isCollapsed && <span className="transition-opacity duration-200 truncate">{navLabel(item.label)}</span>}
                       </Link>
                     );
                   })}
@@ -333,7 +337,7 @@ export function AppShell({
                         : "whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
                     }
                   >
-                    {item.label}
+                    {navLabel(item.label)}
                   </Link>
                 );
               })}

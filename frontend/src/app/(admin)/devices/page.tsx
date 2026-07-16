@@ -8,6 +8,7 @@ import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { inputCls, labelCls } from "@/lib/form-classes";
 import { devicesApi, type Device, type DeviceInput, type SyncSummary, type EnrolledUser } from "@/lib/devices";
+import { branchTermFor } from "@/lib/terminology";
 
 const QK = ["attendance-devices"];
 
@@ -306,6 +307,8 @@ function DeviceFormModal({
     queryFn: () => devicesApi.branches(form.company_id as number),
     enabled: !!form.company_id,
   });
+  // Wording follows the selected company (PASEI → "agency").
+  const branchTerm = branchTermFor(companies?.find((c) => c.id === form.company_id)?.code);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="dialog" aria-modal>
@@ -339,7 +342,7 @@ function DeviceFormModal({
               <p className="mt-1 text-xs text-slate-400">Which location/company this terminal belongs to.</p>
             </div>
             <div>
-              <label className={labelCls}>Branch (optional)</label>
+              <label className={labelCls}>{branchTerm.Singular} (optional)</label>
               <select
                 className={inputCls}
                 value={form.branch_id ?? ""}

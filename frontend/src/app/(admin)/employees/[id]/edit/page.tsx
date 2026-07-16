@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useState } from "react";
 import { getEmployee, updateEmployee, getLookup, type EmployeeCreateInput } from "@/lib/employees";
 import { getMe } from "@/lib/auth";
+import { useBranchTerm } from "@/lib/terminology";
 
 export default function EditEmployeePage() {
   const router = useRouter();
@@ -64,6 +65,7 @@ export default function EditEmployeePage() {
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const canConfi = me?.user.permissions.includes("employee.view.sensitive") ?? false;
+  const branch = useBranchTerm();
 
   const { data: departments = [] } = useQuery({ queryKey: ["lookup-departments"], queryFn: () => getLookup("departments"), staleTime: 300_000 });
   const { data: branches = [] } = useQuery({ queryKey: ["lookup-branches"], queryFn: () => getLookup("branches"), staleTime: 300_000 });
@@ -166,11 +168,11 @@ export default function EditEmployeePage() {
       </FormSection>
 
       {/* ── Section: Employment ── */}
-      <FormSection title="Employment details" description="Department, position, branch and employment dates.">
+      <FormSection title="Employment details" description={`Department, position, ${branch.singular} and employment dates.`}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Branch">
+          <Field label={branch.Singular}>
             <select name="branch_id" value={form.branch_id} onChange={set} className={inp}>
-              <option value="">— Select branch —</option>
+              <option value="">— Select {branch.singular} —</option>
               {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </Field>

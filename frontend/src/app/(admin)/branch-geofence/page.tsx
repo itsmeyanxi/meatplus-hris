@@ -10,10 +10,12 @@ import {
 } from "@/lib/attendance";
 import { PageHeader, TableShell } from "@/components/ui";
 import { inputCls, labelCls } from "@/lib/form-classes";
+import { useBranchTerm } from "@/lib/terminology";
 
 export default function BranchGeofencePage() {
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const canManage = me?.user.permissions.includes("company.manage") ?? false;
+  const term = useBranchTerm();
 
   const { data: branches = [], isLoading } = useQuery({
     queryKey: ["branch-geofence"],
@@ -24,7 +26,7 @@ export default function BranchGeofencePage() {
   if (me && !canManage) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-        You don&apos;t have permission to manage branch geofences.
+        You don&apos;t have permission to manage {term.singular} geofences.
       </div>
     );
   }
@@ -32,8 +34,8 @@ export default function BranchGeofencePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Branch Geofence"
-        description="Set each worksite's GPS pin and the allowed radius. Web check-ins are measured against the employee's branch pin and flagged On-site / Outside. A branch with no pin is simply not geofenced yet."
+        title={`${term.Singular} Geofence`}
+        description={`Set each worksite's GPS pin and the allowed radius. Web check-ins are measured against the employee's ${term.singular} pin and flagged On-site / Outside. A ${term.singular} with no pin is simply not geofenced yet.`}
       />
 
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -46,17 +48,17 @@ export default function BranchGeofencePage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-slate-600">
-              {["Branch", "Latitude", "Longitude", "Radius (m)", "Status", ""].map((h) => (
+              {[term.Singular, "Latitude", "Longitude", "Radius (m)", "Status", ""].map((h) => (
                 <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {isLoading && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-400">Loading branches…</td></tr>
+              <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-400">Loading {term.plural}…</td></tr>
             )}
             {!isLoading && branches.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">No branches found for this company.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">No {term.plural} found for this company.</td></tr>
             )}
             {branches.map((b) => <BranchRow key={b.id} branch={b} />)}
           </tbody>

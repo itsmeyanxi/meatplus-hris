@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ProvisionLoginButton } from "@/components/employees/ProvisionLoginButton";
 import { getEmployee } from "@/lib/employees";
+import { branchTermFor } from "@/lib/terminology";
 
 export default function EmployeeOverviewPage() {
   const params = useParams<{ id: string }>();
@@ -18,6 +19,8 @@ export default function EmployeeOverviewPage() {
 
   if (isLoading) return <div className="space-y-4">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-slate-100" />)}</div>;
   if (!data) return null;
+
+  const branch = branchTermFor(data.company?.code);
 
   return (
     <div className="space-y-6">
@@ -48,7 +51,7 @@ export default function EmployeeOverviewPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
-            <Chip label="Branch" value={data.branch?.name} />
+            <Chip label={branch.Singular} value={data.branch?.name} />
             <Chip label="Type" value={data.employment_type?.name} />
             <Chip label="Hired" value={data.date_hired} />
             <Chip label="Status" value={data.is_active ? "Active" : "Inactive"} active={data.is_active} />
@@ -97,7 +100,7 @@ export default function EmployeeOverviewPage() {
               </dd>
             </div>
           )}
-          <Field label="Branch" value={data.branch?.name} />
+          <Field label={branch.Singular} value={data.branch?.name} />
           <Field label="Department" value={data.department?.name} />
           <Field label="Position" value={data.position?.title} />
           <Field label="Employment type" value={data.employment_type?.name} />
