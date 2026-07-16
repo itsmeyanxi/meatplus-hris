@@ -35,9 +35,29 @@ const STATUS_STYLES: Record<RunStatus, string> = {
   approved: "bg-amber-50 text-amber-700",
   posted: "bg-emerald-50 text-emerald-700",
 };
+const STATUS_DOT: Record<RunStatus, string> = {
+  draft: "bg-slate-400",
+  computed: "bg-sky-500",
+  approved: "bg-amber-500",
+  posted: "bg-emerald-500",
+};
 
 function StatusChip({ status }: { status: RunStatus }) {
-  return <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_STYLES[status]}`}>{status}</span>;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_STYLES[status]}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[status]}`} />
+      {status}
+    </span>
+  );
+}
+
+function MiniStat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className={`rounded-xl border px-4 py-3 ${highlight ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white"}`}>
+      <div className={`text-[11px] font-medium uppercase tracking-wide ${highlight ? "text-slate-300" : "text-slate-500"}`}>{label}</div>
+      <div className="mt-0.5 text-lg font-bold tabular-nums">{value}</div>
+    </div>
+  );
 }
 
 function RunsTab() {
@@ -47,10 +67,21 @@ function RunsTab() {
 
   const { data: runs, isLoading } = useQuery({ queryKey: ["payroll-runs"], queryFn: payrollApi.listRuns });
 
+  const list = runs ?? [];
+  const postedRuns = list.filter((r) => r.status === "posted");
+  const netPaid = postedRuns.reduce((a, r) => a + Number(r.total_net || 0), 0);
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <AppButton onClick={() => setShowForm(true)}>+ New run</AppButton>
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+        <div className="grid flex-1 grid-cols-3 gap-3">
+          <MiniStat label="Total runs" value={String(list.length)} />
+          <MiniStat label="Posted" value={String(postedRuns.length)} />
+          <MiniStat label="Net paid (posted)" value={peso(netPaid)} highlight />
+        </div>
+        <div className="flex sm:items-end">
+          <AppButton onClick={() => setShowForm(true)}>+ New run</AppButton>
+        </div>
       </div>
 
       {isLoading ? (

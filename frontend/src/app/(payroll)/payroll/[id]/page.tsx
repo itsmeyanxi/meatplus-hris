@@ -116,6 +116,11 @@ export default function PayrollRunPage() {
         }
       />
 
+      <div className="rounded-xl border border-slate-200 bg-white px-5 py-4">
+        <StatusStepper status={run.status} />
+        <p className="mt-3 text-xs text-slate-500">{NEXT_HINT[run.status]}</p>
+      </div>
+
       {slips.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
           <Summary label="Gross" value={peso(totals.gross)} />
@@ -172,6 +177,42 @@ export default function PayrollRunPage() {
         </TableShell>
       )}
     </div>
+  );
+}
+
+const STAGES: RunStatus[] = ["draft", "computed", "approved", "posted"];
+const STAGE_LABEL: Record<RunStatus, string> = { draft: "Draft", computed: "Computed", approved: "Approved", posted: "Posted" };
+const NEXT_HINT: Record<RunStatus, string> = {
+  draft: "Next: press Compute to generate payslips from compensation + attendance.",
+  computed: "Payslips are ready. Review them below, then Approve when correct.",
+  approved: "Approved and locked for posting. Press Post to finalize this payroll.",
+  posted: "This run is posted and final. Payslips can be exported and viewed.",
+};
+
+function StatusStepper({ status }: { status: RunStatus }) {
+  const idx = STAGES.indexOf(status);
+  return (
+    <ol className="flex flex-wrap items-center gap-y-2">
+      {STAGES.map((st, i) => {
+        const done = i < idx;
+        const current = i === idx;
+        return (
+          <li key={st} className="flex items-center">
+            <span
+              className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
+                done ? "bg-emerald-500 text-white" : current ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-400"
+              }`}
+            >
+              {done ? "✓" : i + 1}
+            </span>
+            <span className={`ml-2 text-sm font-medium ${current ? "text-slate-900" : done ? "text-emerald-600" : "text-slate-400"}`}>
+              {STAGE_LABEL[st]}
+            </span>
+            {i < STAGES.length - 1 && <span className={`mx-3 h-px w-8 sm:w-12 ${done ? "bg-emerald-400" : "bg-slate-200"}`} />}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
