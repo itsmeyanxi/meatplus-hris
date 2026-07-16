@@ -1,6 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
+
+// A chunk/module load failure means the browser is holding an old build after a
+// redeploy (the hashed JS file it wants no longer exists). This isn't a real
+// app error — a reload fetches the new build. Detect it and self-heal once.
+function isStaleChunkError(error: Error): boolean {
+  const msg = `${error?.name ?? ""} ${error?.message ?? ""}`;
+  return /ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(
+    msg,
+  );
+}
 
 export default function GlobalError({
   error,
@@ -9,6 +20,17 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    if (!isStaleChunkError(error)) return;
+    // Reload at most once per stale-chunk episode to avoid a refresh loop.
+    const KEY = "stale-chunk-reloaded-at";
+    const last = Number(sessionStorage.getItem(KEY) ?? 0);
+    if (Date.now() - last > 10_000) {
+      sessionStorage.setItem(KEY, String(Date.now()));
+      window.location.reload();
+    }
+  }, [error]);
+
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
