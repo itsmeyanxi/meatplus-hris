@@ -498,7 +498,10 @@ export default function EmployeeRegistrationPage() {
       isComplete: (v) => !!v.create_account },
   ];
 
-  const requiredDone = SECTIONS.filter((s) => s.required).every((s) => s.isComplete(watched as Partial<FormValues>));
+  const requiredSections = SECTIONS.filter((s) => s.required);
+  const remainingRequired = requiredSections.filter((s) => !s.isComplete(watched as Partial<FormValues>));
+  const requiredDone = remainingRequired.length === 0;
+  const requiredDoneCount = requiredSections.length - remainingRequired.length;
   const filledCount  = SECTIONS.filter((s) => s.isComplete(watched as Partial<FormValues>)).length;
 
   const register = useMutation({
@@ -859,18 +862,18 @@ export default function EmployeeRegistrationPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      {/* Module header */}
-      <div className="flex items-center justify-between rounded-t-2xl bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-5">
-        <div>
+      {/* Module header — stays visible while scrolling the long form */}
+      <div className="sticky top-0 z-20 flex items-center justify-between rounded-t-2xl bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-5 shadow-sm">
+        <div className="min-w-0">
           <h2 className="text-lg font-bold tracking-tight text-white">Employee Registration</h2>
-          <p className="mt-0.5 text-xs text-slate-400">
+          <p className="mt-0.5 truncate text-xs text-slate-300">
             {requiredDone
-              ? "Required sections complete — ready to register."
-              : "Basic, Work and Locations are required."}
+              ? "All required sections complete — you can register now."
+              : <>Required <span className="font-semibold text-white">{requiredDoneCount}/{requiredSections.length}</span> done — still need {remainingRequired.map((s) => s.label).join(", ")}.</>}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative h-10 w-10">
+        <div className="flex shrink-0 items-center gap-3">
+          <div className="relative h-10 w-10" title={`${filledCount} of ${SECTIONS.length} sections filled`}>
             <svg className="h-10 w-10 -rotate-90" viewBox="0 0 36 36">
               <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="3" />
               <circle
@@ -934,6 +937,11 @@ export default function EmployeeRegistrationPage() {
                         {section.label}
                         {section.required && <span className="ml-1 text-red-500">*</span>}
                       </span>
+                      {!section.required && !isComplete && (
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
+                          Optional
+                        </span>
+                      )}
                     </div>
                     <p className="mt-0.5 text-xs text-slate-500">{section.description}</p>
                   </div>
@@ -1039,14 +1047,23 @@ export default function EmployeeRegistrationPage() {
                     )}
                     {section.key === "portal"      && <PortalSection form={form} createAccount={createAccount} />}
 
-                    <div className="mt-4 flex justify-end">
+                    <div className="mt-4 flex justify-end gap-2">
                       <button
                         type="button"
                         onClick={() => setActive(null)}
-                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                        className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
                       >
-                        Done with this section
+                        Collapse
                       </button>
+                      {idx < SECTIONS.length - 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setActive(SECTIONS[idx + 1].key)}
+                          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                        >
+                          Next section →
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1061,6 +1078,21 @@ export default function EmployeeRegistrationPage() {
             <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
               {serverError}
             </p>
+          )}
+          {!requiredDone && !serverError && (
+            <button
+              type="button"
+              onClick={() => setActive(remainingRequired[0].key)}
+              className="mb-3 flex w-full items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-xs text-amber-800 transition hover:bg-amber-100"
+            >
+              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86l-8.48 14.7A1 1 0 002.67 20h18.66a1 1 0 00.86-1.44l-8.48-14.7a1 1 0 00-1.72 0z" />
+              </svg>
+              <span>
+                Finish the required section{remainingRequired.length > 1 ? "s" : ""} to register:{" "}
+                <span className="font-semibold">{remainingRequired.map((s) => s.label).join(", ")}</span>. Tap to jump there.
+              </span>
+            </button>
           )}
           <div className="flex items-center justify-between gap-3">
             <button
