@@ -44,6 +44,17 @@ class LoginController extends Controller
             }
         }
 
+        // Admins are members of every company, so the company chooser (and later
+        // switching) lets them enter any of them.
+        if ($user->active_company_id) {
+            setPermissionsTeamId($user->active_company_id);
+            if ($user->hasAnyRole(\App\Http\Controllers\Api\V1\Companies\SwitchCompanyController::ADMIN_ROLES)) {
+                $ids = \Illuminate\Support\Facades\DB::table('companies')
+                    ->where('is_active', true)->whereNull('deleted_at')->pluck('id')->all();
+                $user->companies()->syncWithoutDetaching($ids);
+            }
+        }
+
         return response()->json([
             'message' => 'Logged in.',
             'user'    => $user->only(['id', 'name', 'email', 'active_company_id']),

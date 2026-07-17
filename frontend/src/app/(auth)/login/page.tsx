@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { login } from "@/lib/auth";
+import { login, getMe, switchCompany, type Me } from "@/lib/auth";
 
 const schema = z.object({
   email: z.string().min(1, "Email or username is required"),
@@ -64,6 +64,9 @@ export default function LoginPage() {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [server, setServer] = useState<ServerState>("checking");
+  // After sign-in, users who belong to more than one company pick which to enter.
+  const [companies, setCompanies] = useState<Me["user"]["companies"]>([]);
+  const [entering, setEntering] = useState<number | null>(null);
   const warming = useRef(false);
   const {
     register,
@@ -104,6 +107,13 @@ export default function LoginPage() {
     }
     try {
       await login(values.email, values.password);
+      // If the account belongs to several companies, let them choose one to enter.
+      const me = await getMe();
+      const list = me.user.companies ?? [];
+      if (list.length > 1) {
+        setCompanies(list);
+        return;
+      }
       router.push("/dashboard");
       router.refresh();
     } catch (e: unknown) {
@@ -114,14 +124,54 @@ export default function LoginPage() {
     }
   };
 
+  const enterCompany = async (companyId: number) => {
+    setServerError(null);
+    setEntering(companyId);
+    try {
+      await switchCompany(companyId);
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      setServerError("Could not enter that company. Please try again.");
+      setEntering(null);
+    }
+  };
+
   const starting = server === "starting";
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
         <h1 className="mb-1 text-2xl font-semibold">ALL COMPANY HRIS</h1>
-        <p className="mb-6 text-sm text-slate-500">Sign in to continue.</p>
+        <p className="mb-6 text-sm text-slate-500">
+          {companies.length > 1 ? "Choose a company to enter." : "Sign in to continue."}
+        </p>
 
+        {companies.length > 1 ? (
+          <div className="space-y-2">
+            {companies.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => enterCompany(c.id)}
+                disabled={entering !== null}
+                className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-4 py-3 text-left transition hover:border-slate-400 hover:bg-slate-50 disabled:opacity-60"
+              >
+                <span>
+                  <span className="block text-sm font-medium text-slate-900">{c.legal_name}</span>
+                  <span className="block text-xs text-slate-400">{c.code}</span>
+                </span>
+                <span className="text-xs font-medium text-slate-500">
+                  {entering === c.id ? "Entering…" : "Enter →"}
+                </span>
+              </button>
+            ))}
+            {serverError && (
+              <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{serverError}</p>
+            )}
+          </div>
+        ) : (
+        <>
         {starting && (
           <div className="mb-4 flex items-start gap-2.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
             <span className="mt-0.5 h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
@@ -194,6 +244,8 @@ export default function LoginPage() {
             </Link>
           </div>
         </form>
+        </>
+        )}
       </div>
     </div>
   );

@@ -9,6 +9,16 @@ use Illuminate\Validation\ValidationException;
 
 class SwitchCompanyController extends Controller
 {
+    /** Roles that make a user a company-wide admin (member of every company). */
+    public const ADMIN_ROLES = ['it_admin', 'hr_admin'];
+
+    /** IDs of every active company. */
+    private function allCompanyIds(): array
+    {
+        return \Illuminate\Support\Facades\DB::table('companies')
+            ->where('is_active', true)->whereNull('deleted_at')->pluck('id')->all();
+    }
+
     public function __invoke(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -19,11 +29,15 @@ class SwitchCompanyController extends Controller
         $targetId = (int) $data['company_id'];
 
         // Captured in the CURRENT (home) team, before we change the team below.
-        $isRealItAdmin = $user->hasRole('it_admin');
+        // Every role the user holds in the company they are LEAVING is carried into
+        // the target company so that an admin (or any privileged user) in one company
+        // keeps the same access in every company they switch to.
+        $carryRoles = $user->getRoleNames()->all();
+        $isAdmin = $user->hasAnyRole(self::ADMIN_ROLES);
 
-        // IT accounts are any user who currently has it_admin OR who has
-        // previously switched away (original_company_id is set).
-        $isItAccount = $isRealItAdmin || $user->original_company_id !== null;
+        // Admins (and anyone who has switched before) may enter any company; regular
+        // users must be a member of the target company.
+        $isItAccount = $isAdmin || $user->original_company_id !== null;
 
         if (! $isItAccount) {
             // Regular users must be a member of the target company.
@@ -45,15 +59,21 @@ class SwitchCompanyController extends Controller
 
         setPermissionsTeamId($targetId);
 
-        // IT admins keep full admin access in every company they switch to, so
-        // switching never strips their roles. Everyone else gets at least the
-        // employee role in the target company.
-        if ($isRealItAdmin) {
-            if (! $user->hasRole('it_admin')) {
-                $user->assignRole('it_admin');
+        // Carry every role the user held in the previous company into this one, so
+        // switching never strips privileges — an admin in one company stays an admin
+        // in every company they enter. Everyone keeps the baseline employee role.
+        foreach ($carryRoles as $role) {
+            if (! $user->hasRole($role)) {
+                $user->assignRole($role);
             }
-        } elseif (! $user->hasRole('employee')) {
+        }
+        if (! $user->hasRole('employee')) {
             $user->assignRole('employee');
+        }
+
+        // Admins belong to every company, so they can switch into any of them.
+        if ($user->hasAnyRole(self::ADMIN_ROLES)) {
+            $user->companies()->syncWithoutDetaching($this->allCompanyIds());
         }
 
         return response()->json([
