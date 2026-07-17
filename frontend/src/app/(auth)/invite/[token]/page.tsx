@@ -125,7 +125,7 @@ export default function InviteAcceptPage() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
         <h1 className="mb-1 text-2xl font-semibold">Welcome, {info.name.split(" ")[0]}!</h1>
-        <p className="mb-1 text-sm text-slate-500">Set up your Meatplus HRIS account.</p>
+        <p className="mb-1 text-sm text-slate-500">Set up your ALL COMPANY HRIS account.</p>
         <p className="mb-6 text-xs text-slate-400">
           Account email: <span className="font-medium text-slate-600">{info.email}</span>
         </p>

@@ -20,6 +20,36 @@ class OvertimeRequestController extends Controller
 {
     use HandlesApprovalWorkflow;
 
+    /** Bulk-import approved overtime from a CSV/XLSX (deduped by employee+date+start). */
+    public function import(Request $request, \App\Domain\Attendance\Services\OvertimeImportService $service): JsonResponse
+    {
+        abort_unless($request->user()->can('attendance.approve.any'), 403);
+        $request->validate(['file' => ['required', 'file', 'max:5120']]);
+        $file = $request->file('file');
+        $head = @file_get_contents($file->getRealPath(), false, null, 0, 8) ?: '';
+        $format = str_starts_with($head, "PK\x03\x04") ? 'xlsx' : (str_starts_with($head, "\xD0\xCF\x11\xE0") ? null : 'csv');
+        if ($format === null) {
+            return response()->json(['message' => 'Unsupported file. Upload a .csv or .xlsx.'], 422);
+        }
+
+        return response()->json($service->import($file->getRealPath(), $format, (int) $request->user()->active_company_id));
+    }
+
+    /** CSV template for the overtime import. */
+    public function importTemplate(Request $request): StreamedResponse
+    {
+        abort_unless($request->user()->can('attendance.approve.any'), 403);
+        $headers = ['EmpIDNo', 'Shift Date', 'Type', 'Approved OT Schedule', 'OT Approved Minutes'];
+        $ex = ['2160067', '01/01/2026', 'Normal OT', '05:00 PM - 10:00 PM', '300'];
+
+        return response()->streamDownload(function () use ($headers, $ex) {
+            $o = fopen('php://output', 'w');
+            fputcsv($o, $headers);
+            fputcsv($o, $ex);
+            fclose($o);
+        }, 'overtime_import_template.csv', ['Content-Type' => 'text/csv']);
+    }
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $q = OvertimeRequest::query()

@@ -131,6 +131,13 @@ export const leaveAppsApi = {
     return data.data;
   },
   attachmentUrl: (id: number) => `/api/v1/leave-applications/${id}/attachment`,
+  importTemplateUrl: "/api/v1/leave-applications/import/template",
+  import: async (file: File): Promise<{ created: number; skipped: number; total: number; errors: { row: number; message: string }[] }> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const { data } = await api.post("/api/v1/leave-applications/import", fd);
+    return data;
+  },
   approve: async (id: number, decision_remarks?: string) => {
     const { data } = await api.post<{ data: LeaveApplication }>(`/api/v1/leave-applications/${id}/approve`, { decision_remarks });
     return data.data;

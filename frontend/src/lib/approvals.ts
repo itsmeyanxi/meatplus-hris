@@ -152,6 +152,13 @@ export const overtimeApi = {
     return data.data;
   },
   attachmentUrl: (id: number) => `/api/v1/overtime-requests/${id}/attachment`,
+  importTemplateUrl: "/api/v1/overtime-requests/import/template",
+  import: async (file: File): Promise<{ created: number; skipped: number; total: number; errors: { row: number; message: string }[] }> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const { data } = await api.post("/api/v1/overtime-requests/import", fd);
+    return data;
+  },
 };
 export const undertimeApi = makeApi<UndertimeRequest, UndertimeInput>("undertime-requests");
 export const officialBusinessApi = makeApi<OfficialBusinessRequest, OfficialBusinessInput>("official-business-requests");

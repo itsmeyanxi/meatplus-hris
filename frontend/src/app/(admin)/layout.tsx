@@ -345,7 +345,7 @@ const NAV: NavItem[] = [
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
-    <AppShell nav={NAV} brandTitle="Meatplus HRIS">
+    <AppShell nav={NAV} brandTitle="ALL COMPANY HRIS">
       {children}
     </AppShell>
   );

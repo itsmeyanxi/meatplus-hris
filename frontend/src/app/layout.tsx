@@ -3,7 +3,7 @@ import "./globals.css";
 import { QueryProvider } from "@/providers/query-provider";
 
 export const metadata: Metadata = {
-  title: "Meatplus HRIS",
+  title: "ALL COMPANY HRIS",
   description: "Internal HR / Payroll / Attendance system for Meatplus PH",
 };
 

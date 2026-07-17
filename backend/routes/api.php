@@ -217,6 +217,8 @@ Route::prefix('v1')->group(function () {
         Route::post('employees/{employee}/leave-balances', [LeaveBalanceController::class, 'assign']);
         Route::post('leave-balances/{leaveBalance}/adjust', [LeaveBalanceController::class, 'adjust']);
         Route::get('leave-applications', [LeaveApplicationController::class, 'index']);
+        Route::get('leave-applications/import/template', [LeaveApplicationController::class, 'importTemplate']);
+        Route::post('leave-applications/import', [LeaveApplicationController::class, 'import']);
         Route::post('leave-applications', [LeaveApplicationController::class, 'store']);
         Route::get('leave-applications/{leaveApplication}', [LeaveApplicationController::class, 'show']);
         Route::post('leave-applications/{leaveApplication}/approve', [LeaveApplicationController::class, 'approve']);
@@ -282,6 +284,8 @@ Route::prefix('v1')->group(function () {
         Route::get('admin/stats', AdminStatsController::class);
 
         Route::get('overtime-requests/{overtimeRequest}/attachment', [OvertimeRequestController::class, 'attachment']);
+        Route::get('overtime-requests/import/template', [OvertimeRequestController::class, 'importTemplate']);
+        Route::post('overtime-requests/import', [OvertimeRequestController::class, 'import']);
 
         foreach ([
             ['overtime-requests', OvertimeRequestController::class, 'overtimeRequest'],

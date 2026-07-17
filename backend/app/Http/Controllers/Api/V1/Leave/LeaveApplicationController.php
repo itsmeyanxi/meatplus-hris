@@ -28,6 +28,36 @@ class LeaveApplicationController extends Controller
     {
     }
 
+    /** Bulk-import leave applications from a CSV/XLSX (deduped by employee+type+dates). */
+    public function import(Request $request, \App\Domain\HRIS\Services\LeaveApplicationImportService $service): JsonResponse
+    {
+        abort_unless($request->user()->can('leave.approve.any'), 403);
+        $request->validate(['file' => ['required', 'file', 'max:5120']]);
+        $file = $request->file('file');
+        $head = @file_get_contents($file->getRealPath(), false, null, 0, 8) ?: '';
+        $format = str_starts_with($head, "PK\x03\x04") ? 'xlsx' : (str_starts_with($head, "\xD0\xCF\x11\xE0") ? null : 'csv');
+        if ($format === null) {
+            return response()->json(['message' => 'Unsupported file. Upload a .csv or .xlsx.'], 422);
+        }
+
+        return response()->json($service->import($file->getRealPath(), $format, (int) $request->user()->active_company_id));
+    }
+
+    /** CSV template for the leave import. */
+    public function importTemplate(Request $request): StreamedResponse
+    {
+        abort_unless($request->user()->can('leave.approve.any'), 403);
+        $headers = ['EmployeeID', 'LeaveTypeName', 'DateFrom', 'DateTo', 'WithPayNoOfdays', 'WoutPayNoOfDays', 'Reason', 'LeaveStatus'];
+        $ex = ['2160067', 'Vacation Leave', '2026-04-10', '2026-04-10', '0', '1', 'family matter', 'Approved'];
+
+        return response()->streamDownload(function () use ($headers, $ex) {
+            $o = fopen('php://output', 'w');
+            fputcsv($o, $headers);
+            fputcsv($o, $ex);
+            fclose($o);
+        }, 'leave_import_template.csv', ['Content-Type' => 'text/csv']);
+    }
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $user = $request->user();

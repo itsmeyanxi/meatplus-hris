@@ -7,6 +7,7 @@ import { getMe, type Me } from "@/lib/auth";
 import { listEmployees } from "@/lib/employees";
 import { dtrApi } from "@/lib/attendance";
 import { overtimeApi, type OTClassification, type OvertimeInput, type OvertimeRequest } from "@/lib/approvals";
+import { ImportDataButton } from "@/components/ImportDataButton";
 
 // ── helpers ───────────────────────────────────────────────────────────────
 
@@ -75,15 +76,28 @@ export default function OvertimesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-semibold">Overtimes</h2>
-        <p className="text-sm text-slate-500">
-          {isHR
-            ? "Review and approve overtime requests across all employees."
-            : isApprover
-            ? "Approve or reject overtime requests from your department."
-            : "File and track your overtime requests."}
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Overtimes</h2>
+          <p className="text-sm text-slate-500">
+            {isHR
+              ? "Review and approve overtime requests across all employees."
+              : isApprover
+              ? "Approve or reject overtime requests from your department."
+              : "File and track your overtime requests."}
+          </p>
+        </div>
+        {perms.includes("attendance.approve.any") && (
+          <ImportDataButton
+            label="Import overtime"
+            title="Import approved overtime"
+            description="Bulk-upload an overtime report. One row per employee per day; existing records (same employee, date & start time) are skipped."
+            columns="EmpIDNo · Shift Date · Type · Approved OT Schedule · OT Approved Minutes"
+            templateUrl={overtimeApi.importTemplateUrl}
+            importFn={overtimeApi.import}
+            invalidateKeys={[["overtime-requests"], ["overtimes"]]}
+          />
+        )}
       </div>
 
       {/* Stats */}
