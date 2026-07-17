@@ -44,6 +44,8 @@ export type CompRow = {
   name: string;
   department: string | null;
   basic_monthly: string | number | null;
+  pay_type?: "monthly" | "daily";
+  daily_rate?: string | number | null;
   allowance_monthly: string | number | null;
   has_compensation: boolean;
 };
@@ -93,7 +95,9 @@ export const compensationApi = {
   /** Appends a new salary record and closes the previous one. */
   save: async (body: {
     employee_id: number;
-    basic_monthly: number;
+    pay_type?: "monthly" | "daily";
+    basic_monthly?: number;
+    daily_rate?: number;
     allowance_monthly?: number;
     effective_from?: string | null;
   }) => (await api.post("/api/v1/compensations", body)).data,

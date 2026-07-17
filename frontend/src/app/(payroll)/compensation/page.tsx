@@ -7,18 +7,35 @@ import { PageHeader, TableShell } from "@/components/ui";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { compensationApi, type CompRow } from "@/lib/payroll";
 
+type Edit = { payType: "monthly" | "daily"; rate: string; allowance: string };
+
 export default function CompensationPage() {
   const qc = useQueryClient();
   const { data: rows, isLoading } = useQuery({ queryKey: ["compensations"], queryFn: compensationApi.list });
-  const [edits, setEdits] = useState<Record<number, { basic: string; allowance: string }>>({});
+  const [edits, setEdits] = useState<Record<number, Edit>>({});
+
+  // The row's edit state, falling back to its saved values.
+  const base = (r: CompRow): Edit => ({
+    payType: r.pay_type === "daily" ? "daily" : "monthly",
+    rate: r.pay_type === "daily"
+      ? (r.daily_rate != null ? String(r.daily_rate) : "")
+      : (r.basic_monthly != null ? String(r.basic_monthly) : ""),
+    allowance: r.allowance_monthly != null ? String(r.allowance_monthly) : "",
+  });
+  const cur = (r: CompRow): Edit => edits[r.employee_id] ?? base(r);
+  const patch = (r: CompRow, p: Partial<Edit>) =>
+    setEdits((s) => ({ ...s, [r.employee_id]: { ...(s[r.employee_id] ?? base(r)), ...p } }));
 
   const save = useMutation({
     mutationFn: (r: CompRow) => {
-      const e = edits[r.employee_id];
+      const e = cur(r);
       return compensationApi.save({
         employee_id: r.employee_id,
-        basic_monthly: Number(e?.basic ?? r.basic_monthly ?? 0),
-        allowance_monthly: Number(e?.allowance ?? r.allowance_monthly ?? 0),
+        pay_type: e.payType,
+        ...(e.payType === "daily"
+          ? { daily_rate: Number(e.rate || 0) }
+          : { basic_monthly: Number(e.rate || 0) }),
+        allowance_monthly: Number(e.allowance || 0),
       });
     },
     onSuccess: () => {
@@ -29,7 +46,7 @@ export default function CompensationPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Compensation" description="Set each employee's monthly basic pay and allowance." />
+      <PageHeader title="Compensation" description="Set each employee's pay type and rate. Monthly = fixed salary; Daily = paid per day worked." />
 
       {isLoading ? (
         <TableShell><TableSkeleton rows={6} cols={4} /></TableShell>
@@ -42,14 +59,15 @@ export default function CompensationPage() {
               <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-4 py-3">Employee</th>
                 <th className="px-4 py-3">Department</th>
-                <th className="px-4 py-3">Basic / month</th>
+                <th className="px-4 py-3">Pay type</th>
+                <th className="px-4 py-3">Rate</th>
                 <th className="px-4 py-3">Allowance / month</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {rows.map((r) => {
-                const e = edits[r.employee_id];
+                const e = cur(r);
                 return (
                   <tr key={r.employee_id} className="hover:bg-slate-50/60">
                     <td className="px-4 py-2.5">
@@ -58,20 +76,33 @@ export default function CompensationPage() {
                     </td>
                     <td className="px-4 py-2.5 text-slate-600">{r.department ?? "—"}</td>
                     <td className="px-4 py-2.5">
-                      <input
-                        type="number" min={0} step="0.01"
-                        className="w-32 rounded-lg border border-slate-200 px-2 py-1 text-sm tabular-nums"
-                        value={e?.basic ?? (r.basic_monthly != null ? String(r.basic_monthly) : "")}
-                        onChange={(ev) => setEdits({ ...edits, [r.employee_id]: { basic: ev.target.value, allowance: e?.allowance ?? (r.allowance_monthly != null ? String(r.allowance_monthly) : "0") } })}
-                        placeholder="0.00"
-                      />
+                      <select
+                        className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                        value={e.payType}
+                        onChange={(ev) => patch(r, { payType: ev.target.value as Edit["payType"] })}
+                      >
+                        <option value="monthly">Monthly</option>
+                        <option value="daily">Daily</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number" min={0} step="0.01"
+                          className="w-32 rounded-lg border border-slate-200 px-2 py-1 text-sm tabular-nums"
+                          value={e.rate}
+                          onChange={(ev) => patch(r, { rate: ev.target.value })}
+                          placeholder="0.00"
+                        />
+                        <span className="text-xs text-slate-400">{e.payType === "daily" ? "/ day" : "/ month"}</span>
+                      </div>
                     </td>
                     <td className="px-4 py-2.5">
                       <input
                         type="number" min={0} step="0.01"
                         className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-sm tabular-nums"
-                        value={e?.allowance ?? (r.allowance_monthly != null ? String(r.allowance_monthly) : "")}
-                        onChange={(ev) => setEdits({ ...edits, [r.employee_id]: { basic: e?.basic ?? (r.basic_monthly != null ? String(r.basic_monthly) : "0"), allowance: ev.target.value } })}
+                        value={e.allowance}
+                        onChange={(ev) => patch(r, { allowance: ev.target.value })}
                         placeholder="0.00"
                       />
                     </td>

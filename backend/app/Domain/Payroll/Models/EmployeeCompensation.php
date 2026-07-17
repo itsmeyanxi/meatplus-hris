@@ -17,7 +17,7 @@ class EmployeeCompensation extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['basic_monthly', 'allowance_monthly', 'effective_from', 'is_active'])
+            ->logOnly(['basic_monthly', 'pay_type', 'daily_rate', 'allowance_monthly', 'effective_from', 'is_active'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('compensation');
@@ -27,14 +27,15 @@ class EmployeeCompensation extends Model
     protected $table = 'employee_compensations';
 
     protected $fillable = [
-        'company_id', 'employee_id', 'basic_monthly', 'allowance_monthly',
-        'effective_from', 'is_active',
+        'company_id', 'employee_id', 'basic_monthly', 'pay_type', 'daily_rate',
+        'allowance_monthly', 'effective_from', 'is_active',
     ];
 
     protected function casts(): array
     {
         return [
             'basic_monthly' => 'decimal:2',
+            'daily_rate' => 'decimal:4',
             'allowance_monthly' => 'decimal:2',
             'effective_from' => 'date',
             'is_active' => 'boolean',

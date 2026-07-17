@@ -19,7 +19,9 @@ class CompensationRequest extends FormRequest
         return [
             'employee_id' => ['required', 'integer',
                 Rule::exists('employees', 'id')->where('company_id', $companyId)],
-            'basic_monthly' => ['required', 'numeric', 'min:0', 'max:99999999'],
+            'pay_type' => ['nullable', 'in:monthly,daily'],
+            'basic_monthly' => ['required_without:daily_rate', 'nullable', 'numeric', 'min:0', 'max:99999999'],
+            'daily_rate' => ['required_if:pay_type,daily', 'nullable', 'numeric', 'min:0', 'max:99999999'],
             'allowance_monthly' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'effective_from' => ['nullable', 'date'],
         ];

@@ -28,6 +28,8 @@ class CompensationController extends Controller
                 'name' => $e->full_name,
                 'department' => $e->department?->name,
                 'basic_monthly' => $e->compensation?->basic_monthly,
+                'pay_type' => $e->compensation?->pay_type ?? 'monthly',
+                'daily_rate' => $e->compensation?->daily_rate,
                 'allowance_monthly' => $e->compensation?->allowance_monthly,
                 'has_compensation' => (bool) $e->compensation,
             ]);
@@ -53,10 +55,18 @@ class CompensationController extends Controller
                 ->where('is_active', true)
                 ->update(['is_active' => false]);
 
+            $payType = $data['pay_type'] ?? 'monthly';
+            $dailyRate = $payType === 'daily' ? ($data['daily_rate'] ?? null) : null;
+            // Keep basic_monthly meaningful: for daily-paid staff store the monthly
+            // equivalent (rate × 22) when not given, so reports/displays still show a figure.
+            $basicMonthly = $data['basic_monthly'] ?? ($dailyRate !== null ? round((float) $dailyRate * 22, 2) : null);
+
             return EmployeeCompensation::create([
                 'employee_id' => $data['employee_id'],
                 'company_id' => $request->user()->active_company_id,
-                'basic_monthly' => $data['basic_monthly'],
+                'pay_type' => $payType,
+                'daily_rate' => $dailyRate,
+                'basic_monthly' => $basicMonthly,
                 'allowance_monthly' => $data['allowance_monthly'] ?? 0,
                 'effective_from' => $data['effective_from'] ?? null,
                 'is_active' => true,

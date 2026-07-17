@@ -64,8 +64,17 @@ class PayrollComputer
 
     private function computeEmployee(PayrollRun $run, EmployeeCompensation $comp): Payslip
     {
-        $basicMonthly = (float) $comp->basic_monthly;
-        $dailyRate = $basicMonthly / self::WORKDAYS_PER_MONTH;
+        // Two pay models. Daily-paid staff earn per day actually worked; monthly-
+        // salaried earn a fixed amount reduced by absences. Statutory contributions
+        // and tax are always based on the MONTHLY-equivalent salary.
+        $isDaily = $comp->pay_type === 'daily';
+        if ($isDaily) {
+            $dailyRate = (float) $comp->daily_rate;
+            $basicMonthly = $dailyRate * self::WORKDAYS_PER_MONTH; // monthly-equivalent for statutory/tax
+        } else {
+            $basicMonthly = (float) $comp->basic_monthly;
+            $dailyRate = $basicMonthly / self::WORKDAYS_PER_MONTH;
+        }
         $hourlyRate = $dailyRate / 8;
         $minuteRate = $dailyRate / 480;
 
@@ -91,12 +100,19 @@ class PayrollComputer
             $nightMinutes += (int) $d->night_diff_minutes;
         }
 
-        // Earnings (semi-monthly = half the monthly figures).
-        $basicPay = round($basicMonthly / 2, 2);
+        // Earnings. Daily-paid: pay per day worked (unworked days are simply unpaid,
+        // so no separate absence deduction). Monthly: half the monthly salary, less
+        // a deduction for each absent day.
+        if ($isDaily) {
+            $basicPay = round($dailyRate * $daysWorked, 2);
+            $absencesDeduction = 0.0;
+        } else {
+            $basicPay = round($basicMonthly / 2, 2);
+            $absencesDeduction = round($daysAbsent * $dailyRate, 2);
+        }
         $allowance = round((float) $comp->allowance_monthly / 2, 2);
         $overtimePay = round(($otMinutes / 60) * $hourlyRate * 1.25, 2);
         $nightDiffPay = round(($nightMinutes / 60) * $hourlyRate * 0.10, 2); // 10% night differential
-        $absencesDeduction = round($daysAbsent * $dailyRate, 2);
         $tardinessDeduction = round($lateMinutes * $minuteRate, 2);
 
         $grossPay = round($basicPay + $allowance + $overtimePay + $nightDiffPay, 2);
@@ -114,7 +130,9 @@ class PayrollComputer
             $sss + $philhealth + $pagibig + $tax + $absencesDeduction + $tardinessDeduction,
             2,
         );
-        $netPay = round($grossPay - $totalDeductions, 2);
+        // Net can never be negative — a shortfall (deductions > earnings) is carried
+        // by the employer for the cutoff rather than billed back to the employee.
+        $netPay = max(0.0, round($grossPay - $totalDeductions, 2));
 
         return Payslip::create([
             'payroll_run_id' => $run->id,
