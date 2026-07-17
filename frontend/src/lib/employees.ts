@@ -93,6 +93,9 @@ export type ImportResult = {
   skipped: number;
   total: number;
   errors: { row: number; message: string }[];
+  // Non-blocking duplicate flags: repeated IDs in the file, or a new ID whose
+  // name + birth date match an existing employee. Imported, but worth a look.
+  warnings?: { row: number; message: string }[];
 };
 
 export async function importEmployees(file: File, companyId?: number | ""): Promise<ImportResult> {

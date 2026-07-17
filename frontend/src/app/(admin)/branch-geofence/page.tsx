@@ -105,7 +105,13 @@ function BranchRow({ branch }: { branch: BranchGeofence }) {
 
   const useMyLocation = () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setMsg("Geolocation not available");
+      setMsg("Geolocation not available — paste coordinates instead.");
+      return;
+    }
+    // Browsers only expose GPS on a secure (HTTPS) origin. On plain HTTP the call
+    // fails silently, so explain it and point to the manual method.
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setMsg("GPS needs HTTPS. Paste coordinates from Google Maps instead.");
       return;
     }
     setLocating(true);
@@ -115,8 +121,14 @@ function BranchRow({ branch }: { branch: BranchGeofence }) {
         setLng(pos.coords.longitude.toFixed(7));
         setLocating(false);
       },
-      () => {
-        setMsg("Could not get your location");
+      (err) => {
+        const reason =
+          err.code === err.PERMISSION_DENIED
+            ? "Location blocked. Allow it in the browser, or paste coordinates."
+            : err.code === err.TIMEOUT
+              ? "Location timed out. Try again, or paste coordinates."
+              : "Could not get your location. Paste coordinates from Google Maps.";
+        setMsg(reason);
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 8000 },

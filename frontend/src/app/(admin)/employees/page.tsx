@@ -667,12 +667,19 @@ function ImportModal({ companies, onClose, onDone }: { companies: { id: number; 
         )}
         {result && (
           <div className="mt-4 space-y-3">
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <Stat label="Created" value={result.created} tone="emerald" />
               <Stat label="Updated" value={result.updated} tone="sky" />
               <Stat label="Skipped" value={result.skipped} tone="amber" />
+              <Stat label="Duplicates" value={result.warnings?.length ?? 0} tone="amber" />
               <Stat label="Errors" value={result.errors.length} tone="red" />
             </div>
+            {result.warnings && result.warnings.length > 0 && (
+              <div className="max-h-40 overflow-y-auto rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                <p className="mb-1 font-semibold">Possible duplicates — imported, please verify:</p>
+                {result.warnings.map((w, i) => <div key={i}>Row {w.row}: {w.message}</div>)}
+              </div>
+            )}
             {result.errors.length > 0 && (
               <div className="max-h-40 overflow-y-auto rounded-lg border border-red-100 bg-red-50/50 p-3 text-xs text-red-700">
                 {result.errors.map((e, i) => <div key={i}>Row {e.row}: {e.message}</div>)}

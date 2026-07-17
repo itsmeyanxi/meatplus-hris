@@ -64,20 +64,20 @@ class EmployeeImportService
     private array $empTypeCache = [];
 
     /**
-     * @return array{created:int, updated:int, skipped:int, total:int, errors:array<int,array{row:int,message:string}>}
+     * @return array{created:int, updated:int, skipped:int, total:int, errors:array<int,array{row:int,message:string}>, warnings:array<int,array{row:int,message:string}>}
      */
     public function import(string $path, string $ext, int $companyId): array
     {
         $rows = $this->readRows($path, $ext);
         if (count($rows) < 2) {
-            return ['created' => 0, 'updated' => 0, 'skipped' => 0, 'total' => 0,
+            return ['created' => 0, 'updated' => 0, 'skipped' => 0, 'total' => 0, 'warnings' => [],
                 'errors' => [['row' => 0, 'message' => 'The file has no data rows.']]];
         }
 
         $map = $this->mapHeader(array_shift($rows));
         foreach (['employee_no', 'first_name', 'last_name'] as $required) {
             if (! isset($map[$required])) {
-                return ['created' => 0, 'updated' => 0, 'skipped' => 0, 'total' => 0,
+                return ['created' => 0, 'updated' => 0, 'skipped' => 0, 'total' => 0, 'warnings' => [],
                     'errors' => [['row' => 1, 'message' => "Missing required column for: {$required} (check the header row)."]]];
             }
         }
@@ -86,6 +86,9 @@ class EmployeeImportService
         $updated = 0;
         $skipped = 0;
         $errors = [];
+        $warnings = [];
+        // Employee IDs already seen IN THIS FILE, so repeated rows can be flagged (A).
+        $seenInFile = []; // employee_no(lower) => first line number
         $line = 1; // header was line 1
 
         foreach ($rows as $cells) {
@@ -104,6 +107,16 @@ class EmployeeImportService
                 $errors[] = ['row' => $line, 'message' => 'Missing Employee ID, First Name, or Last Name.'];
 
                 continue;
+            }
+
+            // (A) The same Employee ID appearing twice in this upload. It's still
+            // applied (later row wins, matching the upsert), but flagged so the
+            // admin knows a row was repeated.
+            $noKey = strtolower($employeeNo);
+            if (isset($seenInFile[$noKey])) {
+                $warnings[] = ['row' => $line, 'message' => "Duplicate Employee ID \"{$employeeNo}\" — also on row {$seenInFile[$noKey]}. The later row was applied."];
+            } else {
+                $seenInFile[$noKey] = $line;
             }
 
             try {
@@ -160,6 +173,23 @@ class EmployeeImportService
                     }
                     $employee = $existing;
                 } else {
+                    // (B) A NEW Employee ID whose name + birth date match someone
+                    // already in this company is very likely the same person entered
+                    // under a second ID. Create it (don't silently block a real new
+                    // hire) but warn so the admin can verify.
+                    if (isset($present['birth_date'])) {
+                        $twin = Employee::query()
+                            ->where('company_id', $companyId)
+                            ->where('employee_no', '!=', $employeeNo)
+                            ->whereRaw('LOWER(first_name) = ?', [strtolower($first)])
+                            ->whereRaw('LOWER(last_name) = ?', [strtolower($last)])
+                            ->whereDate('birth_date', $present['birth_date'])
+                            ->first(['employee_no']);
+                        if ($twin) {
+                            $warnings[] = ['row' => $line, 'message' => "\"{$first} {$last}\" (ID {$employeeNo}) matches existing employee ID {$twin->employee_no} by name + birth date — created as new; please verify it isn't a duplicate."];
+                        }
+                    }
+
                     $employee = Employee::create($present + [
                         'company_id' => $companyId,
                         'employee_no' => $employeeNo,
@@ -175,7 +205,7 @@ class EmployeeImportService
             }
         }
 
-        return ['created' => $created, 'updated' => $updated, 'skipped' => $skipped, 'total' => count($rows), 'errors' => $errors];
+        return ['created' => $created, 'updated' => $updated, 'skipped' => $skipped, 'total' => count($rows), 'errors' => $errors, 'warnings' => $warnings];
     }
 
     /** Write the government IDs present in the row (encrypted by the model). */
