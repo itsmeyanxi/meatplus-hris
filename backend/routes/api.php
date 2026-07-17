@@ -182,6 +182,14 @@ Route::prefix('v1')->group(function () {
         Route::get('time-logs', [TimeLogController::class, 'index']);
         Route::post('time-logs', [TimeLogController::class, 'store']);
 
+        // Admin-uploaded time logs awaiting approval (staged, don't touch DTR until approved)
+        Route::get('time-log-requests', [\App\Http\Controllers\Api\V1\Attendance\TimeLogRequestController::class, 'index']);
+        Route::get('time-log-requests/template', [\App\Http\Controllers\Api\V1\Attendance\TimeLogRequestController::class, 'template']);
+        Route::post('time-log-requests/import', [\App\Http\Controllers\Api\V1\Attendance\TimeLogRequestController::class, 'import']);
+        Route::post('time-log-requests/approve-batch', [\App\Http\Controllers\Api\V1\Attendance\TimeLogRequestController::class, 'approveBatch']);
+        Route::post('time-log-requests/{timeLogRequest}/approve', [\App\Http\Controllers\Api\V1\Attendance\TimeLogRequestController::class, 'approve']);
+        Route::post('time-log-requests/{timeLogRequest}/reject', [\App\Http\Controllers\Api\V1\Attendance\TimeLogRequestController::class, 'reject']);
+
         Route::get('daily-time-records', [DailyTimeRecordController::class, 'index']);
         Route::get('my/daily-time-records', [DailyTimeRecordController::class, 'mine']);
         Route::post('daily-time-records/compute', [DailyTimeRecordController::class, 'compute']);

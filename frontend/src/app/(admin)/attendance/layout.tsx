@@ -18,6 +18,7 @@ const TABS: Tab[] = [
   { href: "/attendance/dtr",       label: "Matrix" },
   { href: "/attendance/time-logs", label: "Time Logs" },
   { href: "/attendance/requests",  label: "Requests" },
+  { href: "/attendance/uploads",   label: "Uploads",   permissions: ["attendance.manage", "attendance.approve.any"] },
   { href: "/attendance/schedules", label: "Schedules", permissions: ["attendance.manage"] },
   { href: "/attendance/holidays",  label: "Holidays",  permissions: ["attendance.manage"] },
 ];

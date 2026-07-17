@@ -278,6 +278,50 @@ export const branchesAdminApi = {
   },
 };
 
+// ── Admin-uploaded time logs awaiting approval ───────────────────────────────
+
+export type TimeLogRequest = {
+  id: number;
+  batch_id: string;
+  employee_id: number;
+  employee?: { id: number; employee_no: string; full_name: string };
+  work_date: string;
+  time_in: string | null;
+  time_out: string | null;
+  status: "pending" | "approved" | "rejected";
+  note: string | null;
+  uploaded_by_name?: string;
+  decided_at: string | null;
+  decision_remarks: string | null;
+  created_at: string | null;
+};
+
+export type TimeLogImportResult = {
+  batch_id: string;
+  created: number;
+  total: number;
+  errors: { row: number; message: string }[];
+};
+
+export const timeLogRequestsApi = {
+  list: async (status: "pending" | "approved" | "rejected" = "pending"): Promise<TimeLogRequest[]> => {
+    const { data } = await api.get<Listed<TimeLogRequest>>("/api/v1/time-log-requests", { params: { status } });
+    return data.data;
+  },
+  import: async (file: File): Promise<TimeLogImportResult> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const { data } = await api.post<TimeLogImportResult>("/api/v1/time-log-requests/import", fd);
+    return data;
+  },
+  approve: (id: number) => api.post(`/api/v1/time-log-requests/${id}/approve`, {}),
+  reject: (id: number, decision_remarks?: string) =>
+    api.post(`/api/v1/time-log-requests/${id}/reject`, { decision_remarks }),
+  approveBatch: (batch_id: string) =>
+    api.post("/api/v1/time-log-requests/approve-batch", { batch_id }),
+  templateUrl: "/api/v1/time-log-requests/template",
+};
+
 export const employeeSchedulesApi = {
   list: async (employeeId: number): Promise<ScheduleAssignment[]> => {
     const { data } = await api.get<Listed<ScheduleAssignment>>(
