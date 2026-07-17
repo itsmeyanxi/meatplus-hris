@@ -1,10 +1,11 @@
-# Meatplus HRIS — Database Schema
+# ALL COMPANY HRIS — Database Schema
 
-> **Engine (live):** **PostgreSQL** (Supabase, `ap-southeast-1`) — see
-> [09-local-database.md](09-local-database.md). This doc was first written against MySQL 8
-> and the **types below use MySQL spelling** — read them as the design contract, with the
-> Postgres equivalents noted under "Portability" below. The app runs on either. The Laravel
-> migration files are the executable source of truth.
+> **Engine (live):** **PostgreSQL 17**, self-hosted via Laragon on the office PC
+> (`127.0.0.1:5433`, database `meatplus_hris`) — see [04-operations.md](04-operations.md).
+> This doc was first written against MySQL 8, so the **types below use MySQL spelling** —
+> read them as the design contract, with the Postgres equivalents noted under "Portability"
+> below. The app is driver-agnostic and runs on either. The Laravel migration files are the
+> executable source of truth.
 >
 > ⚠️ **On MySQL, string comparison is case-insensitive** (`utf8mb4_unicode_ci`). Values
 > that differ only by letter case — notably `users.email` — collide on unique indexes
@@ -95,7 +96,7 @@ Pivot: which users belong to which companies.
 ## 2. Organizational structure
 
 ### `companies`
-Tenant root. Each row = a legal entity under Meatplus.
+Tenant root. Each row = a legal entity (company) in the system.
 
 | Column | Type | Notes |
 | --- | --- | --- |
