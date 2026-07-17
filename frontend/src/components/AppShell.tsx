@@ -9,6 +9,7 @@ import { branchTermFor, applyBranchTerm } from "@/lib/terminology";
 import { getRoles, ROLE_LABELS } from "@/lib/users";
 import { getCompanies } from "@/lib/companies";
 import { NotificationBell } from "@/components/NotificationBell";
+import { IdleTimeout } from "@/components/IdleTimeout";
 
 export type NavItem = {
   href: string;
@@ -182,6 +183,9 @@ export function AppShell({
         isCollapsed ? "lg:grid-cols-[72px_minmax(0,1fr)]" : "lg:grid-cols-[240px_minmax(0,1fr)]"
       }`}
     >
+      {/* Auto sign-out after 15 min of inactivity */}
+      <IdleTimeout />
+
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden border-r border-slate-200/80 bg-white/90 px-3.5 py-6 backdrop-blur lg:flex lg:min-h-screen lg:flex-col justify-between transition-all duration-300">
         <div className="space-y-6">

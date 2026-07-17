@@ -67,7 +67,14 @@ export default function LoginPage() {
   // After sign-in, users who belong to more than one company pick which to enter.
   const [companies, setCompanies] = useState<Me["user"]["companies"]>([]);
   const [entering, setEntering] = useState<number | null>(null);
+  const [idleOut, setIdleOut] = useState(false);
   const warming = useRef(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("idle") === "1") {
+      setIdleOut(true);
+    }
+  }, []);
   const {
     register,
     handleSubmit,
@@ -146,6 +153,12 @@ export default function LoginPage() {
         <p className="mb-6 text-sm text-slate-500">
           {companies.length > 1 ? "Choose a company to enter." : "Sign in to continue."}
         </p>
+
+        {idleOut && companies.length === 0 && (
+          <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
+            You were signed out after 15 minutes of inactivity. Please sign in again.
+          </div>
+        )}
 
         {companies.length > 1 ? (
           <div className="space-y-2">
