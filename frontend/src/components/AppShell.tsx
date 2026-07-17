@@ -10,6 +10,7 @@ import { getRoles, ROLE_LABELS } from "@/lib/users";
 import { getCompanies } from "@/lib/companies";
 import { NotificationBell } from "@/components/NotificationBell";
 import { IdleTimeout } from "@/components/IdleTimeout";
+import { CommandPalette } from "@/components/CommandPalette";
 
 export type NavItem = {
   href: string;
@@ -185,6 +186,8 @@ export function AppShell({
     >
       {/* Auto sign-out after 15 min of inactivity */}
       <IdleTimeout />
+      {/* Ctrl/⌘+K quick search */}
+      <CommandPalette />
 
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden border-r border-slate-200/80 bg-white/90 px-3.5 py-6 backdrop-blur lg:flex lg:min-h-screen lg:flex-col justify-between transition-all duration-300">

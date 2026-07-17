@@ -6,6 +6,7 @@ import { getMe } from "@/lib/auth";
 import { listEmployees } from "@/lib/employees";
 import { timeLogsApi, type TimeLog, type TimeLogInput } from "@/lib/attendance";
 import { PunchLocation } from "@/components/attendance/PunchLocation";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { AppButton, AppCard, PageHeader, TableShell } from "@/components/ui";
 import { inputCls, labelCls } from "@/lib/form-classes";
 
@@ -70,10 +71,7 @@ export default function TimeLogsPage() {
           {canViewAny && (
             <div>
               <label className={labelCls}>Employee</label>
-              <select className={inputCls} value={employeeId} onChange={(e) => setEmployeeId(e.target.value === "" ? "" : Number(e.target.value))}>
-                <option value="">All employees</option>
-                {empPage?.data.map((e) => (<option key={e.id} value={e.id}>{e.employee_no} — {e.full_name}</option>))}
-              </select>
+              <EmployeeSearchSelect value={employeeId} onChange={(id) => setEmployeeId(id)} />
             </div>
           )}
           <div>

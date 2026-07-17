@@ -86,6 +86,7 @@ export function ApplicationsTab() {
   const approve = useMutation({
     mutationFn: (id: number) => leaveAppsApi.approve(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave-apps"] }); qc.invalidateQueries({ queryKey: ["leave-balances"] }); },
+    meta: { successMessage: "Leave approved" },
   });
   const reject = useMutation({
     mutationFn: ({ id, remarks }: { id: number; remarks: string }) =>
@@ -95,10 +96,12 @@ export function ApplicationsTab() {
       setRejectingId(null);
       setRejectRemarks("");
     },
+    meta: { successMessage: "Leave rejected" },
   });
   const cancel = useMutation({
     mutationFn: (id: number) => leaveAppsApi.cancel(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave-apps"] }); qc.invalidateQueries({ queryKey: ["leave-balances"] }); },
+    meta: { successMessage: "Leave cancelled" },
   });
 
   const colSpan = canApprove ? 8 : 7;

@@ -38,9 +38,9 @@ export default function TimeLogUploadsPage() {
       invalidate();
     },
   });
-  const approve = useMutation({ mutationFn: (id: number) => timeLogRequestsApi.approve(id), onSuccess: invalidate });
-  const reject = useMutation({ mutationFn: (id: number) => timeLogRequestsApi.reject(id), onSuccess: invalidate });
-  const approveBatch = useMutation({ mutationFn: (batch: string) => timeLogRequestsApi.approveBatch(batch), onSuccess: invalidate });
+  const approve = useMutation({ mutationFn: (id: number) => timeLogRequestsApi.approve(id), onSuccess: invalidate, meta: { successMessage: "Punch approved" } });
+  const reject = useMutation({ mutationFn: (id: number) => timeLogRequestsApi.reject(id), onSuccess: invalidate, meta: { successMessage: "Row rejected" } });
+  const approveBatch = useMutation({ mutationFn: (batch: string) => timeLogRequestsApi.approveBatch(batch), onSuccess: invalidate, meta: { successMessage: "Batch approved" } });
 
   // Group pending rows by their upload batch.
   const batches = useMemo(() => {

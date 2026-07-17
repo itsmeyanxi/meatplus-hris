@@ -67,7 +67,9 @@ export async function listEmployees(params: {
   employeeNo?: string;
   name?: string;
   departmentId?: number | "";
+  branchId?: number | "";
   companyId?: number | "";
+  isConfidential?: boolean | "";
   page?: number;
   perPage?: number;
   onlyActive?: boolean;
@@ -78,7 +80,9 @@ export async function listEmployees(params: {
       employee_no: params.employeeNo || undefined,
       name: params.name || undefined,
       department_id: params.departmentId || undefined,
+      branch_id: params.branchId || undefined,
       company_id: params.companyId || undefined,
+      is_confidential: params.isConfidential === "" || params.isConfidential === undefined ? undefined : params.isConfidential,
       page: params.page,
       per_page: params.perPage,
       only_active: params.onlyActive,

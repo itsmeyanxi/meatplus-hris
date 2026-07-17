@@ -56,7 +56,9 @@ export default function EmployeesPage() {
   const [empNo, setEmpNo] = useState("");
   const [name, setName] = useState("");
   const [departmentId, setDepartmentId] = useState<number | "">("");
+  const [branchId, setBranchId] = useState<number | "">("");
   const [companyId, setCompanyId] = useState<number | "">("");
+  const [isConfidential, setIsConfidential] = useState<boolean | "">("");
   const [debEmpNo, setDebEmpNo] = useState("");
   const [debName, setDebName] = useState("");
   const [page, setPage] = useState(1);
@@ -102,9 +104,18 @@ export default function EmployeesPage() {
     staleTime: 5 * 60_000,
   });
 
+  const { data: branches } = useQuery({
+    queryKey: ["lookup-branches", companyId],
+    queryFn: () => getLookup("branches", companyId ? { company_id: Number(companyId) } : {}),
+    enabled: !!me,
+    staleTime: 5 * 60_000,
+  });
+
+  const canConfi = me?.user.permissions.includes("employee.view.sensitive") ?? false;
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["employees", { empNo: debEmpNo, name: debName, departmentId, companyId, page }],
-    queryFn: () => listEmployees({ employeeNo: debEmpNo, name: debName, departmentId, companyId, page, perPage: 50 }),
+    queryKey: ["employees", { empNo: debEmpNo, name: debName, departmentId, branchId, companyId, isConfidential, page }],
+    queryFn: () => listEmployees({ employeeNo: debEmpNo, name: debName, departmentId, branchId, companyId, isConfidential, page, perPage: 50 }),
     enabled: !!me,
     staleTime: 5 * 60_000,
     placeholderData: (prev) => prev,
@@ -150,10 +161,37 @@ export default function EmployeesPage() {
     a.remove();
   };
 
-  const hasFilters = empNo !== "" || name !== "" || departmentId !== "" || companyId !== "";
+  const hasFilters = empNo !== "" || name !== "" || departmentId !== "" || branchId !== "" || companyId !== "" || isConfidential !== "";
+  const advancedCount = [departmentId, branchId, companyId].filter((v) => v !== "").length + (isConfidential !== "" ? 1 : 0);
   const clearFilters = () => {
-    setEmpNo(""); setName(""); setDepartmentId(""); setCompanyId(""); setPage(1);
+    setEmpNo(""); setName(""); setDepartmentId(""); setBranchId(""); setCompanyId(""); setIsConfidential(""); setPage(1);
   };
+
+  // Keep filters in the URL so refresh/back and shared links preserve them.
+  const didInitFromUrl = useRef(false);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("dept")) setDepartmentId(Number(p.get("dept")));
+    if (p.get("branch")) setBranchId(Number(p.get("branch")));
+    if (p.get("company")) setCompanyId(Number(p.get("company")));
+    if (p.get("confi")) setIsConfidential(p.get("confi") === "1");
+    if (p.get("q")) { setName(p.get("q")!); setDebName(p.get("q")!); }
+    if (p.get("page")) setPage(Number(p.get("page")));
+    didInitFromUrl.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!didInitFromUrl.current) return;
+    const p = new URLSearchParams();
+    if (departmentId !== "") p.set("dept", String(departmentId));
+    if (branchId !== "") p.set("branch", String(branchId));
+    if (companyId !== "") p.set("company", String(companyId));
+    if (isConfidential !== "") p.set("confi", isConfidential ? "1" : "0");
+    if (debName) p.set("q", debName);
+    if (page > 1) p.set("page", String(page));
+    const qs = p.toString();
+    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+  }, [departmentId, branchId, companyId, isConfidential, debName, page]);
 
   const COLS = 13; // checkbox + Company + 10 data cols + access
 
@@ -236,7 +274,7 @@ export default function EmployeesPage() {
             type="button"
             onClick={() => setShowFilters((v) => !v)}
             className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium shadow-sm transition ${
-              showFilters || departmentId !== "" || companyId !== ""
+              showFilters || advancedCount > 0
                 ? "border-slate-900 bg-slate-900 text-white"
                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
             }`}
@@ -245,9 +283,9 @@ export default function EmployeesPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M7 8h10M11 12h2" />
             </svg>
             Filters
-            {(departmentId !== "" || companyId !== "") && (
+            {advancedCount > 0 && (
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-slate-900">
-                {[departmentId, companyId].filter(Boolean).length}
+                {advancedCount}
               </span>
             )}
           </button>
@@ -273,6 +311,14 @@ export default function EmployeesPage() {
               </select>
             </div>
             <div>
+              <label className={labelCls}>Location</label>
+              <select className={inputCls} value={branchId}
+                onChange={(e) => { setBranchId(e.target.value === "" ? "" : Number(e.target.value)); setPage(1); }}>
+                <option value="">All locations</option>
+                {branches?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+            <div>
               <label className={labelCls}>Company</label>
               <select className={inputCls} value={companyId}
                 onChange={(e) => { setCompanyId(e.target.value === "" ? "" : Number(e.target.value)); setPage(1); }}>
@@ -280,16 +326,39 @@ export default function EmployeesPage() {
                 {companies?.map((c) => <option key={c.id} value={c.id}>{c.code ? `${c.code} — ${c.name}` : c.name}</option>)}
               </select>
             </div>
+            {canConfi && (
+              <div>
+                <label className={labelCls}>Payroll group</label>
+                <select className={inputCls} value={isConfidential === "" ? "" : isConfidential ? "1" : "0"}
+                  onChange={(e) => { setIsConfidential(e.target.value === "" ? "" : e.target.value === "1"); setPage(1); }}>
+                  <option value="">All</option>
+                  <option value="1">Confidential</option>
+                  <option value="0">Non-confidential</option>
+                </select>
+              </div>
+            )}
           </div>
         )}
 
         {/* Active filter chips */}
-        {(departmentId !== "" || companyId !== "") && (
+        {advancedCount > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {departmentId !== "" && (
               <FilterChip
                 label={departments?.find((d) => d.id === departmentId)?.name ?? "Department"}
                 onRemove={() => { setDepartmentId(""); setPage(1); }}
+              />
+            )}
+            {branchId !== "" && (
+              <FilterChip
+                label={branches?.find((b) => b.id === branchId)?.name ?? "Location"}
+                onRemove={() => { setBranchId(""); setPage(1); }}
+              />
+            )}
+            {isConfidential !== "" && (
+              <FilterChip
+                label={isConfidential ? "Confidential" : "Non-confidential"}
+                onRemove={() => { setIsConfidential(""); setPage(1); }}
               />
             )}
             {companyId !== "" && (

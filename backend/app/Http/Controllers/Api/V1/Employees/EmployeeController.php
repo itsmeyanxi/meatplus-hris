@@ -120,6 +120,15 @@ class EmployeeController extends Controller
             $query->where('company_id', $companyId);
         }
 
+        if ($branchId = $request->query('branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        // Payroll group filter: confidential vs non-confidential.
+        if ($request->has('is_confidential') && $request->query('is_confidential') !== '') {
+            $query->where('is_confidential', $request->boolean('is_confidential'));
+        }
+
         if ($request->boolean('only_active', false)) {
             $query->where('is_active', true);
         }
