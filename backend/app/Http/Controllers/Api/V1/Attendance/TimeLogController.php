@@ -37,8 +37,27 @@ class TimeLogController extends Controller
         if ($to = $request->query('to')) {
             $q->where('logged_at', '<=', $to.' 23:59:59');
         }
+        if ($device = $request->query('device_id')) {
+            $q->where('device_id', $device);
+        }
 
         return TimeLogResource::collection($q->limit(500)->get());
+    }
+
+    /** Distinct device identifiers seen in the punch log (for the Device filter). */
+    public function devices(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user->can('attendance.view'), 403);
+
+        $q = TimeLog::query()->select('device_id')->distinct()->whereNotNull('device_id');
+        if (! $user->can('attendance.view.any')) {
+            $employee = $user->employee;
+            abort_unless($employee, 403, 'Your account is not linked to an employee record.');
+            $q->where('employee_id', $employee->id);
+        }
+
+        return response()->json(['data' => $q->orderBy('device_id')->pluck('device_id')]);
     }
 
     public function store(TimeLogRequest $request): JsonResponse

@@ -172,8 +172,12 @@ export const holidaysApi = {
 };
 
 export const timeLogsApi = {
-  list: async (params: { employee_id?: number; from?: string; to?: string } = {}): Promise<TimeLog[]> => {
+  list: async (params: { employee_id?: number; from?: string; to?: string; device_id?: string } = {}): Promise<TimeLog[]> => {
     const { data } = await api.get<Listed<TimeLog>>("/api/v1/time-logs", { params });
+    return data.data;
+  },
+  devices: async (): Promise<string[]> => {
+    const { data } = await api.get<{ data: string[] }>("/api/v1/time-logs/devices");
     return data.data;
   },
   create: async (body: TimeLogInput): Promise<TimeLog> => {

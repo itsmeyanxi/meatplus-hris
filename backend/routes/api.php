@@ -180,6 +180,7 @@ Route::prefix('v1')->group(function () {
         Route::get('attendance-devices/{attendanceDevice}/users', [AttendanceDeviceController::class, 'users']);
 
         Route::get('time-logs', [TimeLogController::class, 'index']);
+        Route::get('time-logs/devices', [TimeLogController::class, 'devices']);
         Route::post('time-logs', [TimeLogController::class, 'store']);
 
         // Admin-uploaded time logs awaiting approval (staged, don't touch DTR until approved)

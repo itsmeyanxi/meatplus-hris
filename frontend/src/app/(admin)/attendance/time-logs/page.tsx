@@ -27,8 +27,11 @@ export default function TimeLogsPage() {
   const [employeeId, setEmployeeId] = useState<number | "">("");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
+  const [deviceId, setDeviceId] = useState<string>("");
 
-  const filterKey = ["time-logs", { employeeId, from, to }];
+  const { data: devices = [] } = useQuery({ queryKey: ["time-log-devices"], queryFn: timeLogsApi.devices });
+
+  const filterKey = ["time-logs", { employeeId, from, to, deviceId }];
   const { data: items = [] } = useQuery({
     queryKey: filterKey,
     queryFn: () =>
@@ -36,6 +39,7 @@ export default function TimeLogsPage() {
         employee_id: employeeId === "" ? undefined : Number(employeeId),
         from: from || undefined,
         to: to || undefined,
+        device_id: deviceId || undefined,
       }),
   });
 
@@ -62,7 +66,7 @@ export default function TimeLogsPage() {
       />
 
       <AppCard title="Filter">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {canViewAny && (
             <div>
               <label className={labelCls}>Employee</label>
@@ -72,6 +76,13 @@ export default function TimeLogsPage() {
               </select>
             </div>
           )}
+          <div>
+            <label className={labelCls}>Device</label>
+            <select className={inputCls} value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
+              <option value="">All devices</option>
+              {devices.map((d) => (<option key={d} value={d}>{d}</option>))}
+            </select>
+          </div>
           <div>
             <label className={labelCls}>From</label>
             <input type="date" className={inputCls} value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -136,7 +147,10 @@ export default function TimeLogsPage() {
                 <td className="px-4 py-3 font-mono text-xs text-slate-600">{l.logged_at}</td>
                 <td className="px-4 py-3 text-slate-600">{l.employee_id}</td>
                 <td className="px-4 py-3 capitalize text-slate-700">{l.direction.replace("_", " ")}</td>
-                <td className="px-4 py-3 text-slate-500">{l.source}</td>
+                <td className="px-4 py-3 text-slate-500">
+                  {l.source}
+                  {l.device_id && <span className="ml-1 text-xs text-slate-400">· {l.device_id}</span>}
+                </td>
                 <td className="px-4 py-3"><PunchLocation lat={l.lat} lng={l.lng} geo={l.geo} /></td>
               </tr>
             ))}
