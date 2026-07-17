@@ -93,7 +93,7 @@ export default function ScheduleAdjustmentsPage() {
             className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50 ${
               showForm
                 ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                : "bg-green-600 text-white hover:bg-green-700"
+                : "bg-slate-900 text-white hover:bg-slate-800"
             }`}
           >
             {showForm ? (
@@ -155,7 +155,7 @@ export default function ScheduleAdjustmentsPage() {
               onClick={() => handleTabChange(t.key)}
               className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
                 tab === t.key
-                  ? "border-green-600 text-green-700"
+                  ? "border-slate-900 text-slate-800"
                   : "border-transparent text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -377,7 +377,7 @@ function ApplicationForm({
     <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
       {/* Form header */}
       <div className="px-6 py-4 border-b border-slate-200">
-        <h3 className="text-base font-semibold text-green-700">Schedule Adjustment Application Form</h3>
+        <h3 className="text-base font-semibold text-slate-800">Schedule Adjustment Application Form</h3>
       </div>
 
       <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="px-6 py-5 space-y-6">

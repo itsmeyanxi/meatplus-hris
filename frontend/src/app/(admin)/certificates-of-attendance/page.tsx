@@ -205,7 +205,7 @@ function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; ca
       {open && (
         <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="border-t border-slate-200">
           <div className="border-b border-slate-100 px-6 py-4">
-            <h3 className="text-lg font-bold text-green-700">Certificate of Attendance Form</h3>
+            <h3 className="text-lg font-bold text-slate-800">Certificate of Attendance Form</h3>
           </div>
 
           <div className="flex flex-col lg:flex-row">
@@ -279,7 +279,7 @@ function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; ca
 
           <div className="flex justify-end border-t border-slate-100 px-6 py-4">
             <button type="submit" disabled={create.isPending}
-              className="rounded-lg bg-green-600 px-8 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60">
+              className="rounded-lg bg-slate-900 px-8 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60">
               {create.isPending ? "Submitting…" : "Submit"}
             </button>
           </div>
@@ -293,7 +293,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="text-sm">
       <span className="text-slate-700">{label}: </span>
-      <span className="font-medium text-green-700">{value}</span>
+      <span className="font-medium text-slate-800">{value}</span>
     </div>
   );
 }

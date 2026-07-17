@@ -366,7 +366,7 @@ function FileOTForm({ employeeId, canManage, meData }: { employeeId: number; can
 
               {/* Overtime Details */}
               <div>
-                <p className="mb-3 text-sm font-semibold text-green-700 border-b border-slate-200 pb-1">Overtime Details:</p>
+                <p className="mb-3 text-sm font-semibold text-slate-800 border-b border-slate-200 pb-1">Overtime Details:</p>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-500">OT Classification</label>
@@ -471,7 +471,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <span className="text-xs text-slate-500">{label}: </span>
-      <span className="text-xs font-semibold text-green-700">{value}</span>
+      <span className="text-xs font-semibold text-slate-800">{value}</span>
     </div>
   );
 }

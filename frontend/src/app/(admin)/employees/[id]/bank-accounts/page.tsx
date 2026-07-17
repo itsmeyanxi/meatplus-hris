@@ -139,7 +139,7 @@ export default function BankAccountsTab() {
                   <td className="px-4 py-2 capitalize">{a.purpose}</td>
                   <td className="px-4 py-2">
                     {a.is_primary ? (
-                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-slate-800">
                         Primary
                       </span>
                     ) : (
