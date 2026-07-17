@@ -42,15 +42,14 @@ class TimeClockController extends Controller
             return response()->json(['message' => 'Your account is not linked to an employee record.'], 422);
         }
 
-        // Location is REQUIRED for a web punch — the front-end blocks the punch when
-        // the browser denies GPS, and this is the server-side backstop.
+        // Location is captured when the browser can provide it (a secure/HTTPS
+        // origin). On plain HTTP the browser blocks geolocation entirely, so the
+        // server accepts a punch without coordinates rather than locking everyone
+        // out; the front-end still requires location wherever it's actually available.
         $validated = $request->validate([
             'direction' => 'required|in:in,out',
-            'lat' => 'required|numeric|between:-90,90',
-            'lng' => 'required|numeric|between:-180,180',
-        ], [
-            'lat.required' => 'Location is required to clock in or out. Please allow location access and try again.',
-            'lng.required' => 'Location is required to clock in or out. Please allow location access and try again.',
+            'lat' => 'nullable|numeric|between:-90,90',
+            'lng' => 'nullable|numeric|between:-180,180',
         ]);
         $direction = $validated['direction'];
 

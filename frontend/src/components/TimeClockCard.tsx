@@ -45,6 +45,9 @@ function getCoords(): Promise<{ lat: number; lng: number } | null> {
 export function TimeClockCard() {
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  // Geolocation only works on HTTPS/localhost; know which so the hint is honest.
+  const [locationAvailable, setLocationAvailable] = useState(true);
+  useEffect(() => { setLocationAvailable(window.isSecureContext); }, []);
 
   const { data: status, isLoading } = useQuery({
     queryKey: ["my", "time-clock"],
@@ -55,9 +58,12 @@ export function TimeClockCard() {
   const punch = useMutation({
     mutationFn: async (direction: "in" | "out") => {
       const coords = await getCoords();
-      // Location is required — refuse the punch if the browser can't/won't provide it.
-      if (!coords) throw new Error("LOCATION_REQUIRED");
-      return myTimeClockApi.punch(direction, coords);
+      // Geolocation only works on a secure (HTTPS) origin. Where it's available,
+      // require it (a null result means the user denied it). On plain HTTP the
+      // browser can't provide location at all, so let the punch through without it.
+      const secure = typeof window !== "undefined" && window.isSecureContext;
+      if (!coords && secure) throw new Error("LOCATION_REQUIRED");
+      return myTimeClockApi.punch(direction, coords ?? undefined);
     },
     onMutate: () => setError(null),
     onSuccess: (res) => {
@@ -158,7 +164,9 @@ export function TimeClockCard() {
             {busy ? "Saving…" : isIn ? "Time Out" : "Time In"}
           </button>
           <p className="text-center text-xs text-slate-400 sm:text-right">
-            Location required — you&apos;ll be asked to allow it
+            {locationAvailable
+              ? "Location required — you’ll be asked to allow it"
+              : "Location capture is off until the site is on HTTPS"}
           </p>
         </div>
       </div>
