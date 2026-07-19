@@ -13,7 +13,7 @@ class PayrollRun extends Model
     use BelongsToCompany;
 
     protected $fillable = [
-        'company_id', 'name', 'period_start', 'period_end', 'pay_date',
+        'company_id', 'name', 'pay_group', 'period_start', 'period_end', 'pay_date',
         'status', 'notes', 'created_by_user_id',
         'computed_at', 'approved_at', 'posted_at',
     ];

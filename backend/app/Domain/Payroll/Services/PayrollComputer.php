@@ -32,8 +32,16 @@ class PayrollComputer
         $comps = EmployeeCompensation::query()
             ->where('company_id', $run->company_id)
             ->where('is_active', true)
-            ->with('employee:id,first_name,last_name,is_active')
+            ->with('employee:id,first_name,last_name,is_active,is_confidential')
             ->get();
+
+        // Optional payroll group: run only the confidential or only the
+        // non-confidential employees (null = everyone).
+        if ($run->pay_group === 'confidential') {
+            $comps = $comps->filter(fn ($c) => $c->employee?->is_confidential);
+        } elseif ($run->pay_group === 'non_confidential') {
+            $comps = $comps->filter(fn ($c) => $c->employee && ! $c->employee->is_confidential);
+        }
 
         $employees = 0;
         $skipped = 0;
@@ -84,15 +92,19 @@ class PayrollComputer
             ->whereBetween('work_date', [$run->period_start->toDateString(), $run->period_end->toDateString()])
             ->get();
 
-        $daysWorked = 0.0;
+        $daysWorked = 0.0;   // paid days: worked, approved leave, or a (paid) holiday
         $daysAbsent = 0;
+        $scheduledDays = 0;  // days the employee was expected to work (not a rest day)
         $lateMinutes = 0;
         $otMinutes = 0;
         $nightMinutes = 0;
         foreach ($dtrs as $d) {
+            if (! $d->is_rest_day) {
+                $scheduledDays++;
+            }
             if ($d->is_absent) {
                 $daysAbsent++;
-            } elseif (! $d->is_rest_day && ((float) $d->hours_worked > 0 || $d->actual_in || $d->is_on_leave)) {
+            } elseif (! $d->is_rest_day && ((float) $d->hours_worked > 0 || $d->actual_in || $d->is_on_leave || $d->holiday_type)) {
                 $daysWorked++;
             }
             $lateMinutes += (int) $d->late_minutes;
@@ -100,16 +112,21 @@ class PayrollComputer
             $nightMinutes += (int) $d->night_diff_minutes;
         }
 
-        // Earnings. Daily-paid: pay per day worked (unworked days are simply unpaid,
-        // so no separate absence deduction). Monthly: half the monthly salary, less
-        // a deduction for each absent day.
+        // Pay strictly by attendance.
+        //  • Daily-paid: rate × days worked.
+        //  • Monthly: prorate the fixed semi-monthly salary by (paid days ÷ scheduled
+        //    days) — full attendance = full pay, every absence lowers it, and NO
+        //    attendance for the cutoff pays nothing. Worked days, approved leave, and
+        //    holidays all count as paid.
+        // Unworked days are simply unpaid, so there is no separate absence deduction.
+        $fullSemiMonthly = round($basicMonthly / 2, 2);
         if ($isDaily) {
             $basicPay = round($dailyRate * $daysWorked, 2);
-            $absencesDeduction = 0.0;
         } else {
-            $basicPay = round($basicMonthly / 2, 2);
-            $absencesDeduction = round($daysAbsent * $dailyRate, 2);
+            $ratio = $scheduledDays > 0 ? min(1.0, $daysWorked / $scheduledDays) : 0.0;
+            $basicPay = round($fullSemiMonthly * $ratio, 2);
         }
+        $absencesDeduction = 0.0;
         $allowance = round((float) $comp->allowance_monthly / 2, 2);
         $overtimePay = round(($otMinutes / 60) * $hourlyRate * 1.25, 2);
         $nightDiffPay = round(($nightMinutes / 60) * $hourlyRate * 0.10, 2); // 10% night differential

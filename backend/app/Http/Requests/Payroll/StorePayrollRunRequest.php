@@ -15,6 +15,7 @@ class StorePayrollRunRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:120'],
+            'pay_group' => ['nullable', 'in:confidential,non_confidential'],
             'period_start' => ['required', 'date'],
             'period_end' => ['required', 'date', 'after_or_equal:period_start'],
             'pay_date' => ['required', 'date'],

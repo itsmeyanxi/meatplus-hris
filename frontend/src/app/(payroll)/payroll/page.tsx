@@ -104,7 +104,14 @@ function RunsTab() {
             <tbody className="divide-y divide-slate-100">
               {runs.map((r) => (
                 <tr key={r.id} onClick={() => router.push(`/payroll/${r.id}`)} className="cursor-pointer hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-800">{r.name}</td>
+                  <td className="px-4 py-3 font-medium text-slate-800">
+                    {r.name}
+                    {r.pay_group && (
+                      <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500">
+                        {r.pay_group === "confidential" ? "Confidential" : "Non-confi"}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-slate-600">{r.period_start} → {r.period_end}</td>
                   <td className="px-4 py-3 text-slate-600">{r.pay_date}</td>
                   <td className="px-4 py-3"><StatusChip status={r.status} /></td>
@@ -132,11 +139,11 @@ function RunsTab() {
 }
 
 function NewRunModal({ onClose, onCreated }: { onClose: () => void; onCreated: (r: PayrollRun) => void }) {
-  const [form, setForm] = useState<NewRunInput>({ name: "", period_start: "", period_end: "", pay_date: "" });
+  const [form, setForm] = useState<NewRunInput>({ name: "", pay_group: "", period_start: "", period_end: "", pay_date: "" });
   const set = <K extends keyof NewRunInput>(k: K, v: NewRunInput[K]) => setForm({ ...form, [k]: v });
 
   const create = useMutation({
-    mutationFn: () => payrollApi.createRun(form),
+    mutationFn: () => payrollApi.createRun({ ...form, pay_group: form.pay_group || undefined }),
     meta: { successMessage: "Payroll run created." },
     onSuccess: onCreated,
   });
@@ -149,6 +156,14 @@ function NewRunModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           <div>
             <label className={labelCls}>Run name</label>
             <input className={inputCls} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="June 2026 (2nd cutoff)" required />
+          </div>
+          <div>
+            <label className={labelCls}>Employee group</label>
+            <select className={inputCls} value={form.pay_group ?? ""} onChange={(e) => set("pay_group", e.target.value as NewRunInput["pay_group"])}>
+              <option value="">All employees</option>
+              <option value="non_confidential">Non-confidential only</option>
+              <option value="confidential">Confidential only</option>
+            </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

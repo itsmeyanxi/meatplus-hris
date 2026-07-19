@@ -5,6 +5,7 @@ export type RunStatus = "draft" | "computed" | "approved" | "posted";
 export type PayrollRun = {
   id: number;
   name: string;
+  pay_group?: "confidential" | "non_confidential" | null;
   period_start: string;
   period_end: string;
   pay_date: string;
@@ -52,6 +53,7 @@ export type CompRow = {
 
 export type NewRunInput = {
   name: string;
+  pay_group?: "confidential" | "non_confidential" | "";
   period_start: string;
   period_end: string;
   pay_date: string;

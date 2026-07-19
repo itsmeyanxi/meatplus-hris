@@ -12,6 +12,7 @@ class PayrollRunResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'pay_group' => $this->pay_group,
             'period_start' => $this->period_start?->toDateString(),
             'period_end' => $this->period_end?->toDateString(),
             'pay_date' => $this->pay_date?->toDateString(),
