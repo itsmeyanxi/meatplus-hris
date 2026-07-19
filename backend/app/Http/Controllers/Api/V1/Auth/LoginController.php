@@ -44,14 +44,30 @@ class LoginController extends Controller
             }
         }
 
-        // Admins are members of every company, so the company chooser (and later
-        // switching) lets them enter any of them.
+        // Admin roles are team-scoped, but admin ACCESS is meant to be global: if a
+        // user is an admin in ANY company, make them a member of every company (so the
+        // chooser and switching work) and ensure the role is present in the company
+        // they're currently in — otherwise an admin whose role sits in their home
+        // company would land elsewhere with no access and no company picker.
         if ($user->active_company_id) {
-            setPermissionsTeamId($user->active_company_id);
-            if ($user->hasAnyRole(\App\Http\Controllers\Api\V1\Companies\SwitchCompanyController::ADMIN_ROLES)) {
+            $adminRoles = \Illuminate\Support\Facades\DB::table('model_has_roles')
+                ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+                ->where('model_has_roles.model_id', $user->id)
+                ->where('model_has_roles.model_type', $user->getMorphClass())
+                ->whereIn('roles.name', \App\Http\Controllers\Api\V1\Companies\SwitchCompanyController::ADMIN_ROLES)
+                ->distinct()->pluck('roles.name');
+
+            if ($adminRoles->isNotEmpty()) {
                 $ids = \Illuminate\Support\Facades\DB::table('companies')
                     ->where('is_active', true)->whereNull('deleted_at')->pluck('id')->all();
                 $user->companies()->syncWithoutDetaching($ids);
+
+                setPermissionsTeamId($user->active_company_id);
+                foreach ($adminRoles as $role) {
+                    if (! $user->hasRole($role)) {
+                        $user->assignRole($role);
+                    }
+                }
             }
         }
 

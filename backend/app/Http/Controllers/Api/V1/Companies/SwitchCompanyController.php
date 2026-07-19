@@ -19,6 +19,17 @@ class SwitchCompanyController extends Controller
             ->where('is_active', true)->whereNull('deleted_at')->pluck('id')->all();
     }
 
+    /** True if the user holds an admin role in ANY company (roles are team-scoped). */
+    private function isAdminAnywhere(\App\Models\User $user): bool
+    {
+        return \Illuminate\Support\Facades\DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $user->id)
+            ->where('model_has_roles.model_type', $user->getMorphClass())
+            ->whereIn('roles.name', self::ADMIN_ROLES)
+            ->exists();
+    }
+
     public function __invoke(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -33,7 +44,7 @@ class SwitchCompanyController extends Controller
         // the target company so that an admin (or any privileged user) in one company
         // keeps the same access in every company they switch to.
         $carryRoles = $user->getRoleNames()->all();
-        $isAdmin = $user->hasAnyRole(self::ADMIN_ROLES);
+        $isAdmin = $this->isAdminAnywhere($user);
 
         // Admins (and anyone who has switched before) may enter any company; regular
         // users must be a member of the target company.
