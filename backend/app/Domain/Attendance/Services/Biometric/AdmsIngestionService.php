@@ -113,8 +113,12 @@ class AdmsIngestionService
             $ts = Carbon::parse($timeStr, $tz);
             $date = $ts->toDateString();
 
+            // Seed the in/out alternation from this employee's BIOMETRIC punches only.
+            // Counting web/manual/upload punches here would offset the parity and flip
+            // a real device check-in to "out" whenever a web punch already exists that day.
             $dayCount[$employee->id][$date] ??= TimeLog::query()
                 ->where('employee_id', $employee->id)
+                ->where('source', 'biometric')
                 ->whereDate('logged_at', $date)
                 ->count();
 

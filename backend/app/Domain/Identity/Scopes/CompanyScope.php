@@ -24,6 +24,10 @@ class CompanyScope implements Scope
 
         if ($user->active_company_id) {
             $builder->where($model->getTable().'.company_id', $user->active_company_id);
+        } else {
+            // No active company (and not it_admin) → fail CLOSED, never open. Without
+            // this the scope would apply no filter and leak every tenant's rows.
+            $builder->whereRaw('1 = 0');
         }
     }
 }

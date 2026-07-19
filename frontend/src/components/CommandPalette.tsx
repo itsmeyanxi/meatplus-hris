@@ -83,7 +83,7 @@ export function CommandPalette() {
   const go = (href: string) => { setOpen(false); router.push(href); };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(a + 1, items.length - 1)); }
+    if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.max(0, Math.min(a + 1, items.length - 1))); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
     else if (e.key === "Enter") { e.preventDefault(); if (items[active]) go(items[active].href); }
   };

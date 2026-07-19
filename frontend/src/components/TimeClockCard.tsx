@@ -176,13 +176,13 @@ export function TimeClockCard() {
       )}
 
       {/* Today's punches */}
-      {status && status.punches.length > 0 && (
+      {(status?.punches ?? []).length > 0 && (
         <div className="mt-5 border-t border-slate-100 pt-4">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
             Today&apos;s punches
           </p>
           <ul className="flex flex-col gap-2">
-            {status.punches.map((p) => (
+            {(status?.punches ?? []).map((p) => (
               <li key={p.id} className="flex flex-wrap items-center gap-2">
                 <span
                   className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm ${

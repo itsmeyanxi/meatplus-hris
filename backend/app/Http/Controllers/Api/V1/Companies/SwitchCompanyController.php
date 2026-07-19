@@ -46,12 +46,11 @@ class SwitchCompanyController extends Controller
         $carryRoles = $user->getRoleNames()->all();
         $isAdmin = $this->isAdminAnywhere($user);
 
-        // Admins (and anyone who has switched before) may enter any company; regular
-        // users must be a member of the target company.
-        $isItAccount = $isAdmin || $user->original_company_id !== null;
-
-        if (! $isItAccount) {
-            // Regular users must be a member of the target company.
+        // Only admins may enter any company. Everyone else must be a member of the
+        // target — including users who have switched before. (Previously a set
+        // original_company_id also bypassed this, which let any multi-company user
+        // reach companies they don't belong to after their first switch.)
+        if (! $isAdmin) {
             $member = $user->companies()->where('companies.id', $targetId)->first();
             if (! $member) {
                 throw ValidationException::withMessages([

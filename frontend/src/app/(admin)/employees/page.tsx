@@ -78,7 +78,7 @@ export default function EmployeesPage() {
   }, [empNo, name]);
 
   // Clear selection when page / filters change
-  useEffect(() => { setSelected(new Set()); }, [debEmpNo, debName, departmentId, companyId, page]);
+  useEffect(() => { setSelected(new Set()); }, [debEmpNo, debName, departmentId, branchId, companyId, isConfidential, page]);
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const canManageUsers = me?.user.permissions?.includes("user.manage") ?? false;
@@ -171,12 +171,13 @@ export default function EmployeesPage() {
   const didInitFromUrl = useRef(false);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
-    if (p.get("dept")) setDepartmentId(Number(p.get("dept")));
-    if (p.get("branch")) setBranchId(Number(p.get("branch")));
-    if (p.get("company")) setCompanyId(Number(p.get("company")));
-    if (p.get("confi")) setIsConfidential(p.get("confi") === "1");
+    const num = (v: string | null) => { const n = Number(v); return v && Number.isFinite(n) && n > 0 ? n : null; };
+    const dept = num(p.get("dept")); if (dept) setDepartmentId(dept);
+    const branch = num(p.get("branch")); if (branch) setBranchId(branch);
+    const company = num(p.get("company")); if (company) setCompanyId(company);
+    if (p.get("confi") === "1" || p.get("confi") === "0") setIsConfidential(p.get("confi") === "1");
     if (p.get("q")) { setName(p.get("q")!); setDebName(p.get("q")!); }
-    if (p.get("page")) setPage(Number(p.get("page")));
+    const pg = num(p.get("page")); if (pg) setPage(pg);
     didInitFromUrl.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
