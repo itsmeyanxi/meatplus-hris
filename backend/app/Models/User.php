@@ -79,6 +79,25 @@ class User extends Authenticatable
             || $this->active_company_id === $this->original_company_id;
     }
 
+    /** Cached per-instance result of the global it_admin check. */
+    protected ?bool $itAdminResolved = null;
+
+    /**
+     * True if the user is an IT Admin in ANY company. This is intentionally global
+     * and team-independent: it_admin is the top-level super-admin and bypasses both
+     * permission checks (Gate::before) and the company scope everywhere, regardless
+     * of which company is currently active.
+     */
+    public function isItAdmin(): bool
+    {
+        return $this->itAdminResolved ??= \Illuminate\Support\Facades\DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $this->id)
+            ->where('model_has_roles.model_type', $this->getMorphClass())
+            ->where('roles.name', 'it_admin')
+            ->exists();
+    }
+
     public function companies(): BelongsToMany
     {
         return $this->belongsToMany(Company::class, 'company_user')
