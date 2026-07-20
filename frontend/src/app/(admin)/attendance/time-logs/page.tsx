@@ -154,7 +154,7 @@ export default function TimeLogsPage() {
                     <span className="ml-1 text-xs text-slate-400">· {l.device_name ?? l.device_id}</span>
                   )}
                 </td>
-                <td className="px-4 py-3"><PunchLocation lat={l.lat} lng={l.lng} geo={l.geo} /></td>
+                <td className="px-4 py-3"><PunchLocation lat={l.lat} lng={l.lng} geo={l.geo} siteLabel={l.site_location} siteLat={l.site_lat} siteLng={l.site_lng} /></td>
               </tr>
             ))}
           </tbody>

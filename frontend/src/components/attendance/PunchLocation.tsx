@@ -2,21 +2,51 @@ import type { GeoVerdict } from "@/lib/attendance";
 
 /**
  * Renders a punch's captured location: a Google-Maps pin link plus, when the
- * employee's branch has a geofence pin, an inside/outside badge. Shows a muted
- * "no location" note when coordinates are missing (older/denied punches).
+ * employee's branch has a geofence pin, an inside/outside badge. When the punch
+ * itself has no GPS (e.g. biometric), it falls back to the fixed site/company
+ * location. Shows a muted "no location" note only when neither is available.
  */
 export function PunchLocation({
   lat,
   lng,
   geo,
+  siteLabel = null,
+  siteLat = null,
+  siteLng = null,
   className = "",
 }: {
   lat: number | null;
   lng: number | null;
   geo: GeoVerdict | null;
+  siteLabel?: string | null;
+  siteLat?: number | null;
+  siteLng?: number | null;
   className?: string;
 }) {
+  // No GPS on the punch itself — show the fixed site/company location instead.
   if (lat == null || lng == null) {
+    if (siteLabel) {
+      const inner = (
+        <span className="inline-flex items-center gap-0.5">
+          🏢 {siteLabel}
+        </span>
+      );
+      return siteLat != null && siteLng != null ? (
+        <a
+          href={`https://www.google.com/maps?q=${siteLat},${siteLng}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`inline-flex items-center text-xs font-medium text-slate-600 hover:text-teal-700 hover:underline ${className}`}
+          title={`${siteLabel} — open site location in Google Maps`}
+        >
+          {inner}
+        </a>
+      ) : (
+        <span className={`text-xs text-slate-500 ${className}`} title="Site / company location">
+          {inner}
+        </span>
+      );
+    }
     return <span className={`text-xs text-slate-400 ${className}`}>No location</span>;
   }
 

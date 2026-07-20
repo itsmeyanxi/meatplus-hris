@@ -17,9 +17,12 @@ class TimeLogController extends Controller
         $user = $request->user();
         abort_unless($user->can('attendance.view'), 403);
 
-        // employee.branch feeds the geofence verdict in TimeLogResource;
-        // device resolves the friendly, location-identifying terminal name.
-        $q = TimeLog::query()->with('employee.branch', 'device')->orderBy('logged_at');
+        // employee.branch feeds the geofence verdict + site location in TimeLogResource;
+        // device (and its branch) resolves the friendly terminal name and site;
+        // employee.company is the last-resort location fallback.
+        $q = TimeLog::query()
+            ->with('employee.branch', 'employee.company', 'device.branch')
+            ->orderBy('logged_at');
 
         // HR (attendance.view.any) sees everyone; everyone else is locked to their own logs.
         if ($user->can('attendance.view.any')) {

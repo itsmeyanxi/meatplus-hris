@@ -59,6 +59,9 @@ export type TimeLog = {
   lat: number | null;
   lng: number | null;
   geo: GeoVerdict | null;
+  site_location: string | null;
+  site_lat: number | null;
+  site_lng: number | null;
 };
 
 export type TimeLogDevice = { device_id: string; name: string };
