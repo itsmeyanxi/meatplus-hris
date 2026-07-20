@@ -10,6 +10,21 @@ import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { AppButton, AppCard, PageHeader, TableShell } from "@/components/ui";
 import { inputCls, labelCls } from "@/lib/form-classes";
 
+/**
+ * Punch timestamps are stored as local (Manila) wall-clock time but tagged UTC
+ * ("…Z") by the API. Render the wall-clock exactly as stored — format in UTC so
+ * the browser doesn't shift it — giving a readable local time for every punch.
+ */
+function fmtLoggedAt(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-PH", {
+    timeZone: "UTC",
+    year: "numeric", month: "short", day: "2-digit",
+    hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true,
+  });
+}
+
 export default function TimeLogsPage() {
   const qc = useQueryClient();
 
@@ -142,7 +157,7 @@ export default function TimeLogsPage() {
             )}
             {items.map((l: TimeLog) => (
               <tr key={l.id} className="border-t border-slate-100 transition hover:bg-slate-50/70">
-                <td className="px-4 py-3 font-mono text-xs text-slate-600">{l.logged_at}</td>
+                <td className="px-4 py-3 text-xs tabular-nums text-slate-600">{fmtLoggedAt(l.logged_at)}</td>
                 <td className="px-4 py-3">
                   <div className="font-medium text-slate-800">{l.employee_name ?? "—"}</div>
                   <div className="text-xs text-slate-400">#{l.employee_no ?? l.employee_id}</div>
