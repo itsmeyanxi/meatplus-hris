@@ -40,6 +40,7 @@ enabled — the site is intentionally HTTP for now. See
 | 04 | [Operations](04-operations.md) | Run it, deploy changes, back it up — the day-to-day runbook |
 | 05 | [Biometric (ZKTeco / ADMS)](05-biometric.md) | Connect a device, enroll people, troubleshoot punches |
 | 06 | [Deployment & hosting](06-deployment-hosting.md) | How the self-hosting works (Caddy, DNS, router, HTTPS-later, hardening) |
+| 07 | [Employee accounts](07-employee-accounts.md) | Give employees a login — bulk invite, single invite, direct provision |
 
 ---
 
