@@ -116,7 +116,11 @@ class EmployeeController extends Controller
             $query->where('department_id', $departmentId);
         }
 
-        if ($companyId = $request->query('company_id')) {
+        // The employee module reflects the company the user is currently in. An
+        // explicit company filter (an admin drilling into another company) overrides
+        // it. This also constrains it_admin, who otherwise bypasses the company scope.
+        $companyId = $request->query('company_id') ?: $request->user()->active_company_id;
+        if ($companyId) {
             $query->where('company_id', $companyId);
         }
 
