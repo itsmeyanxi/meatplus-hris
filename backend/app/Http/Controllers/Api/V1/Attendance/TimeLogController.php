@@ -17,8 +17,9 @@ class TimeLogController extends Controller
         $user = $request->user();
         abort_unless($user->can('attendance.view'), 403);
 
-        // employee.branch feeds the geofence verdict in TimeLogResource.
-        $q = TimeLog::query()->with('employee.branch')->orderBy('logged_at');
+        // employee.branch feeds the geofence verdict in TimeLogResource;
+        // device resolves the friendly, location-identifying terminal name.
+        $q = TimeLog::query()->with('employee.branch', 'device')->orderBy('logged_at');
 
         // HR (attendance.view.any) sees everyone; everyone else is locked to their own logs.
         if ($user->can('attendance.view.any')) {
@@ -57,7 +58,21 @@ class TimeLogController extends Controller
             $q->where('employee_id', $employee->id);
         }
 
-        return response()->json(['data' => $q->orderBy('device_id')->pluck('device_id')]);
+        $serials = $q->orderBy('device_id')->pluck('device_id');
+
+        // Resolve each serial to its friendly device name so the filter reads as
+        // locations, not raw serials. Non-device sources (WEB/MANUAL) fall back
+        // to the raw identifier.
+        $names = \App\Domain\Attendance\Models\AttendanceDevice::query()
+            ->whereIn('serial_no', $serials)
+            ->pluck('name', 'serial_no');
+
+        $data = $serials->map(fn ($id) => [
+            'device_id' => $id,
+            'name' => $names[$id] ?? $id,
+        ])->values();
+
+        return response()->json(['data' => $data]);
     }
 
     public function store(TimeLogRequest $request): JsonResponse

@@ -78,7 +78,7 @@ export default function TimeLogsPage() {
             <label className={labelCls}>Device</label>
             <select className={inputCls} value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
               <option value="">All devices</option>
-              {devices.map((d) => (<option key={d} value={d}>{d}</option>))}
+              {devices.map((d) => (<option key={d.device_id} value={d.device_id}>{d.name}</option>))}
             </select>
           </div>
           <div>
@@ -126,7 +126,7 @@ export default function TimeLogsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-slate-600">
-              {["Logged at", "Employee #", "Direction", "Source", "Location"].map((h) => (
+              {["Logged at", "Employee", "Direction", "Source", "Location"].map((h) => (
                 <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">{h}</th>
               ))}
             </tr>
@@ -143,11 +143,16 @@ export default function TimeLogsPage() {
             {items.map((l: TimeLog) => (
               <tr key={l.id} className="border-t border-slate-100 transition hover:bg-slate-50/70">
                 <td className="px-4 py-3 font-mono text-xs text-slate-600">{l.logged_at}</td>
-                <td className="px-4 py-3 text-slate-600">{l.employee_id}</td>
+                <td className="px-4 py-3">
+                  <div className="font-medium text-slate-800">{l.employee_name ?? "—"}</div>
+                  <div className="text-xs text-slate-400">#{l.employee_no ?? l.employee_id}</div>
+                </td>
                 <td className="px-4 py-3 capitalize text-slate-700">{l.direction.replace("_", " ")}</td>
                 <td className="px-4 py-3 text-slate-500">
                   {l.source}
-                  {l.device_id && <span className="ml-1 text-xs text-slate-400">· {l.device_id}</span>}
+                  {(l.device_name || l.device_id) && (
+                    <span className="ml-1 text-xs text-slate-400">· {l.device_name ?? l.device_id}</span>
+                  )}
                 </td>
                 <td className="px-4 py-3"><PunchLocation lat={l.lat} lng={l.lng} geo={l.geo} /></td>
               </tr>

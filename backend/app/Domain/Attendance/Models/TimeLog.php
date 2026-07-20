@@ -32,4 +32,14 @@ class TimeLog extends Model
     {
         return $this->belongsTo(Employee::class);
     }
+
+    /**
+     * The biometric terminal that produced this punch, matched on serial.
+     * `device_id` stores the device serial (or WEB/MANUAL for non-device
+     * sources), so this resolves to a device only for biometric punches.
+     */
+    public function device(): BelongsTo
+    {
+        return $this->belongsTo(AttendanceDevice::class, 'device_id', 'serial_no');
+    }
 }

@@ -49,14 +49,19 @@ export type GeoVerdict = {
 export type TimeLog = {
   id: number;
   employee_id: number;
+  employee_no: string | null;
+  employee_name: string | null;
   logged_at: string;
   direction: "in" | "out" | "break_out" | "break_in";
   source: "biometric" | "web" | "mobile" | "manual";
   device_id: string | null;
+  device_name: string | null;
   lat: number | null;
   lng: number | null;
   geo: GeoVerdict | null;
 };
+
+export type TimeLogDevice = { device_id: string; name: string };
 export type TimeLogInput = {
   employee_id: number;
   logged_at: string;
@@ -176,8 +181,8 @@ export const timeLogsApi = {
     const { data } = await api.get<Listed<TimeLog>>("/api/v1/time-logs", { params });
     return data.data;
   },
-  devices: async (): Promise<string[]> => {
-    const { data } = await api.get<{ data: string[] }>("/api/v1/time-logs/devices");
+  devices: async (): Promise<TimeLogDevice[]> => {
+    const { data } = await api.get<{ data: TimeLogDevice[] }>("/api/v1/time-logs/devices");
     return data.data;
   },
   create: async (body: TimeLogInput): Promise<TimeLog> => {
