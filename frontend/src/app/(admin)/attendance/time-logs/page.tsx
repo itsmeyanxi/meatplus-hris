@@ -141,7 +141,7 @@ export default function TimeLogsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-slate-600">
-              {["Logged at", "Employee", "Direction", "Source", "Location"].map((h) => (
+              {["Logged at", "Employee", "Company", "Direction", "Source", "Location"].map((h) => (
                 <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">{h}</th>
               ))}
             </tr>
@@ -149,7 +149,7 @@ export default function TimeLogsPage() {
           <tbody>
             {items.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-16 text-center">
+                <td colSpan={6} className="px-4 py-16 text-center">
                   <p className="text-sm font-medium text-slate-700">No logs in this range</p>
                   <p className="mt-1 text-sm text-slate-500">Adjust the filter or add a manual log above.</p>
                 </td>
@@ -161,6 +161,15 @@ export default function TimeLogsPage() {
                 <td className="px-4 py-3">
                   <div className="font-medium text-slate-800">{l.employee_name ?? "—"}</div>
                   <div className="text-xs text-slate-400">#{l.employee_no ?? l.employee_id}</div>
+                </td>
+                <td className="px-4 py-3">
+                  {l.company_code ? (
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600" title={l.company_name ?? undefined}>
+                      {l.company_code}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-400">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 capitalize text-slate-700">{l.direction.replace("_", " ")}</td>
                 <td className="px-4 py-3 text-slate-500">

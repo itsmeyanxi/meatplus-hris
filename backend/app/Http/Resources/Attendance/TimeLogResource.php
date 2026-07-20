@@ -46,6 +46,10 @@ class TimeLogResource extends JsonResource
             // without cross-referencing the employee list.
             'employee_no' => $employee?->employee_no,
             'employee_name' => $employee?->full_name,
+            // Which company the employee belongs to (useful when an it_admin
+            // views punches across all companies).
+            'company_code' => $company?->code,
+            'company_name' => $company?->trade_name ?: $company?->legal_name,
             'logged_at' => $this->logged_at,
             'direction' => $this->direction,
             'source' => $this->source,

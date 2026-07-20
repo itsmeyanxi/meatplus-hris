@@ -51,6 +51,8 @@ export type TimeLog = {
   employee_id: number;
   employee_no: string | null;
   employee_name: string | null;
+  company_code: string | null;
+  company_name: string | null;
   logged_at: string;
   direction: "in" | "out" | "break_out" | "break_in";
   source: "biometric" | "web" | "mobile" | "manual";
