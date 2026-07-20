@@ -57,7 +57,6 @@ export default function EmployeesPage() {
   const [name, setName] = useState("");
   const [departmentId, setDepartmentId] = useState<number | "">("");
   const [branchId, setBranchId] = useState<number | "">("");
-  const [companyId, setCompanyId] = useState<number | "">("");
   const [isConfidential, setIsConfidential] = useState<boolean | "">("");
   const [debEmpNo, setDebEmpNo] = useState("");
   const [debName, setDebName] = useState("");
@@ -78,7 +77,7 @@ export default function EmployeesPage() {
   }, [empNo, name]);
 
   // Clear selection when page / filters change
-  useEffect(() => { setSelected(new Set()); }, [debEmpNo, debName, departmentId, branchId, companyId, isConfidential, page]);
+  useEffect(() => { setSelected(new Set()); }, [debEmpNo, debName, departmentId, branchId, isConfidential, page]);
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const canManageUsers = me?.user.permissions?.includes("user.manage") ?? false;
@@ -90,6 +89,8 @@ export default function EmployeesPage() {
     staleTime: 2 * 60_000,
   });
 
+  // Company list — used only by the Import modal's "import into" selector (a
+  // deliberate admin write target), not for filtering the list.
   const { data: companies } = useQuery({
     queryKey: ["lookup-companies"],
     queryFn: () => getLookup("companies"),
@@ -105,8 +106,8 @@ export default function EmployeesPage() {
   });
 
   const { data: branches } = useQuery({
-    queryKey: ["lookup-branches", companyId],
-    queryFn: () => getLookup("branches", companyId ? { company_id: Number(companyId) } : {}),
+    queryKey: ["lookup-branches"],
+    queryFn: () => getLookup("branches"),
     enabled: !!me,
     staleTime: 5 * 60_000,
   });
@@ -114,8 +115,8 @@ export default function EmployeesPage() {
   const canConfi = me?.user.permissions.includes("employee.view.sensitive") ?? false;
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["employees", { empNo: debEmpNo, name: debName, departmentId, branchId, companyId, isConfidential, page }],
-    queryFn: () => listEmployees({ employeeNo: debEmpNo, name: debName, departmentId, branchId, companyId, isConfidential, page, perPage: 50 }),
+    queryKey: ["employees", { empNo: debEmpNo, name: debName, departmentId, branchId, isConfidential, page }],
+    queryFn: () => listEmployees({ employeeNo: debEmpNo, name: debName, departmentId, branchId, isConfidential, page, perPage: 50 }),
     enabled: !!me,
     staleTime: 5 * 60_000,
     placeholderData: (prev) => prev,
@@ -154,17 +155,17 @@ export default function EmployeesPage() {
 
   const onExport = () => {
     const a = document.createElement("a");
-    a.href = employeeExportUrl({ employeeNo: debEmpNo, name: debName, departmentId, companyId });
+    a.href = employeeExportUrl({ employeeNo: debEmpNo, name: debName, departmentId });
     a.download = "employees.csv";
     document.body.appendChild(a);
     a.click();
     a.remove();
   };
 
-  const hasFilters = empNo !== "" || name !== "" || departmentId !== "" || branchId !== "" || companyId !== "" || isConfidential !== "";
-  const advancedCount = [departmentId, branchId, companyId].filter((v) => v !== "").length + (isConfidential !== "" ? 1 : 0);
+  const hasFilters = empNo !== "" || name !== "" || departmentId !== "" || branchId !== "" || isConfidential !== "";
+  const advancedCount = [departmentId, branchId].filter((v) => v !== "").length + (isConfidential !== "" ? 1 : 0);
   const clearFilters = () => {
-    setEmpNo(""); setName(""); setDepartmentId(""); setBranchId(""); setCompanyId(""); setIsConfidential(""); setPage(1);
+    setEmpNo(""); setName(""); setDepartmentId(""); setBranchId(""); setIsConfidential(""); setPage(1);
   };
 
   // Keep filters in the URL so refresh/back and shared links preserve them.
@@ -174,7 +175,6 @@ export default function EmployeesPage() {
     const num = (v: string | null) => { const n = Number(v); return v && Number.isFinite(n) && n > 0 ? n : null; };
     const dept = num(p.get("dept")); if (dept) setDepartmentId(dept);
     const branch = num(p.get("branch")); if (branch) setBranchId(branch);
-    const company = num(p.get("company")); if (company) setCompanyId(company);
     if (p.get("confi") === "1" || p.get("confi") === "0") setIsConfidential(p.get("confi") === "1");
     if (p.get("q")) { setName(p.get("q")!); setDebName(p.get("q")!); }
     const pg = num(p.get("page")); if (pg) setPage(pg);
@@ -186,13 +186,12 @@ export default function EmployeesPage() {
     const p = new URLSearchParams();
     if (departmentId !== "") p.set("dept", String(departmentId));
     if (branchId !== "") p.set("branch", String(branchId));
-    if (companyId !== "") p.set("company", String(companyId));
     if (isConfidential !== "") p.set("confi", isConfidential ? "1" : "0");
     if (debName) p.set("q", debName);
     if (page > 1) p.set("page", String(page));
     const qs = p.toString();
     window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
-  }, [departmentId, branchId, companyId, isConfidential, debName, page]);
+  }, [departmentId, branchId, isConfidential, debName, page]);
 
   const COLS = 13; // checkbox + Company + 10 data cols + access
 
@@ -319,14 +318,6 @@ export default function EmployeesPage() {
                 {branches?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             </div>
-            <div>
-              <label className={labelCls}>Company</label>
-              <select className={inputCls} value={companyId}
-                onChange={(e) => { setCompanyId(e.target.value === "" ? "" : Number(e.target.value)); setPage(1); }}>
-                <option value="">All companies</option>
-                {companies?.map((c) => <option key={c.id} value={c.id}>{c.code ? `${c.code} — ${c.name}` : c.name}</option>)}
-              </select>
-            </div>
             {canConfi && (
               <div>
                 <label className={labelCls}>Payroll group</label>
@@ -360,12 +351,6 @@ export default function EmployeesPage() {
               <FilterChip
                 label={isConfidential ? "Confidential" : "Non-confidential"}
                 onRemove={() => { setIsConfidential(""); setPage(1); }}
-              />
-            )}
-            {companyId !== "" && (
-              <FilterChip
-                label={companies?.find((c) => c.id === companyId)?.name ?? "Company"}
-                onRemove={() => { setCompanyId(""); setPage(1); }}
               />
             )}
           </div>
