@@ -56,3 +56,20 @@ export function downloadOvertimeReport(params: {
 export function downloadPayrollReport(payrollRunId: number, label: string) {
   return downloadCsv(`/api/v1/reports/payroll/${payrollRunId}`, {}, `payroll_${label}.csv`);
 }
+
+/**
+ * Full data export for the active company: one Excel file per category, zipped.
+ * Can take a while to build, so we allow a generous timeout and keep the
+ * server-provided filename (company code + timestamp).
+ */
+export async function downloadFullExport() {
+  const res = await api.get<Blob>("/api/v1/reports/full-export", { responseType: "blob", timeout: 180000 });
+  const cd = (res.headers["content-disposition"] as string | undefined) ?? "";
+  const filename = cd.match(/filename="?([^"]+)"?/)?.[1] ?? "full_export.zip";
+  const href = URL.createObjectURL(res.data);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(href);
+}
