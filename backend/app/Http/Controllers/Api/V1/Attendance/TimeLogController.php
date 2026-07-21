@@ -48,6 +48,61 @@ class TimeLogController extends Controller
         return TimeLogResource::collection($q->limit(500)->get());
     }
 
+    /**
+     * Export the (filtered) punch log as CSV. Honours the same filters and the
+     * company scope as index(); streamed in chunks so a large range stays memory-safe.
+     */
+    public function export(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $user = $request->user();
+        abort_unless($user->can('attendance.view'), 403);
+
+        $q = TimeLog::query()->with('employee.branch', 'employee.company', 'device.branch');
+
+        if ($user->can('attendance.view.any')) {
+            if ($eid = $request->query('employee_id')) {
+                $q->where('employee_id', $eid);
+            }
+        } else {
+            $employee = $user->employee;
+            abort_unless($employee, 403, 'Your account is not linked to an employee record.');
+            $q->where('employee_id', $employee->id);
+        }
+        if ($from = $request->query('from')) {
+            $q->where('logged_at', '>=', $from);
+        }
+        if ($to = $request->query('to')) {
+            $q->where('logged_at', '<=', $to.' 23:59:59');
+        }
+        if ($device = $request->query('device_id')) {
+            $q->where('device_id', $device);
+        }
+
+        return response()->streamDownload(function () use ($q) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Logged At', 'Employee No', 'Employee Name', 'Company', 'Direction', 'Source', 'Device', 'Location']);
+
+            // lazy() chunks by primary key and keeps eager-loads, so 60k+ rows
+            // stream without exhausting memory.
+            foreach ($q->lazy(1000) as $l) {
+                $branch = ($l->relationLoaded('device') && $l->device && $l->device->branch)
+                    ? $l->device->branch
+                    : $l->employee?->branch;
+                fputcsv($out, [
+                    $l->logged_at?->format('Y-m-d h:i:s A'),
+                    $l->employee?->employee_no,
+                    $l->employee?->full_name,
+                    $l->employee?->company?->code,
+                    $l->direction,
+                    $l->source,
+                    $l->device?->name ?? $l->device_id,
+                    $branch?->name,
+                ]);
+            }
+            fclose($out);
+        }, 'time-logs.csv', ['Content-Type' => 'text/csv']);
+    }
+
     /** Distinct device identifiers seen in the punch log (for the Device filter). */
     public function devices(Request $request): JsonResponse
     {

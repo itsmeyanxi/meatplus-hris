@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { getMe } from "@/lib/auth";
 import { listEmployees } from "@/lib/employees";
-import { timeLogsApi, type TimeLog, type TimeLogInput } from "@/lib/attendance";
+import { timeLogsApi, timeLogsExportUrl, type TimeLog, type TimeLogInput } from "@/lib/attendance";
 import { PunchLocation } from "@/components/attendance/PunchLocation";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { AppButton, AppCard, PageHeader, TableShell } from "@/components/ui";
@@ -74,11 +74,22 @@ export default function TimeLogsPage() {
     },
   });
 
+  // Download the CSV for the current filters (session cookie authenticates the request).
+  const onExport = () => {
+    const a = document.createElement("a");
+    a.href = timeLogsExportUrl({ employee_id: employeeId, from, to, device_id: deviceId });
+    a.download = "time-logs.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Time logs"
         description="Append-only raw punches. Enter logs manually here; biometric/web/mobile sources populate automatically once integrated."
+        actions={<AppButton variant="secondary" onClick={onExport}>Export CSV</AppButton>}
       />
 
       <AppCard title="Filter">
