@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Adms;
 
+use App\Domain\Attendance\Models\AttendanceDevice;
 use App\Domain\Attendance\Services\Biometric\AdmsIngestionService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -33,10 +34,31 @@ class IclockController extends Controller
         return $this->text("OK: {$count}");
     }
 
-    /** Device polls here for queued commands; we have none for now. */
+    /**
+     * Device polls here for queued commands. If an admin has queued a one-shot
+     * command on the device (e.g. DATA QUERY ATTLOG to re-upload stored history),
+     * we hand it over once and clear it; otherwise there is nothing to do.
+     */
     public function getrequest(Request $request): Response
     {
         $this->logRequest($request);
+
+        $sn = (string) $request->query('SN', '');
+        if ($sn !== '') {
+            $device = AttendanceDevice::query()
+                ->withoutGlobalScopes()
+                ->where('serial_no', $sn)
+                ->where('is_active', true)
+                ->first();
+
+            if ($device && $device->pending_command) {
+                $command = $device->pending_command;
+                $device->forceFill(['pending_command' => null])->save(); // one-shot
+                \Illuminate\Support\Facades\Log::info("ADMS: dispatched command to {$sn}: {$command}");
+
+                return $this->text($command);
+            }
+        }
 
         return $this->text('OK');
     }
