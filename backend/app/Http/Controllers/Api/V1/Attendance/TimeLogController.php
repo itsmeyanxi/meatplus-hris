@@ -22,7 +22,7 @@ class TimeLogController extends Controller
         // employee.company is the last-resort location fallback.
         $q = TimeLog::query()
             ->with('employee.branch', 'employee.company', 'device.branch')
-            ->orderBy('logged_at');
+            ->orderByDesc('logged_at'); // newest punches first
 
         // HR (attendance.view.any) sees everyone; everyone else is locked to their own logs.
         if ($user->can('attendance.view.any')) {
