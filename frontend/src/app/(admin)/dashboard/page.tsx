@@ -22,12 +22,9 @@ function ymd(d: Date): string {
 }
 
 function to12h(ts: string): string {
-  const hhmm = ts.slice(11, 16);
-  let h = Number(hhmm.slice(0, 2));
-  const m = hhmm.slice(3, 5);
-  const ap = h >= 12 ? "PM" : "AM";
-  h = h % 12 || 12;
-  return `${String(h).padStart(2, "0")}:${m} ${ap}`;
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return ts.slice(11, 16);
+  return d.toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: true });
 }
 
 function mdy(workDate: string): string {

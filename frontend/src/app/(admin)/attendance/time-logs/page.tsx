@@ -10,16 +10,12 @@ import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { AppButton, AppCard, PageHeader, TableShell } from "@/components/ui";
 import { inputCls, labelCls } from "@/lib/form-classes";
 
-/**
- * Punch timestamps are stored as local (Manila) wall-clock time but tagged UTC
- * ("…Z") by the API. Render the wall-clock exactly as stored — format in UTC so
- * the browser doesn't shift it — giving a readable local time for every punch.
- */
+/** Render a punch timestamp as readable Manila local time. */
 function fmtLoggedAt(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
   return d.toLocaleString("en-PH", {
-    timeZone: "UTC",
+    timeZone: "Asia/Manila",
     year: "numeric", month: "short", day: "2-digit",
     hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true,
   });

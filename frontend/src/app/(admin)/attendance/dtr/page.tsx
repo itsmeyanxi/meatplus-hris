@@ -499,7 +499,8 @@ function DetailDrawer({
   onClose: () => void;
 }) {
   const status: DayStatus = r.day_status ?? "no_record";
-  const hm = (v: string | null) => (v ? v.slice(11, 16) : "—");
+  const hm = (v: string | null) =>
+    v ? new Date(v).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
 
   const statusLabel: Record<DayStatus, string> = {
     present: "Present", late: "Late", absent: "Absent", leave: "On Leave",

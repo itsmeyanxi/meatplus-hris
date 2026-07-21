@@ -387,8 +387,8 @@ export default function EmployeeAttendanceTab() {
                   }
                 >
                   <td className="px-3 py-2 font-mono">{d.work_date}</td>
-                  <td className="px-3 py-2">{d.actual_in ? d.actual_in.slice(11, 16) : "—"}</td>
-                  <td className="px-3 py-2">{d.actual_out ? d.actual_out.slice(11, 16) : "—"}</td>
+                  <td className="px-3 py-2">{d.actual_in ? new Date(d.actual_in).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false }) : "—"}</td>
+                  <td className="px-3 py-2">{d.actual_out ? new Date(d.actual_out).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false }) : "—"}</td>
                   <td className="px-3 py-2 font-medium">{d.hours_worked}</td>
                   <td className="px-3 py-2">{d.late_minutes ? `${d.late_minutes}m` : "—"}</td>
                   <td className="px-3 py-2">{d.overtime_minutes ? `${d.overtime_minutes}m` : "—"}</td>

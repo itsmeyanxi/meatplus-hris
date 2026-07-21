@@ -282,7 +282,8 @@ function DayDetailDrawer({
   const style = STATUS_STYLE[status];
   const heading =
     status === "holiday" && record.holiday_name ? record.holiday_name : style.label;
-  const hm = (v: string | null) => (v ? v.slice(11, 16) : "—");
+  const hm = (v: string | null) =>
+    v ? new Date(v).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
 
   return (
     <>

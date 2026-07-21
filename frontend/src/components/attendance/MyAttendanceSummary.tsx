@@ -14,7 +14,8 @@ const inputCls =
   "rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900/50";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const hm = (v: string | null) => (v ? v.slice(11, 16) : "—");
+const hm = (v: string | null) =>
+  v ? new Date(v).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
 
 export function MyAttendanceSummary({ employeeName }: { employeeName: string }) {
   const initial = useMemo(() => {
