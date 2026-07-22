@@ -7,10 +7,22 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class PayrollRun extends Model
 {
     use BelongsToCompany;
+    use LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'status', 'period_start', 'period_end', 'pay_date', 'pay_group'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('payroll');
+    }
 
     protected $fillable = [
         'company_id', 'name', 'pay_group', 'period_start', 'period_end', 'pay_date',

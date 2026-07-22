@@ -6,6 +6,8 @@ use App\Domain\Identity\Concerns\BelongsToCompany;
 use App\Domain\Identity\Models\Branch;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * A physical attendance terminal (e.g. Hikvision DS-K1T804AMF) the system polls
@@ -14,6 +16,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class AttendanceDevice extends Model
 {
     use BelongsToCompany;
+    use LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'serial_no', 'company_id', 'branch_id', 'is_active'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('device');
+    }
 
     protected $fillable = [
         'company_id', 'branch_id', 'name', 'vendor', 'serial_no',
