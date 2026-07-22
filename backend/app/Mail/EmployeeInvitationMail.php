@@ -4,12 +4,15 @@ namespace App\Mail;
 
 use App\Models\Invitation;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class EmployeeInvitationMail extends Mailable
+// Queued so bulk invites return immediately and the worker sends them in the
+// background (Gmail SMTP is slow — sending inline would time out the request).
+class EmployeeInvitationMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
