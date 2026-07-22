@@ -18,7 +18,9 @@ class AttendanceCorrectionRequest extends FormRequest
         $companyId = $this->user()->active_company_id;
 
         return [
-            'employee_id' => ['required', 'integer',
+            // Optional — derived from the logged-in user's employee record when
+            // omitted (self-service). Managers may pass another employee's id.
+            'employee_id' => ['nullable', 'integer',
                 Rule::exists('employees', 'id')->where('company_id', $companyId)],
             'work_date' => ['required', 'date'],
             'field_to_correct' => ['required', 'string', Rule::in(AttendanceCorrectionApplier::CORRECTABLE_FIELDS)],

@@ -16,11 +16,12 @@ class CertificateOfAttendanceRequestRequest extends FormRequest
     public function rules(): array
     {
         $companyId = $this->user()->active_company_id;
-        $isManager = $this->user()->can('attendance.manage');
 
         return [
+            // Optional — derived from the logged-in user's employee record when
+            // omitted (self-service). Managers may pass another employee's id.
             'employee_id' => [
-                $isManager ? 'required' : 'nullable',
+                'nullable',
                 'integer',
                 Rule::exists('employees', 'id')->where('company_id', $companyId),
             ],
