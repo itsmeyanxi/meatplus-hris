@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { myTimeClockApi, type TimeClockStatus } from "@/lib/attendance";
+import { useQuery } from "@tanstack/react-query";
+import { myTimeClockApi } from "@/lib/attendance";
 import { PunchLocation } from "@/components/attendance/PunchLocation";
 
 const TZ = "Asia/Manila";
@@ -29,61 +29,17 @@ function fmtDate(iso: string): string {
   });
 }
 
-// Ask the browser for GPS; resolve to null (never reject) if denied/unavailable,
-// so a location refusal still lets the punch go through.
-function getCoords(): Promise<{ lat: number; lng: number } | null> {
-  return new Promise((resolve) => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
-    );
-  });
-}
-
+/**
+ * Display-only time clock. Attendance is recorded on the biometric device, not
+ * here — this card just shows the live time, today's status, and the punches
+ * that came in from the device.
+ */
 export function TimeClockCard() {
-  const qc = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
-  // Geolocation only works on HTTPS/localhost; know which so the hint is honest.
-  const [locationAvailable, setLocationAvailable] = useState(true);
-  useEffect(() => { setLocationAvailable(window.isSecureContext); }, []);
-
   const { data: status, isLoading } = useQuery({
     queryKey: ["my", "time-clock"],
     queryFn: myTimeClockApi.today,
     refetchOnWindowFocus: true,
-  });
-
-  const punch = useMutation({
-    mutationFn: async (direction: "in" | "out") => {
-      const coords = await getCoords();
-      // Geolocation only works on a secure (HTTPS) origin. Where it's available,
-      // require it (a null result means the user denied it). On plain HTTP the
-      // browser can't provide location at all, so let the punch through without it.
-      const secure = typeof window !== "undefined" && window.isSecureContext;
-      if (!coords && secure) throw new Error("LOCATION_REQUIRED");
-      return myTimeClockApi.punch(direction, coords ?? undefined);
-    },
-    onMutate: () => setError(null),
-    onSuccess: (res) => {
-      qc.setQueryData(["my", "time-clock"], res.data);
-      // The punch also recomputes today's DTR server-side; refresh anything showing it.
-      qc.invalidateQueries({ queryKey: ["my", "attendance"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
-    },
-    onError: (e: unknown) => {
-      if ((e as Error)?.message === "LOCATION_REQUIRED") {
-        setError(
-          "Location is required to clock in or out. Please allow location access in your browser and try again.",
-        );
-        return;
-      }
-      const msg =
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        "Could not record your punch. Please try again.";
-      setError(msg);
-    },
+    refetchInterval: 60_000, // pick up new device punches without a manual refresh
   });
 
   // Live clock, driven off the server time so it's correct even if the device
@@ -96,8 +52,6 @@ export function TimeClockCard() {
     }
   }, [status?.server_time]);
   useEffect(() => {
-    // server_time carries the correct +08:00 offset, so this real epoch converts
-    // cleanly to Manila for the live ticking clock.
     const tick = () =>
       setNowLabel(
         new Date(Date.now() + offsetRef.current).toLocaleTimeString("en-US", {
@@ -114,7 +68,6 @@ export function TimeClockCard() {
   }, []);
 
   const isIn = status?.state === "in";
-  const busy = punch.isPending;
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -144,38 +97,21 @@ export function TimeClockCard() {
                 Clocked out at <strong>{fmtTime(status.last_punch_at)}</strong>
               </span>
             ) : (
-              <span className="text-slate-500">Not clocked in yet today</span>
+              <span className="text-slate-500">No punch yet today</span>
             )}
           </div>
         </div>
 
-        {/* Right: the one valid action */}
-        <div className="flex flex-col items-stretch gap-2 sm:items-end">
-          <button
-            type="button"
-            disabled={busy || isLoading}
-            onClick={() => punch.mutate(isIn ? "out" : "in")}
-            className={`rounded-2xl px-8 py-4 text-lg font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
-              isIn
-                ? "bg-rose-600 hover:bg-rose-700"
-                : "bg-emerald-600 hover:bg-emerald-700"
-            }`}
-          >
-            {busy ? "Saving…" : isIn ? "Time Out" : "Time In"}
-          </button>
-          <p className="text-center text-xs text-slate-400 sm:text-right">
-            {locationAvailable
-              ? "Location required — you’ll be asked to allow it"
-              : "Location capture is off until the site is on HTTPS"}
+        {/* Right: this is a read-only view — punching happens on the device */}
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center sm:text-right">
+          <p className="text-sm font-medium text-slate-600">Biometric attendance</p>
+          <p className="mt-0.5 text-xs text-slate-400">
+            Time in / out is recorded on the biometric device.
           </p>
         </div>
       </div>
 
-      {error && (
-        <p className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
-      )}
-
-      {/* Today's punches */}
+      {/* Today's punches (from the device) */}
       {(status?.punches ?? []).length > 0 && (
         <div className="mt-5 border-t border-slate-100 pt-4">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">

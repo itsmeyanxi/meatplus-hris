@@ -70,8 +70,9 @@ export default function MyAttendancePage() {
   const cur = view ?? currentMonth;
 
   const [tab, setTab] = useState<"calendar" | "summary" | "requests">("calendar");
-  const [detailDay, setDetailDay] = useState<DailyTimeRecord | null>(null);
+  const [detailDay, setDetailDay] = useState<{ date: string; record: DailyTimeRecord | null } | null>(null);
   const [prefillRequest, setPrefillRequest] = useState<PrefillRequest | null>(null);
+  const canCorrect = me?.user.permissions?.includes("attendance.correct") ?? false;
 
   const handleFileRequest = (type: PrefillRequest["type"], date: string) => {
     setDetailDay(null);
@@ -216,6 +217,7 @@ export default function MyAttendancePage() {
           {cells.map((cell, i) => {
             if (cell === "blank") return <div key={`b${i}`} />;
             const dayNum = i - cells.findIndex((c) => c !== "blank") + 1;
+            const date = ymd(new Date(cur.year, cur.month, dayNum));
             const status: DayStatus = cell?.day_status ?? "no_record";
             const style = STATUS_STYLE[status];
             const label =
@@ -223,9 +225,9 @@ export default function MyAttendancePage() {
             return (
               <div
                 key={i}
-                title={cell ? `${cell.work_date} — ${label}` : style.label}
-                onClick={cell ? () => setDetailDay(cell) : undefined}
-                className={`flex min-h-[64px] flex-col rounded-lg border p-1.5 ${style.cell} ${cell ? "cursor-pointer transition hover:ring-2 hover:ring-slate-900/20" : ""}`}
+                title={`${date} — ${cell ? label : "no record — click to file a request"}`}
+                onClick={() => setDetailDay({ date, record: cell })}
+                className={`flex min-h-[64px] cursor-pointer flex-col rounded-lg border p-1.5 transition hover:ring-2 hover:ring-slate-900/20 ${style.cell}`}
               >
                 <span className="text-xs font-medium text-slate-500">{dayNum}</span>
                 {cell && (
@@ -263,27 +265,51 @@ export default function MyAttendancePage() {
       )}
 
       {detailDay && (
-        <DayDetailDrawer record={detailDay} onClose={() => setDetailDay(null)} onFileRequest={handleFileRequest} />
+        <DayDetailDrawer
+          date={detailDay.date}
+          record={detailDay.record}
+          canCorrect={canCorrect}
+          onClose={() => setDetailDay(null)}
+          onFileRequest={handleFileRequest}
+        />
       )}
     </div>
   );
 }
 
 function DayDetailDrawer({
+  date,
   record,
+  canCorrect,
   onClose,
   onFileRequest,
 }: {
-  record: DailyTimeRecord;
+  date: string;
+  record: DailyTimeRecord | null;
+  canCorrect: boolean;
   onClose: () => void;
-  onFileRequest: (type: "overtime" | "undertime" | "correction" | "official_business", date: string) => void;
+  onFileRequest: (
+    type: "overtime" | "undertime" | "correction" | "official_business" | "certificate",
+    date: string,
+  ) => void;
 }) {
-  const status: DayStatus = record.day_status ?? "no_record";
+  const status: DayStatus = record?.day_status ?? "no_record";
   const style = STATUS_STYLE[status];
-  const heading =
-    status === "holiday" && record.holiday_name ? record.holiday_name : style.label;
+  const heading = !record
+    ? "No record"
+    : status === "holiday" && record.holiday_name
+      ? record.holiday_name
+      : style.label;
   const hm = (v: string | null) =>
     v ? new Date(v).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
+
+  const actions: { type: Parameters<typeof onFileRequest>[0]; label: string }[] = [
+    { type: "certificate", label: "Cert. of Attendance" },
+    { type: "official_business", label: "Off. Business" },
+    { type: "overtime", label: "Overtime" },
+    { type: "undertime", label: "Undertime" },
+  ];
+  if (canCorrect) actions.push({ type: "correction", label: "Correction" });
 
   return (
     <>
@@ -291,7 +317,7 @@ function DayDetailDrawer({
       <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col border-l border-slate-200 bg-white p-6 shadow-2xl">
         <div className="flex items-start justify-between border-b border-slate-100 pb-4">
           <div>
-            <p className="font-mono text-xs font-semibold uppercase tracking-wider text-slate-400">{record.work_date}</p>
+            <p className="font-mono text-xs font-semibold uppercase tracking-wider text-slate-400">{date}</p>
             <div className="mt-1 flex items-center gap-2">
               <span className={`h-2.5 w-2.5 rounded-full ${style.dot}`} />
               <h2 className="text-lg font-bold text-slate-900">{heading}</h2>
@@ -304,24 +330,28 @@ function DayDetailDrawer({
           </button>
         </div>
 
-        <div className="mt-5 space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Detail label="Time in">{hm(record.actual_in)}</Detail>
-            <Detail label="Time out">{hm(record.actual_out)}</Detail>
-            <Detail label="Scheduled">{record.scheduled_in ?? "—"} – {record.scheduled_out ?? "—"}</Detail>
-            <Detail label="Hours worked">{record.hours_worked}</Detail>
-          </div>
-          <div className="grid grid-cols-1 gap-4 border-t border-slate-100 pt-4 sm:grid-cols-3">
-            <Detail label="Late">{record.late_minutes ? `${record.late_minutes}m` : "—"}</Detail>
-            <Detail label="Undertime">{record.undertime_minutes ? `${record.undertime_minutes}m` : "—"}</Detail>
-            <Detail label="Overtime">{record.overtime_minutes ? `${record.overtime_minutes}m` : "—"}</Detail>
-          </div>
-          {record.remarks && (
-            <div className="border-t border-slate-100 pt-4">
-              <Detail label="Remarks">{record.remarks}</Detail>
+        {record ? (
+          <div className="mt-5 space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Detail label="Time in">{hm(record.actual_in)}</Detail>
+              <Detail label="Time out">{hm(record.actual_out)}</Detail>
+              <Detail label="Scheduled">{record.scheduled_in ?? "—"} – {record.scheduled_out ?? "—"}</Detail>
+              <Detail label="Hours worked">{record.hours_worked}</Detail>
             </div>
-          )}
-        </div>
+            <div className="grid grid-cols-1 gap-4 border-t border-slate-100 pt-4 sm:grid-cols-3">
+              <Detail label="Late">{record.late_minutes ? `${record.late_minutes}m` : "—"}</Detail>
+              <Detail label="Undertime">{record.undertime_minutes ? `${record.undertime_minutes}m` : "—"}</Detail>
+              <Detail label="Overtime">{record.overtime_minutes ? `${record.overtime_minutes}m` : "—"}</Detail>
+            </div>
+            {record.remarks && (
+              <div className="border-t border-slate-100 pt-4">
+                <Detail label="Remarks">{record.remarks}</Detail>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="mt-5 text-sm text-slate-500">No attendance record for this day yet.</p>
+        )}
 
         {/* Quick-file actions */}
         <div className="mt-6 border-t border-slate-100 pt-5">
@@ -329,18 +359,11 @@ function DayDetailDrawer({
             File a request for this day
           </p>
           <div className="grid grid-cols-2 gap-2">
-            {(
-              [
-                { type: "correction", label: "Correction" },
-                { type: "overtime", label: "Overtime" },
-                { type: "undertime", label: "Undertime" },
-                { type: "official_business", label: "Off. Business" },
-              ] as const
-            ).map((action) => (
+            {actions.map((action) => (
               <button
                 key={action.type}
                 type="button"
-                onClick={() => onFileRequest(action.type, record.work_date)}
+                onClick={() => onFileRequest(action.type, date)}
                 className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-100 hover:border-slate-300"
               >
                 + {action.label}

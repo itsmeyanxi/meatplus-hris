@@ -9,7 +9,8 @@ import {
   getMyAccessRequests,
   type AccessRequest,
 } from "@/lib/access-requests";
-import { listEmployees } from "@/lib/employees";
+import { listEmployees, getEmployee } from "@/lib/employees";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { inputCls, labelCls } from "@/lib/form-classes";
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -80,11 +81,14 @@ export default function RequestAccessPage() {
     queryFn: () => listEmployees({ perPage: 200 }),
   });
   const employees = empPage?.data ?? [];
+  const [selectedEmpId, setSelectedEmpId] = useState<number | "">("");
 
-  function handleEmpSelect(e: React.ChangeEvent<HTMLSelectElement>) {
-    const id = e.target.value;
+  async function handleEmpSelect(id: number | "") {
+    setSelectedEmpId(id);
     if (!id) return;
-    const emp = employees.find((em) => String(em.id) === id);
+    // Prefer the already-loaded list; fall back to fetching the full record so
+    // employees outside the first page still auto-fill.
+    const emp = employees.find((em) => em.id === id) ?? (await getEmployee(id).catch(() => null));
     if (!emp) return;
     setEmpName(emp.full_name);
     setEmpIdNo(emp.employee_no);
@@ -228,18 +232,13 @@ export default function RequestAccessPage() {
               Look up employee
               <span className="ml-1 font-normal text-slate-400">(optional — auto-fills fields below)</span>
             </label>
-            <select
-              className={`${inputCls} mt-1`}
-              defaultValue=""
-              onChange={handleEmpSelect}
-            >
-              <option value="">— select an employee —</option>
-              {employees.map((em) => (
-                <option key={em.id} value={em.id}>
-                  {em.employee_no} — {em.full_name}
-                </option>
-              ))}
-            </select>
+            <div className="mt-1">
+              <EmployeeSearchSelect
+                value={selectedEmpId}
+                onChange={handleEmpSelect}
+                placeholder="Search employee by name or number…"
+              />
+            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

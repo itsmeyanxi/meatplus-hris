@@ -26,10 +26,26 @@ class CertificateOfAttendanceRequestRequest extends FormRequest
                 Rule::exists('employees', 'id')->where('company_id', $companyId),
             ],
             'work_date' => ['required', 'date'],
-            'missed_punch' => ['required', 'string', 'in:in,out,both'],
+            // Optional now — the employee just states the reason + actual time(s).
+            // Derived from which times are supplied when not sent (see prepareForValidation).
+            'missed_punch' => ['nullable', 'string', 'in:in,out,both'],
             'claimed_time_in' => ['nullable', 'date_format:H:i'],
             'claimed_time_out' => ['nullable', 'date_format:H:i'],
             'reason' => ['required', 'string', 'max:1000'],
         ];
+    }
+
+    /** Derive missed_punch from which claimed times were supplied when the client omits it. */
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('missed_punch')) {
+            return;
+        }
+
+        $in = $this->filled('claimed_time_in');
+        $out = $this->filled('claimed_time_out');
+        $this->merge([
+            'missed_punch' => $in && $out ? 'both' : ($out ? 'out' : 'in'),
+        ]);
     }
 }

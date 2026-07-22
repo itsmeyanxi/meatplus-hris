@@ -10,17 +10,16 @@ import {
   type CertificateOfAttendanceRequest,
 } from "@/lib/approvals";
 
-// ── helpers ───────────────────────────────────────────────────────────────
+// ââ helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 function fmt(iso: string) {
   return new Date(iso + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 }
 function to12h(t: string | null): string {
-  if (!t) return "—";
+  if (!t) return "â";
   const [h, m] = t.split(":").map(Number);
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
-const MISSED_LABEL: Record<string, string> = { in: "Time In", out: "Time Out", both: "Both" };
 
 const STATUS_STYLE: Record<string, string> = {
   pending:   "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
@@ -31,10 +30,10 @@ const STATUS_STYLE: Record<string, string> = {
 const inputCls = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100";
 
 function blankForm(): CertificateOfAttendanceInput {
-  return { work_date: "", missed_punch: "in", claimed_time_in: "", claimed_time_out: "", reason: "" };
+  return { work_date: "", claimed_time_in: "", claimed_time_out: "", reason: "" };
 }
 
-// ── page ──────────────────────────────────────────────────────────────────
+// ââ page ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 export default function CertificatesOfAttendancePage() {
   const qc = useQueryClient();
@@ -48,7 +47,7 @@ export default function CertificatesOfAttendancePage() {
   const employeeId = user?.employee?.id ?? null;
 
   const showQueue = isHR || isApprover;
-  const queueLabel = isHR ? "Pending approval — all employees" : "Pending approval — your department";
+  const queueLabel = isHR ? "Pending approval â all employees" : "Pending approval â your department";
 
   const { data: pendingRequests = [], isLoading: pendingLoading } = useQuery({
     queryKey: ["coa-requests", "pending", isHR ? "all" : "dept"],
@@ -87,7 +86,7 @@ export default function CertificatesOfAttendancePage() {
         <section className="space-y-3">
           <h3 className="text-sm font-semibold text-slate-700">{queueLabel}</h3>
           {pendingLoading ? (
-            <p className="text-sm text-slate-400">Loading…</p>
+            <p className="text-sm text-slate-400">Loadingâ¦</p>
           ) : pendingRequests.length === 0 ? (
             <div className="rounded-xl border border-slate-200 bg-white px-5 py-8 text-center text-sm text-slate-400">
               No pending certificate-of-attendance requests.
@@ -99,8 +98,7 @@ export default function CertificatesOfAttendancePage() {
                   <tr className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <th className="px-4 py-3 text-left">Employee</th>
                     <th className="px-4 py-3 text-left">Work Date</th>
-                    <th className="px-4 py-3 text-left">Missed</th>
-                    <th className="px-4 py-3 text-left">Claimed In/Out</th>
+                    <th className="px-4 py-3 text-left">Time In/Out</th>
                     <th className="px-4 py-3 text-left">Reason</th>
                     <th className="px-4 py-3 text-left">Actions</th>
                   </tr>
@@ -121,7 +119,7 @@ export default function CertificatesOfAttendancePage() {
   );
 }
 
-// ── Stats bar ─────────────────────────────────────────────────────────────
+// ââ Stats bar âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 function StatsBar({ employeeId, isHR, isApprover }: { employeeId: number | null; isHR: boolean; isApprover: boolean }) {
   const { data: all = [] } = useQuery({
@@ -154,7 +152,7 @@ function StatsBar({ employeeId, isHR, isApprover }: { employeeId: number | null;
   );
 }
 
-// ── File COA form ─────────────────────────────────────────────────────────
+// ââ File COA form âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; canManage: boolean; meData: Me | undefined }) {
   const qc = useQueryClient();
@@ -162,9 +160,6 @@ function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; ca
   const [form, setForm] = useState<CertificateOfAttendanceInput>(blankForm());
   const [adminEmployeeId, setAdminEmployeeId] = useState<number>(employeeId);
   const targetEmpId = canManage ? adminEmployeeId : employeeId;
-
-  const needIn  = form.missed_punch === "in"  || form.missed_punch === "both";
-  const needOut = form.missed_punch === "out" || form.missed_punch === "both";
 
   const { data: empPage } = useQuery({
     queryKey: ["employees", { all: true }],
@@ -177,8 +172,8 @@ function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; ca
     mutationFn: () => certificateOfAttendanceApi.create({
       ...form,
       employee_id: targetEmpId,
-      claimed_time_in:  needIn  ? (form.claimed_time_in  || null) : null,
-      claimed_time_out: needOut ? (form.claimed_time_out || null) : null,
+      claimed_time_in:  form.claimed_time_in  || null,
+      claimed_time_out: form.claimed_time_out || null,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["coa-requests"] });
@@ -219,14 +214,14 @@ function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; ca
                     value={adminEmployeeId}
                     onChange={(e) => setAdminEmployeeId(Number(e.target.value))}
                   >
-                    <option value="">Select…</option>
+                    <option value="">Selectâ¦</option>
                     {empPage?.data.map((e) => <option key={e.id} value={e.id}>{e.full_name}</option>)}
                   </select>
                 </div>
               )}
-              <InfoRow label="Name" value={employee?.full_name ?? "—"} />
-              <InfoRow label="Position" value={employee?.position ?? "—"} />
-              <InfoRow label="Account / Department" value={employee?.department ?? "—"} />
+              <InfoRow label="Name" value={employee?.full_name ?? "â"} />
+              <InfoRow label="Position" value={employee?.position ?? "â"} />
+              <InfoRow label="Account / Department" value={employee?.department ?? "â"} />
               <InfoRow label="Date Filed" value={today} />
             </div>
 
@@ -239,29 +234,15 @@ function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; ca
                     onChange={(e) => setForm({ ...form, work_date: e.target.value })} required />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm text-slate-700">Missed Punch:</label>
-                  <select className={inputCls} value={form.missed_punch}
-                    onChange={(e) => setForm({ ...form, missed_punch: e.target.value as CertificateOfAttendanceInput["missed_punch"] })}>
-                    <option value="in">Time In</option>
-                    <option value="out">Time Out</option>
-                    <option value="both">Both</option>
-                  </select>
+                  <label className="mb-1 block text-sm text-slate-700">Time In:</label>
+                  <input type="time" className={inputCls} value={form.claimed_time_in ?? ""}
+                    onChange={(e) => setForm({ ...form, claimed_time_in: e.target.value })} />
                 </div>
-                <div className="hidden sm:block" />
-                {needIn && (
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-700">Claimed Time In:</label>
-                    <input type="time" className={inputCls} value={form.claimed_time_in ?? ""}
-                      onChange={(e) => setForm({ ...form, claimed_time_in: e.target.value })} required />
-                  </div>
-                )}
-                {needOut && (
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-700">Claimed Time Out:</label>
-                    <input type="time" className={inputCls} value={form.claimed_time_out ?? ""}
-                      onChange={(e) => setForm({ ...form, claimed_time_out: e.target.value })} required />
-                  </div>
-                )}
+                <div>
+                  <label className="mb-1 block text-sm text-slate-700">Time Out:</label>
+                  <input type="time" className={inputCls} value={form.claimed_time_out ?? ""}
+                    onChange={(e) => setForm({ ...form, claimed_time_out: e.target.value })} />
+                </div>
               </div>
 
               <div>
@@ -280,7 +261,7 @@ function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; ca
           <div className="flex justify-end border-t border-slate-100 px-6 py-4">
             <button type="submit" disabled={create.isPending}
               className="rounded-lg bg-slate-900 px-8 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60">
-              {create.isPending ? "Submitting…" : "Submit"}
+              {create.isPending ? "Submittingâ¦" : "Submit"}
             </button>
           </div>
         </form>
@@ -298,7 +279,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-// ── Approver row ──────────────────────────────────────────────────────────
+// ââ Approver row ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 function ApproverRow({ request: r, onDone }: { request: CertificateOfAttendanceRequest; onDone: () => void }) {
   const [remarks, setRemarks] = useState("");
@@ -315,7 +296,6 @@ function ApproverRow({ request: r, onDone }: { request: CertificateOfAttendanceR
           <p className="text-xs text-slate-500">{r.employee?.employee_no}</p>
         </td>
         <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">{fmt(r.work_date)}</td>
-        <td className="px-4 py-3 text-xs text-slate-600">{MISSED_LABEL[r.missed_punch]}</td>
         <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-600">{to12h(r.claimed_time_in)} / {to12h(r.claimed_time_out)}</td>
         <td className="max-w-xs px-4 py-3"><span className="line-clamp-2 text-xs text-slate-600">{r.reason}</span></td>
         <td className="px-4 py-3">
@@ -331,7 +311,7 @@ function ApproverRow({ request: r, onDone }: { request: CertificateOfAttendanceR
             <div className="flex items-center gap-2">
               <input
                 className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-400"
-                placeholder={acting === "reject" ? "Rejection reason (required)…" : "Remarks (optional)…"}
+                placeholder={acting === "reject" ? "Rejection reason (required)â¦" : "Remarks (optional)â¦"}
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
               />
@@ -340,7 +320,7 @@ function ApproverRow({ request: r, onDone }: { request: CertificateOfAttendanceR
                 onClick={() => acting === "approve" ? approve.mutate() : reject.mutate()}
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50 ${acting === "approve" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}
               >
-                {approve.isPending || reject.isPending ? "Saving…" : acting === "approve" ? "Confirm approve" : "Confirm reject"}
+                {approve.isPending || reject.isPending ? "Savingâ¦" : acting === "approve" ? "Confirm approve" : "Confirm reject"}
               </button>
               <button onClick={() => { setActing(null); setRemarks(""); }} className="text-xs text-slate-400 hover:text-slate-700">Cancel</button>
             </div>
@@ -351,7 +331,7 @@ function ApproverRow({ request: r, onDone }: { request: CertificateOfAttendanceR
   );
 }
 
-// ── My history ────────────────────────────────────────────────────────────
+// ââ My history ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 function MyHistory({ requests, isLoading }: { requests: CertificateOfAttendanceRequest[]; isLoading: boolean }) {
   const qc = useQueryClient();
@@ -360,7 +340,7 @@ function MyHistory({ requests, isLoading }: { requests: CertificateOfAttendanceR
     onSuccess: () => qc.invalidateQueries({ queryKey: ["coa-requests"] }),
   });
 
-  if (isLoading) return <p className="text-sm text-slate-400">Loading…</p>;
+  if (isLoading) return <p className="text-sm text-slate-400">Loadingâ¦</p>;
   if (requests.length === 0) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white px-5 py-10 text-center text-sm text-slate-400">
@@ -377,8 +357,7 @@ function MyHistory({ requests, isLoading }: { requests: CertificateOfAttendanceR
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <th className="px-4 py-3 text-left">Work Date</th>
-              <th className="px-4 py-3 text-left">Missed</th>
-              <th className="px-4 py-3 text-left">Claimed In/Out</th>
+              <th className="px-4 py-3 text-left">Time In/Out</th>
               <th className="px-4 py-3 text-left">Reason</th>
               <th className="px-4 py-3 text-left">Status</th>
               <th className="px-4 py-3 text-left"></th>
@@ -388,7 +367,6 @@ function MyHistory({ requests, isLoading }: { requests: CertificateOfAttendanceR
             {requests.map((r) => (
               <tr key={r.id} className="hover:bg-slate-50/60">
                 <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">{fmt(r.work_date)}</td>
-                <td className="px-4 py-3 text-xs text-slate-600">{MISSED_LABEL[r.missed_punch]}</td>
                 <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-600">{to12h(r.claimed_time_in)} / {to12h(r.claimed_time_out)}</td>
                 <td className="max-w-xs px-4 py-3"><span className="line-clamp-2 text-xs text-slate-600">{r.reason}</span></td>
                 <td className="px-4 py-3">

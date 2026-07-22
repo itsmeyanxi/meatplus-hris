@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { getMe } from "@/lib/auth";
 import { StatusPill } from "@/components/approvals/StatusPill";
 import { AppButton } from "@/components/ui";
 import {
@@ -25,7 +26,7 @@ const TYPES = [
 type ReqType = (typeof TYPES)[number]["key"];
 
 export type PrefillRequest = {
-  type: "overtime" | "undertime" | "correction" | "official_business";
+  type: "overtime" | "undertime" | "correction" | "official_business" | "certificate";
   date: string;
 };
 
@@ -68,11 +69,17 @@ export function MyAttendanceRequests({
   const [form, setForm] = useState<FormBag>(EMPTY);
   const [error, setError] = useState<string | null>(null);
 
+  // Correction is an HR/timekeeper tool (fixing someone's record), not a regular
+  // self-service request — hide the tab unless the user may correct attendance.
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const canCorrect = me?.user.permissions?.includes("attendance.correct") ?? false;
+  const visibleTypes = TYPES.filter((t) => t.key !== "correction" || canCorrect);
+
   // When a prefill arrives, switch type + open form with date pre-filled.
   useEffect(() => {
     if (!prefill) return;
     setType(prefill.type as ReqType);
-    const dateKey = prefill.type === "correction" ? "work_date" : "date";
+    const dateKey = prefill.type === "correction" || prefill.type === "certificate" ? "work_date" : "date";
     setForm({ [dateKey]: prefill.date });
     setIsAdding(true);
     onPrefillUsed?.();
@@ -113,7 +120,7 @@ export function MyAttendanceRequests({
     <div className="space-y-5">
       {/* Type selector */}
       <div className="flex flex-wrap gap-2">
-        {TYPES.map((t) => (
+        {visibleTypes.map((t) => (
           <button
             key={t.key}
             onClick={() => {
@@ -233,18 +240,10 @@ function RequestFields({ type, form, set }: { type: ReqType; form: FormBag; set:
       return (
         <>
           {field("Work date", "work_date", "date")}
-          <div>
-            <label className={labelCls}>Missed punch *</label>
-            <select className={inputCls} value={form.missed_punch ?? ""} onChange={(e) => set("missed_punch", e.target.value)} required>
-              <option value="">Select…</option>
-              <option value="in">Time in</option>
-              <option value="out">Time out</option>
-              <option value="both">Both</option>
-            </select>
-          </div>
-          {field("Claimed time in", "claimed_time_in", "time", false)}
-          {field("Claimed time out", "claimed_time_out", "time", false)}
-          {reason()}
+          <div className="hidden sm:block" aria-hidden />
+          {field("Time in", "claimed_time_in", "time", false)}
+          {field("Time out", "claimed_time_out", "time", false)}
+          {reason("reason", "Reason (e.g. biometric not working, field work, forgot to scan)")}
         </>
       );
     case "correction":
@@ -277,7 +276,7 @@ function submitRequest(type: ReqType, f: FormBag): Promise<unknown> {
     case "official_business":
       return officialBusinessApi.create({ date: f.date, start_time: t(f.start_time), end_time: t(f.end_time), location: f.location, purpose: f.purpose });
     case "certificate":
-      return certificateOfAttendanceApi.create({ work_date: f.work_date, missed_punch: f.missed_punch as "in" | "out" | "both", claimed_time_in: t(f.claimed_time_in), claimed_time_out: t(f.claimed_time_out), reason: f.reason });
+      return certificateOfAttendanceApi.create({ work_date: f.work_date, claimed_time_in: t(f.claimed_time_in), claimed_time_out: t(f.claimed_time_out), reason: f.reason });
     case "correction":
       return correctionsApi.create({ work_date: f.work_date, field_to_correct: f.field_to_correct, new_value: f.new_value, reason: f.reason });
   }
@@ -292,7 +291,7 @@ function summarize(type: ReqType, r: Record<string, unknown>): string {
     case "official_business":
       return `${s("date")} · ${s("location")}`;
     case "certificate":
-      return `${s("work_date")} · missed ${s("missed_punch")}`;
+      return `${s("work_date")} · ${s("claimed_time_in") || "—"}–${s("claimed_time_out") || "—"}`;
     case "correction":
       return `${s("work_date")} · ${s("field_to_correct")} → ${s("new_value")}`;
   }

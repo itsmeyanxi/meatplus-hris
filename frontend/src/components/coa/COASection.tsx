@@ -267,10 +267,10 @@ function CreateForm({
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700">
-              {PUNCH_LABELS[form.missed_punch]} <span className="font-normal text-slate-400">(Required)</span>
+              {PUNCH_LABELS[form.missed_punch ?? "both"]} <span className="font-normal text-slate-400">(Required)</span>
             </label>
             <textarea className={inputCls} rows={2}
-              placeholder={`Explain the issue with your ${PUNCH_LABELS[form.missed_punch].toLowerCase()}…`}
+              placeholder={`Explain the issue with your ${PUNCH_LABELS[form.missed_punch ?? "both"].toLowerCase()}…`}
               value={details} onChange={(e) => setDetails(e.target.value)} required />
           </div>
           <div>

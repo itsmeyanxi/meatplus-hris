@@ -80,7 +80,7 @@ export type CertificateOfAttendanceRequest = BaseRequest & {
 export type CertificateOfAttendanceInput = {
   employee_id?: number;
   work_date: string;
-  missed_punch: "in" | "out" | "both";
+  missed_punch?: "in" | "out" | "both";
   claimed_time_in?: string | null;
   claimed_time_out?: string | null;
   reason: string;
