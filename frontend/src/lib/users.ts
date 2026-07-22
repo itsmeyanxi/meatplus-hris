@@ -23,7 +23,8 @@ export type UserItem = {
   email: string;
   is_active: boolean;
   last_login_at: string | null;
-  employee: { id: number; employee_no: string; full_name: string } | null;
+  employee: { id: number; employee_no: string; full_name: string; position?: string | null } | null;
+  suggested_role?: Role | null;
   roles: Role[];
 };
 

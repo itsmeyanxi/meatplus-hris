@@ -19,7 +19,13 @@ class UserResource extends JsonResource
                 'id' => $this->employee->id,
                 'employee_no' => $this->employee->employee_no,
                 'full_name' => $this->employee->full_name,
+                'position' => $this->employee->relationLoaded('position') ? $this->employee->position?->title : null,
             ] : null),
+            // A hint (from the linked employee's job title) HR can one-click apply
+            // when assigning access. Never auto-assigned; sensitive roles excluded.
+            'suggested_role' => $this->whenLoaded('employee', fn () => $this->employee
+                ? app(\App\Domain\Identity\Services\RoleSuggester::class)->suggest($this->employee)
+                : null),
             'roles' => $this->getRoleNames(),
             'created_at' => $this->created_at,
         ];

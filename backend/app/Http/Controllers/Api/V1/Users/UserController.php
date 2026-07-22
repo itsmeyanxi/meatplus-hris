@@ -22,7 +22,7 @@ class UserController extends Controller
         $companyId = $request->user()->active_company_id;
 
         $q = User::query()
-            ->with(['employee:id,employee_no,first_name,last_name,user_id'])
+            ->with(['employee:id,employee_no,first_name,last_name,user_id,position_id', 'employee.position:id,title'])
             ->whereHas('companies', fn ($c) => $c->where('companies.id', $companyId))
             ->orderBy('name');
 
@@ -74,7 +74,7 @@ class UserController extends Controller
         abort_unless($request->user()->can('user.manage'), 403);
         $this->ensureSameCompany($request, $user);
 
-        return new UserResource($user->load('employee'));
+        return new UserResource($user->load('employee.position'));
     }
 
     public function update(UpdateUserRequest $request, User $user): UserResource
