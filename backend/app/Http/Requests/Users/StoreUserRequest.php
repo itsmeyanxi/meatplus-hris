@@ -21,7 +21,7 @@ class StoreUserRequest extends FormRequest
             // 8-20 chars with at least one lowercase, uppercase, number and symbol.
             'password' => ['required', 'string', 'max:20', Password::min(8)->mixedCase()->numbers()->symbols()],
             'role' => ['required', 'string', Rule::in([
-                'hr_admin', 'it_admin', 'it_staff', 'payroll_officer', 'dept_head', 'employee',
+                'hr_admin', 'hr_officer', 'it_admin', 'it_staff', 'payroll_officer', 'dept_head', 'employee',
                 'supervisor', 'team_lead', 'dept_admin', 'transport_access',
                 'sales_employee', 'timekeeper', 'hr_coordinator', 'garahe_teamlead',
             ]), $this->blockItAdminEscalation()],
