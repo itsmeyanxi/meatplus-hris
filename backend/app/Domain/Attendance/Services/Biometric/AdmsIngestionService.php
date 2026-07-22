@@ -58,7 +58,17 @@ class AdmsIngestionService
      */
     public function receive(string $sn, string $table, string $body): int
     {
-        if (strtoupper($table) !== 'ATTLOG' || trim($body) === '') {
+        $table = strtoupper($table);
+
+        // The device's enrolled-user list — captured so we can reconcile each
+        // person's on-device User ID with their HRIS biometric_user_id.
+        if ($table === 'USERINFO' && trim($body) !== '') {
+            $this->captureUserInfo($sn, $body);
+
+            return 0;
+        }
+
+        if ($table !== 'ATTLOG' || trim($body) === '') {
             return 0;
         }
 
@@ -170,6 +180,45 @@ class AdmsIngestionService
         $device->forceFill(['last_synced_at' => now(), 'last_event_at' => now()])->save();
 
         return $inserted;
+    }
+
+    /**
+     * Parse a pushed USERINFO table (the device's enrolled users) and persist the
+     * on-device User ID → Name map to storage/app/device_users/{serial}.json so
+     * an admin can reconcile it against HRIS biometric IDs.
+     */
+    private function captureUserInfo(string $sn, string $body): void
+    {
+        $users = [];
+        foreach (preg_split('/\r\n|\n|\r/', trim($body)) as $line) {
+            if (stripos($line, 'PIN=') === false) {
+                continue;
+            }
+            $pin = null;
+            $name = null;
+            foreach (preg_split('/\t/', $line) as $part) {
+                if (preg_match('/(?:USER\s+)?PIN=(.*)/i', $part, $m)) {
+                    $pin = trim($m[1]);
+                } elseif (preg_match('/Name=(.*)/i', $part, $m)) {
+                    $name = trim($m[1]);
+                }
+            }
+            if ($pin !== null && $pin !== '') {
+                $users[$pin] = $name;
+            }
+        }
+
+        if (! $users) {
+            return;
+        }
+
+        $dir = storage_path('app/device_users');
+        if (! is_dir($dir)) {
+            mkdir($dir, 0775, true);
+        }
+        $file = $dir.'/'.preg_replace('/[^A-Za-z0-9_-]/', '', $sn).'.json';
+        $existing = is_file($file) ? (json_decode(file_get_contents($file), true) ?: []) : [];
+        file_put_contents($file, json_encode(array_replace($existing, $users), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     }
 
     /** Find the device by serial, registering it on first contact. */
