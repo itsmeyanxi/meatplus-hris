@@ -2,9 +2,11 @@
 
 namespace App\Domain\Attendance\Services;
 
+use App\Domain\Attendance\Models\CertificateOfAttendanceRequest;
 use App\Domain\Attendance\Models\DailyTimeRecord;
 use App\Domain\Attendance\Models\EmployeeSchedule;
 use App\Domain\Attendance\Models\Holiday;
+use App\Domain\Attendance\Models\OfficialBusinessRequest;
 use App\Domain\Attendance\Models\OvertimeRequest;
 use App\Domain\Attendance\Models\ShiftAdjustment;
 use App\Domain\Attendance\Models\TimeLog;
@@ -82,6 +84,31 @@ class DtrComputer
             ->get()
             ->keyBy(fn (OvertimeRequest $o) => $o->date->toDateString());
 
+        // Approved Certificate of Attendance — certifies presence for a single day.
+        $coas = CertificateOfAttendanceRequest::query()
+            ->where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])
+            ->get()
+            ->keyBy(fn (CertificateOfAttendanceRequest $c) => $c->work_date->toDateString());
+
+        // Approved Official Business — employee out on business, expanded across its range.
+        $obByDate = [];
+        $obs = OfficialBusinessRequest::query()
+            ->where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->where('date', '<=', $to->toDateString())
+            ->where(function ($q) use ($from) {
+                $q->whereNull('date_to')->orWhere('date_to', '>=', $from->toDateString());
+            })
+            ->get();
+        foreach ($obs as $ob) {
+            $end = $ob->date_to ?? $ob->date;
+            for ($d = CarbonImmutable::parse($ob->date); $d->lte(CarbonImmutable::parse($end)); $d = $d->addDay()) {
+                $obByDate[$d->toDateString()] = $ob;
+            }
+        }
+
         $results = collect();
 
         for ($day = $from; $day->lte($to); $day = $day->addDay()) {
@@ -105,6 +132,7 @@ class DtrComputer
             $dtr = $this->computeDay(
                 $employee, $day, $scheduleDay, $holiday, $dayLogs, $adjustment,
                 $leaveByDate[$dateStr] ?? null, $overtimes->get($dateStr),
+                $coas->get($dateStr), $obByDate[$dateStr] ?? null,
             );
 
             $row = DailyTimeRecord::updateOrCreate(
@@ -243,7 +271,13 @@ class DtrComputer
         ?ShiftAdjustment $adjustment = null,
         ?LeaveApplication $leave = null,
         ?OvertimeRequest $overtime = null,
+        ?CertificateOfAttendanceRequest $coa = null,
+        ?OfficialBusinessRequest $ob = null,
     ): array {
+        // Only employees on a regular schedule are absence-tracked. Contractual /
+        // no-schedule staff have no $scheduleDay for the day and are never marked
+        // absent (they're a separate group whose attendance isn't schedule-based).
+        $hasSchedule = $scheduleDay !== null || (bool) $adjustment;
         $isRestDay = (bool) ($scheduleDay?->is_rest_day);
         $hasAnyLogs = $dayLogs->isNotEmpty();
 
@@ -320,7 +354,18 @@ class DtrComputer
         // but is flagged on-leave for display.
         $onLeave = (bool) $leave;
         $leavePaid = $onLeave && (bool) ($leave->leaveType?->is_paid ?? true);
-        $isAbsent = ! $hasAnyLogs && ! $isRestDay && ! $holiday && ! $leavePaid;
+
+        // Certificate of Attendance or Official Business certifies presence: the day
+        // is excused (not absent) and, with no punch, credited the scheduled hours.
+        $excused = (bool) ($coa || $ob);
+        if ($excused && ! $hasAnyLogs && $requiredHours > 0) {
+            $hoursWorked = $requiredHours;
+        }
+
+        // Absent = a SCHEDULED workday with no attendance and nothing that excuses it
+        // (rest day, holiday, paid leave, COA, or OB). Unscheduled/contractual staff
+        // are never absent.
+        $isAbsent = $hasSchedule && ! $hasAnyLogs && ! $isRestDay && ! $holiday && ! $leavePaid && ! $excused;
 
         return [
             'company_id' => $employee->company_id,
