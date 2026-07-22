@@ -60,6 +60,19 @@ class PermissionsSeeder extends Seeder
             ],
             // IT is the top-level administrator: full access to every function of the system.
             'it_admin' => $permissions,
+            // Regular IT employee: day-to-day tech support — manage biometric
+            // devices, help users with their accounts (invite / reset / provision),
+            // view attendance to troubleshoot, and handle IT access requests. NO
+            // payroll, confidential data, company/role management, or the it_admin
+            // global super-admin bypass. Scoped to their own company like any user.
+            'it_staff' => [
+                'employee.view',
+                'attendance.view', 'attendance.view.any',
+                'device.manage',
+                'user.manage',
+                'audit.view',
+                'access_request.view', 'access_request.approve.it',
+            ],
             'payroll_officer' => [
                 'employee.view', 'attendance.view',
                 'leave.view',

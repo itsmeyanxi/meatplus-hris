@@ -22,7 +22,7 @@ class UpdateUserRequest extends FormRequest
             'is_active' => ['sometimes', 'boolean'],
             'roles'   => ['sometimes', 'array', 'min:1'],
             'roles.*' => ['string', Rule::in([
-                'hr_admin', 'it_admin', 'payroll_officer', 'dept_head', 'employee',
+                'hr_admin', 'it_admin', 'it_staff', 'payroll_officer', 'dept_head', 'employee',
                 'supervisor', 'team_lead', 'dept_admin', 'transport_access',
                 'sales_employee', 'timekeeper', 'hr_coordinator', 'garahe_teamlead',
             ]), $this->blockItAdminEscalation()],
