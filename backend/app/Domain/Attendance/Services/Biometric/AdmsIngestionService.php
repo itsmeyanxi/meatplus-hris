@@ -105,12 +105,13 @@ class AdmsIngestionService
 
             $pin = trim($cols[0]);
             $timeStr = trim($cols[1]);
-            $verify    = isset($cols[2]) ? trim($cols[2]) : '';   // biometric method (0=pw,1=fp,4=face,255=other)
-            $statusCol = isset($cols[3]) ? trim($cols[3]) : null; // attendance status col — null when absent
+            // ZKTeco ATTLOG columns: col[2] = attendance status (0=in, 1=out,
+            // 2=break-out, 3=break-in, 4=OT-in, 5=OT-out); col[3] = verify method
+            // (1=fingerprint, 15=face, …). (These were previously swapped, which is
+            // why a device "OUT" was being ignored.)
+            $statusCode = isset($cols[2]) ? trim($cols[2]) : '';
+            $verify     = isset($cols[3]) ? trim($cols[3]) : '';
 
-            // IMPORTANT: $verify must NOT be used as a status fallback.
-            // Verify codes (1=fingerprint) collide with status codes (1=out),
-            // causing fingerprint check-ins to be recorded as outs.
             if ($pin === '' || $timeStr === '') {
                 continue;
             }
@@ -132,30 +133,23 @@ class AdmsIngestionService
                 ->whereDate('logged_at', $date)
                 ->count();
 
-            // Determine direction.
-            // Only trust the device status code for explicit check-out/break/OT codes (1,2,3,5).
-            // Status 0 and 4 both mean "in", so they're safe to trust too.
-            // However, some ZKTeco firmware sends status=1 for ALL punches regardless of direction
-            // (device work-code button stuck on "Out"). To guard against this, we only use the
-            // device status when it makes contextual sense: if every punch so far today for this
-            // employee already has a stored direction, trust the alternating count instead.
-            // Simple rule: always use alternating count — it is reliable for standard in/out
-            // terminals where employees scan once per event.
-            $direction = $dayCount[$employee->id][$date] % 2 === 0 ? 'in' : 'out';
-
-            // Keep $verify in the idempotency key (not $statusCol) to stay consistent
-            // with records already stored under the 3-column format.
-            $status = $statusCol ?? $verify;
+            // Direction: when the employee explicitly marks an OUT / break / OT-out
+            // on the device (status 1,2,3,5) we TRUST it — that is the whole point of
+            // the in/out selection. For a plain tap (status 0/4, the device default)
+            // we fall back to the alternating in/out count.
+            $direction = in_array($statusCode, ['1', '2', '3', '5'], true)
+                ? self::STATUS_MAP[$statusCode]
+                : ($dayCount[$employee->id][$date] % 2 === 0 ? 'in' : 'out');
 
             $log = TimeLog::firstOrCreate(
-                ['device_id' => $deviceKey, 'source_event_id' => "{$pin}|{$timeStr}|{$status}"],
+                ['device_id' => $deviceKey, 'source_event_id' => "{$pin}|{$timeStr}|{$verify}"],
                 [
                     'company_id' => $employee->company_id,
                     'employee_id' => $employee->id,
                     'logged_at' => $ts->toDateTimeString(),
                     'direction' => $direction,
                     'source' => 'biometric',
-                    'metadata' => ['device_id' => $device->id, 'pin' => $pin, 'verify' => $verify, 'status' => $status, 'raw' => $line],
+                    'metadata' => ['device_id' => $device->id, 'pin' => $pin, 'verify' => $verify, 'status' => $statusCode, 'raw' => $line],
                 ],
             );
 
