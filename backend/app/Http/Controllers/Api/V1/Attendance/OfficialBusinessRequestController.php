@@ -49,6 +49,8 @@ class OfficialBusinessRequestController extends Controller
         $req = OfficialBusinessRequest::create($data);
         $req->load(['employee:id,employee_no,first_name,last_name']);
 
+        $this->notifyAttendanceApprovers($req, 'Official Business request', "/attendance/requests/official-business/{$req->id}");
+
         return (new OfficialBusinessRequestResource($req))->response()->setStatusCode(201);
     }
 

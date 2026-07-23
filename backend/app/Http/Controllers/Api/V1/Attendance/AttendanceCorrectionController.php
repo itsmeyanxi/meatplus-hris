@@ -53,6 +53,8 @@ class AttendanceCorrectionController extends Controller
         $req = AttendanceCorrection::create($data);
         $req->load(['employee:id,employee_no,first_name,last_name']);
 
+        $this->notifyAttendanceApprovers($req, 'Attendance correction', "/attendance/requests/corrections/{$req->id}");
+
         return (new AttendanceCorrectionResource($req))->response()->setStatusCode(201);
     }
 

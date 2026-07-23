@@ -49,6 +49,12 @@ class CertificateOfAttendanceRequestController extends Controller
         $req = CertificateOfAttendanceRequest::create($data);
         $req->load(['employee:id,employee_no,first_name,last_name']);
 
+        $this->notifyAttendanceApprovers(
+            $req,
+            'Certificate of Attendance',
+            "/attendance/requests/certificate-of-attendance/{$req->id}",
+        );
+
         return (new CertificateOfAttendanceRequestResource($req))->response()->setStatusCode(201);
     }
 

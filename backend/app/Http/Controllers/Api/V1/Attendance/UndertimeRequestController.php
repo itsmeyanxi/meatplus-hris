@@ -49,6 +49,8 @@ class UndertimeRequestController extends Controller
         $req = UndertimeRequest::create($data);
         $req->load(['employee:id,employee_no,first_name,last_name']);
 
+        $this->notifyAttendanceApprovers($req, 'Undertime request', "/attendance/requests/undertime/{$req->id}");
+
         return (new UndertimeRequestResource($req))->response()->setStatusCode(201);
     }
 

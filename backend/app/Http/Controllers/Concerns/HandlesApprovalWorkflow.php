@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Concerns;
 
 use App\Domain\HRIS\Models\Employee;
 use App\Models\User;
+use App\Notifications\AttendanceRequestAwaitingApproval;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -173,6 +176,73 @@ trait HandlesApprovalWorkflow
         }
 
         abort(403, 'You do not have permission to cancel this request.');
+    }
+
+    /**
+     * Notify everyone who can act on a freshly-filed attendance request: the
+     * subject's direct manager, their department head, and the global attendance
+     * approvers (holders of attendance.approve.any / attendance.manage). The
+     * manager and head are resolved without the company scope, so a cross-company
+     * manager (e.g. the IT head) is reached no matter which company they sit in.
+     * The filer never notifies themselves. Failures here must never break filing.
+     */
+    protected function notifyAttendanceApprovers(Model $model, string $kind, string $url): void
+    {
+        try {
+            $subject = Employee::withoutGlobalScopes()
+                ->where('id', $model->employee_id)
+                ->with('department:id,head_employee_id')
+                ->first(['id', 'user_id', 'manager_employee_id', 'department_id', 'first_name', 'last_name']);
+            if (! $subject) {
+                return;
+            }
+
+            $recipientIds = collect();
+
+            foreach ([$subject->manager_employee_id, $subject->department?->head_employee_id] as $empId) {
+                if ($empId) {
+                    $uid = Employee::withoutGlobalScopes()->where('id', $empId)->value('user_id');
+                    if ($uid) {
+                        $recipientIds->push($uid);
+                    }
+                }
+            }
+
+            // Global approvers: any user whose roles grant blanket attendance approval.
+            $roleIds = DB::table('role_has_permissions as rp')
+                ->join('permissions as p', 'p.id', '=', 'rp.permission_id')
+                ->whereIn('p.name', ['attendance.approve.any', 'attendance.manage'])
+                ->pluck('rp.role_id');
+            $roleUserIds = DB::table('model_has_roles')
+                ->where('model_type', User::class)
+                ->whereIn('role_id', $roleIds)
+                ->pluck('model_id');
+
+            $filerId = $model->filed_by_user_id ?? $subject->user_id;
+            $users = User::whereIn('id', $recipientIds->merge($roleUserIds)->unique()->filter()->values())
+                ->where('is_active', true)
+                ->when($filerId, fn ($q) => $q->where('id', '!=', $filerId))
+                ->get();
+
+            // Different request types name their date column differently
+            // (COA/correction: work_date; OT/OB/UT: date).
+            $dateVal = $model->work_date ?? $model->date ?? null;
+            $dateStr = $dateVal instanceof \DateTimeInterface
+                ? $dateVal->format('Y-m-d')
+                : ($dateVal ? (string) $dateVal : null);
+
+            if ($users->isNotEmpty()) {
+                Notification::send($users, new AttendanceRequestAwaitingApproval(
+                    $kind,
+                    trim(($subject->first_name ?? '').' '.($subject->last_name ?? '')),
+                    $dateStr,
+                    $url,
+                    $model->id,
+                ));
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**

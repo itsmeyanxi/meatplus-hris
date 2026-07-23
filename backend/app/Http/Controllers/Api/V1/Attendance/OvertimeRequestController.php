@@ -88,6 +88,8 @@ class OvertimeRequestController extends Controller
         $req = OvertimeRequest::create($data);
         $req->load(['employee:id,employee_no,first_name,last_name']);
 
+        $this->notifyAttendanceApprovers($req, 'Overtime request', "/attendance/requests/overtime/{$req->id}");
+
         return (new OvertimeRequestResource($req))->response()->setStatusCode(201);
     }
 
