@@ -20,6 +20,12 @@ use Illuminate\Support\Collection;
 class DtrComputer
 {
     /**
+     * Minutes of allowance after the scheduled start before an arrival counts as
+     * late. Within it the employee is on time; past it the full lateness applies.
+     */
+    public const LATE_GRACE_MINUTES = 15;
+
+    /**
      * Compute (or recompute) DailyTimeRecords for an employee across [from, to].
      * Returns the upserted DTR rows. Locked rows are skipped.
      */
@@ -343,6 +349,11 @@ class DtrComputer
             [$schedIn, $schedOut] = $this->scheduledWindow($day->toDateString(), $scheduledIn, $scheduledOut);
             if ($schedIn && ! $isRestDay) {
                 $lateMinutes = max(0, (int) round($schedIn->diffInMinutes($actualIn, false)));
+                // Grace period: arriving within the allowance is not late at all.
+                // Past it, the full lateness from the scheduled start counts.
+                if ($lateMinutes <= self::LATE_GRACE_MINUTES) {
+                    $lateMinutes = 0;
+                }
             }
             if ($schedOut && ! $isRestDay) {
                 $undertimeMinutes = max(0, (int) round($actualOut->diffInMinutes($schedOut, false)));
