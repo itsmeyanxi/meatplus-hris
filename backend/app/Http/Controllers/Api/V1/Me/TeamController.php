@@ -8,45 +8,66 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * The signed-in user's team — their direct reports. This is the department
- * head / supervisor view; returns an empty list for accounts that manage no one.
+ * The signed-in user's team view. Everyone with an employee profile sees
+ * something here:
+ *   - manager : who they report to (if any)
+ *   - reports : their direct reports (the manager/supervisor view)
+ *   - peers   : teammates who report to the same manager
  *
- * Direct reports are a personal relationship, so this deliberately IGNORES the
+ * Reporting is a personal relationship, so this deliberately IGNORES the
  * company scope: an org-wide manager (e.g. the IT head) can have reports in
- * several companies and should see all of them from one login, no matter which
+ * several companies and should see them all from one login, no matter which
  * company is currently active.
  */
 class TeamController extends Controller
 {
     public function __invoke(Request $request): JsonResponse
     {
-        // The manager's own record may live in a different company than the one
-        // they're currently viewing, so resolve it without the company scope.
-        $employee = Employee::withoutGlobalScopes()
+        $me = Employee::withoutGlobalScopes()
             ->where('user_id', $request->user()->id)
             ->first();
 
-        if (! $employee) {
-            return response()->json(['data' => []]);
+        if (! $me) {
+            return response()->json(['data' => ['manager' => null, 'reports' => [], 'peers' => []]]);
         }
 
-        $reports = Employee::withoutGlobalScopes()
-            ->where('manager_employee_id', $employee->id)
-            ->with(['position:id,title', 'department:id,name', 'company:id,code,trade_name'])
-            ->orderBy('company_id')
-            ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->get()
-            ->map(fn (Employee $e) => [
-                'id' => $e->id,
-                'employee_no' => $e->employee_no,
-                'full_name' => trim(($e->first_name ?? '').' '.($e->last_name ?? '')),
-                'position' => $e->position?->title,
-                'department' => $e->department?->name,
-                'company' => $e->company?->code ?? $e->company?->trade_name,
-                'is_active' => $e->is_active,
-            ]);
+        $with = ['position:id,title', 'department:id,name', 'company:id,code,trade_name'];
+        $map = fn (Employee $e) => [
+            'id' => $e->id,
+            'employee_no' => $e->employee_no,
+            'full_name' => trim(($e->first_name ?? '').' '.($e->last_name ?? '')),
+            'position' => $e->position?->title,
+            'department' => $e->department?->name,
+            'company' => $e->company?->code ?? $e->company?->trade_name,
+            'is_active' => $e->is_active,
+        ];
 
-        return response()->json(['data' => $reports]);
+        // People who report to me.
+        $reports = Employee::withoutGlobalScopes()
+            ->where('manager_employee_id', $me->id)
+            ->with($with)
+            ->orderBy('company_id')->orderBy('last_name')->orderBy('first_name')
+            ->get()->map($map)->values();
+
+        // Who I report to, and the teammates I share that manager with.
+        $manager = null;
+        $peers = collect();
+        if ($me->manager_employee_id) {
+            $mgr = Employee::withoutGlobalScopes()->with($with)->find($me->manager_employee_id);
+            $manager = $mgr ? $map($mgr) : null;
+
+            $peers = Employee::withoutGlobalScopes()
+                ->where('manager_employee_id', $me->manager_employee_id)
+                ->where('id', '<>', $me->id)
+                ->with($with)
+                ->orderBy('company_id')->orderBy('last_name')->orderBy('first_name')
+                ->get()->map($map)->values();
+        }
+
+        return response()->json(['data' => [
+            'manager' => $manager,
+            'reports' => $reports,
+            'peers' => $peers,
+        ]]);
     }
 }
