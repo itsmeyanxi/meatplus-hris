@@ -18,7 +18,11 @@ $backendDir  = Join-Path $root 'backend'
 $frontendDir = Join-Path $root 'frontend'
 $logDir      = Join-Path $root 'logs'
 $backendPort  = 8000
-$frontendPort = 3001
+# Next.js serves port 80 DIRECTLY (it is the public entry point). Caddy used to
+# do this, but Windows Smart App Control blocks the unsigned caddy.exe, so the
+# frontend now proxies /api, /sanctum, /up and /iclock to the backend itself
+# (see frontend/next.config.mjs). Set back to 3001 if Caddy is ever restored.
+$frontendPort = 80
 
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
@@ -126,25 +130,31 @@ if (Test-PortInUse -Port $frontendPort) {
         -RedirectStandardError  (Join-Path $logDir 'frontend.err.log')
 }
 
-# --- Caddy (reverse proxy + HTTPS) ---
-# Prefer the bundled copy in tools\, fall back to one on PATH.
-$caddyExe = Join-Path $root 'tools\caddy.exe'
-if (-not (Test-Path $caddyExe)) {
-    $onPath = Get-Command caddy.exe -ErrorAction SilentlyContinue
-    $caddyExe = if ($onPath) { $onPath.Source } else { $null }
-}
-if ($caddyExe -and (Test-Path $caddyExe)) {
-    if (Test-PortInUse -Port 443) {
-        Write-Warning "Port 443 already in use (Laragon Apache?). Stop it before Caddy can bind."
-    } else {
-        Write-Host "Starting Caddy (80/443) from $caddyExe ..."
+# --- Caddy (reverse proxy) — DISABLED ---
+# Windows Smart App Control (enforced) blocks the unsigned tools\caddy.exe:
+# "An Application Control policy has blocked this file". Next.js serves port 80
+# directly instead and proxies /api, /sanctum, /up and /iclock to the backend.
+# To restore Caddy: use a SIGNED caddy build (or turn off Smart App Control —
+# note that is irreversible without reinstalling Windows), set $frontendPort back
+# to 3001, then re-enable the block below.
+$useCaddy = $false
+if ($useCaddy) {
+    $caddyExe = Join-Path $root 'tools\caddy.exe'
+    if (-not (Test-Path $caddyExe)) {
+        $onPath = Get-Command caddy.exe -ErrorAction SilentlyContinue
+        $caddyExe = if ($onPath) { $onPath.Source } else { $null }
+    }
+    if ($caddyExe -and (Test-Path $caddyExe)) {
+        Write-Host "Starting Caddy from $caddyExe ..."
         Start-Process -FilePath $caddyExe -ArgumentList 'run','--config','Caddyfile' `
             -WorkingDirectory $root -WindowStyle Minimized `
             -RedirectStandardOutput (Join-Path $logDir 'caddy.log') `
             -RedirectStandardError  (Join-Path $logDir 'caddy.err.log')
+    } else {
+        Write-Warning "caddy.exe not found (expected in tools\ or on PATH)."
     }
 } else {
-    Write-Warning "caddy.exe not found (expected in tools\ or on PATH) - HTTPS/reverse-proxy will not start."
+    Write-Host "Caddy disabled (blocked by Smart App Control) - Next.js is serving port 80."
 }
 
 Write-Host ''
