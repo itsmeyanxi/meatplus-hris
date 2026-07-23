@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ChildListShell, EmptyRow, inputCls } from "@/components/employees/ChildList";
+import { SearchSelect } from "@/components/SearchSelect";
 import {
   bankAccountsApi,
   type BankAccount,
@@ -84,17 +85,15 @@ export default function BankAccountsTab() {
             onChange={(e) => setForm({ ...form, account_name: e.target.value })}
             required
           />
-          <select
+          <SearchSelect
             className={inputCls}
             value={form.purpose}
-            onChange={(e) => setForm({ ...form, purpose: e.target.value })}
-          >
-            {PURPOSES.map((p) => (
-              <option key={p} value={p}>
-                {p.charAt(0).toUpperCase() + p.slice(1)}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setForm({ ...form, purpose: v })}
+            options={PURPOSES.map((p) => ({
+              value: p,
+              label: p.charAt(0).toUpperCase() + p.slice(1),
+            }))}
+          />
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"

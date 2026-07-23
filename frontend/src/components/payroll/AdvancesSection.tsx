@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppButton, TableShell } from "@/components/ui";
+import { SearchSelect } from "@/components/SearchSelect";
 import { inputCls, labelCls } from "@/lib/form-classes";
 import { peso } from "@/lib/payroll";
 import { employeeRecordsApi, type RecordRow } from "@/lib/employee-records";
@@ -137,9 +138,12 @@ function AddTransactionModal({ saving, onClose, onAdd }: { saving: boolean; onCl
         <div className="mt-4 space-y-4">
           <div>
             <label className={labelCls}>Loan Type</label>
-            <select className={inputCls} value={f.loan_type} onChange={(e) => set("loan_type", e.target.value)}>
-              {LOAN_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <SearchSelect
+              className={inputCls}
+              value={f.loan_type}
+              onChange={(v) => set("loan_type", v)}
+              options={LOAN_TYPES.map((t) => ({ value: t, label: t }))}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className={labelCls}>Date Request</label><input className={inputCls} type="date" value={f.date_request} onChange={(e) => set("date_request", e.target.value)} /></div>

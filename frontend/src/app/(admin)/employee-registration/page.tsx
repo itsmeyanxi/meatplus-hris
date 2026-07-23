@@ -18,6 +18,7 @@ import { leaveBalancesApi, leaveTypesApi } from "@/lib/leaves";
 import { compensationApi, payrollProfileApi } from "@/lib/payroll";
 import { bankAccountsApi } from "@/lib/employee-relations";
 import { usersApi, ROLE_LABELS, type Role } from "@/lib/users";
+import { SearchSelect } from "@/components/SearchSelect";
 
 // ── schema ────────────────────────────────────────────────────────────────────
 
@@ -1202,20 +1203,28 @@ function BasicSection({ form, photoPreview, photoError, onPickPhoto }: {
             <Input value="Assigned on save" disabled readOnly />
           </Field>
           <Field label="Gender *">
-            <Select {...form.register("gender")}>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="other">Other</option>
-            </Select>
+            <SearchSelect
+              value={String(form.watch("gender") ?? "")}
+              onChange={(v) => form.setValue("gender", v as FormInput["gender"], { shouldValidate: true })}
+              options={[
+                { value: "male", label: "Male" },
+                { value: "female", label: "Female" },
+                { value: "other", label: "Other" },
+              ]}
+            />
           </Field>
           <Field label="Civil Status *">
-            <Select {...form.register("civil_status")}>
-              <option value="single">Single</option>
-              <option value="married">Married</option>
-              <option value="widowed">Widowed</option>
-              <option value="separated">Separated</option>
-              <option value="divorced">Divorced</option>
-            </Select>
+            <SearchSelect
+              value={String(form.watch("civil_status") ?? "")}
+              onChange={(v) => form.setValue("civil_status", v as FormInput["civil_status"], { shouldValidate: true })}
+              options={[
+                { value: "single", label: "Single" },
+                { value: "married", label: "Married" },
+                { value: "widowed", label: "Widowed" },
+                { value: "separated", label: "Separated" },
+                { value: "divorced", label: "Divorced" },
+              ]}
+            />
           </Field>
           <Field label="Date of Birth *" error={E.birth_date?.message}>
             <Input type="date" {...form.register("birth_date")} />
@@ -1254,41 +1263,60 @@ function WorkSection({ form, companies, departments, positions, employmentTypes,
         <GroupTitle>Basic Job Information</GroupTitle>
         <Grid>
           <Field label="Company *" error={E.company_id?.message}>
-            <Select {...form.register("company_id")}>
-              <option value="">Please select…</option>
-              {companies?.map((c) => (
-                <option key={c.id} value={c.id}>{c.code ? `${c.code} — ${c.name}` : c.name}</option>
-              ))}
-            </Select>
+            <SearchSelect
+              value={String(form.watch("company_id") ?? "")}
+              onChange={(v) => form.setValue("company_id", v as unknown as number, { shouldValidate: true })}
+              options={[
+                { value: "", label: "Please select…" },
+                ...(companies?.map((c) => ({ value: String(c.id), label: c.code ? `${c.code} — ${c.name}` : c.name })) ?? []),
+              ]}
+            />
           </Field>
           <Field label="Department *" error={E.department_id?.message}>
-            <Select {...form.register("department_id")} disabled={!companySelected}>
-              <option value="">{companySelected ? "Please select…" : "Pick company first"}</option>
-              {departments?.map((d) => <option key={d.id} value={d.id}>{d.name ?? d.title}</option>)}
-            </Select>
+            <SearchSelect
+              value={String(form.watch("department_id") ?? "")}
+              onChange={(v) => form.setValue("department_id", v as unknown as number, { shouldValidate: true })}
+              disabled={!companySelected}
+              options={[
+                { value: "", label: companySelected ? "Please select…" : "Pick company first" },
+                ...(departments?.map((d) => ({ value: String(d.id), label: d.name ?? d.title ?? "" })) ?? []),
+              ]}
+            />
           </Field>
           <Field label="Job Title *" error={E.position_id?.message}>
-            <Select {...form.register("position_id")} disabled={!deptId}>
-              <option value="">{deptId ? "Please select…" : "Pick department first"}</option>
-              {positions?.map((p) => <option key={p.id} value={p.id}>{p.title ?? p.name}</option>)}
-            </Select>
+            <SearchSelect
+              value={String(form.watch("position_id") ?? "")}
+              onChange={(v) => form.setValue("position_id", v as unknown as number, { shouldValidate: true })}
+              disabled={!deptId}
+              options={[
+                { value: "", label: deptId ? "Please select…" : "Pick department first" },
+                ...(positions?.map((p) => ({ value: String(p.id), label: p.title ?? p.name ?? "" })) ?? []),
+              ]}
+            />
           </Field>
           <Field label="Employee Type">
-            <Select {...form.register("employee_type")}>
-              <option value="">Select employee type…</option>
-              <option value="rank_and_file">Rank &amp; File</option>
-              <option value="supervisory">Supervisory</option>
-              <option value="managerial">Managerial</option>
-              <option value="executive">Executive</option>
-            </Select>
+            <SearchSelect
+              value={String(form.watch("employee_type") ?? "")}
+              onChange={(v) => form.setValue("employee_type", v as FormInput["employee_type"])}
+              options={[
+                { value: "", label: "Select employee type…" },
+                { value: "rank_and_file", label: "Rank & File" },
+                { value: "supervisory", label: "Supervisory" },
+                { value: "managerial", label: "Managerial" },
+                { value: "executive", label: "Executive" },
+              ]}
+            />
           </Field>
           <Field label="Immediate Supervisor">
-            <Select {...form.register("manager_employee_id")}>
-              <option value="">Search…</option>
-              {supervisors?.map((s) => (
-                <option key={s.id} value={s.id}>{s.full_name} ({s.employee_no})</option>
-              ))}
-            </Select>
+            <SearchSelect
+              value={String(form.watch("manager_employee_id") ?? "")}
+              onChange={(v) => form.setValue("manager_employee_id", v ? Number(v) : "")}
+              placeholder="Search…"
+              options={[
+                { value: "", label: "Search…" },
+                ...(supervisors?.map((s) => ({ value: String(s.id), label: `${s.full_name} (${s.employee_no})` })) ?? []),
+              ]}
+            />
           </Field>
         </Grid>
         <Hint>Worksites and their designated workplace are set under Locations.</Hint>
@@ -1298,34 +1326,50 @@ function WorkSection({ form, companies, departments, positions, employmentTypes,
         <GroupTitle>Employment Details</GroupTitle>
         <Grid>
           <Field label="Employment Status *" error={E.employment_type_id?.message}>
-            <Select {...form.register("employment_type_id")}>
-              <option value="">Please select…</option>
-              {employmentTypes?.map((t) => <option key={t.id} value={t.id}>{t.name ?? t.title}</option>)}
-            </Select>
+            <SearchSelect
+              value={String(form.watch("employment_type_id") ?? "")}
+              onChange={(v) => form.setValue("employment_type_id", v as unknown as number, { shouldValidate: true })}
+              options={[
+                { value: "", label: "Please select…" },
+                ...(employmentTypes?.map((t) => ({ value: String(t.id), label: t.name ?? t.title ?? "" })) ?? []),
+              ]}
+            />
           </Field>
           <Field label="User Type">
-            <Select {...form.register("user_type")}>
-              <option value="">Employee</option>
-              <option value="employee">Employee</option>
-              <option value="manager">Manager</option>
-              <option value="admin">Admin</option>
-            </Select>
+            <SearchSelect
+              value={String(form.watch("user_type") ?? "")}
+              onChange={(v) => form.setValue("user_type", v as FormInput["user_type"])}
+              options={[
+                { value: "", label: "Employee" },
+                { value: "employee", label: "Employee" },
+                { value: "manager", label: "Manager" },
+                { value: "admin", label: "Admin" },
+              ]}
+            />
           </Field>
           <Field label="Job Code"><Input {...form.register("job_code")} /></Field>
 
           <Field label="Job Grade">
-            <Select {...form.register("job_grade")}>
-              <option value="">Please select…</option>
-              {["G1","G2","G3","G4","G5","G6","G7"].map((g) => <option key={g} value={g}>{g}</option>)}
-            </Select>
+            <SearchSelect
+              value={String(form.watch("job_grade") ?? "")}
+              onChange={(v) => form.setValue("job_grade", v)}
+              options={[
+                { value: "", label: "Please select…" },
+                ...["G1","G2","G3","G4","G5","G6","G7"].map((g) => ({ value: g, label: g })),
+              ]}
+            />
           </Field>
           <Field label="Client Name"><Input {...form.register("client_name")} /></Field>
           <Field label="Billability">
-            <Select {...form.register("billability")}>
-              <option value="">Select billability…</option>
-              <option value="billable">Billable</option>
-              <option value="non_billable">Non-billable</option>
-            </Select>
+            <SearchSelect
+              value={String(form.watch("billability") ?? "")}
+              onChange={(v) => form.setValue("billability", v as FormInput["billability"])}
+              options={[
+                { value: "", label: "Select billability…" },
+                { value: "billable", label: "Billable" },
+                { value: "non_billable", label: "Non-billable" },
+              ]}
+            />
           </Field>
 
           <Field label="Hire Date *" error={E.date_hired?.message}>
@@ -1366,13 +1410,17 @@ function WorkSection({ form, companies, departments, positions, employmentTypes,
             <Input {...form.register("biometric_user_id")} placeholder="Device enrollment number" />
           </Field>
           <Field label="Payroll Run Type">
-            <Select {...form.register("payroll_run_type")}>
-              <option value="">Please select…</option>
-              <option value="monthly">Monthly</option>
-              <option value="semi_monthly">Semi-monthly</option>
-              <option value="weekly">Weekly</option>
-              <option value="daily">Daily</option>
-            </Select>
+            <SearchSelect
+              value={String(form.watch("payroll_run_type") ?? "")}
+              onChange={(v) => form.setValue("payroll_run_type", v as FormInput["payroll_run_type"])}
+              options={[
+                { value: "", label: "Please select…" },
+                { value: "monthly", label: "Monthly" },
+                { value: "semi_monthly", label: "Semi-monthly" },
+                { value: "weekly", label: "Weekly" },
+                { value: "daily", label: "Daily" },
+              ]}
+            />
           </Field>
         </Grid>
         <Hint>
@@ -1458,20 +1506,19 @@ function LocationsSection({ form, branches, locations, onAdd, onRemove, onWorkpl
             <tr>
               <td className="px-4 py-2.5" colSpan={5}>
                 <div className="max-w-xs">
-                  <Select
+                  <SearchSelect
                     value=""
                     disabled={!companySelected || unpicked.length === 0}
-                    onChange={(e) => onAdd(Number(e.target.value))}
-                  >
-                    <option value="">
-                      {!companySelected
+                    onChange={(v) => onAdd(Number(v))}
+                    placeholder={
+                      !companySelected
                         ? "Pick a company under Work Information"
                         : unpicked.length === 0
                           ? "All branches added"
-                          : "Add Location"}
-                    </option>
-                    {unpicked.map((b) => <option key={b.id} value={b.id}>{b.name ?? b.title}</option>)}
-                  </Select>
+                          : "Add Location"
+                    }
+                    options={unpicked.map((b) => ({ value: String(b.id), label: b.name ?? b.title ?? "" }))}
+                  />
                 </div>
               </td>
             </tr>
@@ -1512,10 +1559,14 @@ function ScheduleSection({ form, workSchedules, days, onDay }: {
     <div className="space-y-5">
       <Grid>
         <Field label="Assign">
-          <Select {...form.register("schedule_mode")}>
-            <option value="existing">Use an existing schedule</option>
-            <option value="new">Define a new schedule</option>
-          </Select>
+          <SearchSelect
+            value={String(form.watch("schedule_mode") ?? "existing")}
+            onChange={(v) => form.setValue("schedule_mode", v as FormInput["schedule_mode"])}
+            options={[
+              { value: "existing", label: "Use an existing schedule" },
+              { value: "new", label: "Define a new schedule" },
+            ]}
+          />
         </Field>
         <Field label="Effective From">
           <Input type="date" {...form.register("schedule_from")} />
@@ -1526,10 +1577,14 @@ function ScheduleSection({ form, workSchedules, days, onDay }: {
         <>
           <Grid>
             <Field label="Work Schedule">
-              <Select {...form.register("work_schedule_id")}>
-                <option value="">No schedule yet</option>
-                {workSchedules?.map((w) => <option key={w.id} value={w.id}>{w.name} ({w.code})</option>)}
-              </Select>
+              <SearchSelect
+                value={String(form.watch("work_schedule_id") ?? "")}
+                onChange={(v) => form.setValue("work_schedule_id", v ? Number(v) : "")}
+                options={[
+                  { value: "", label: "No schedule yet" },
+                  ...(workSchedules?.map((w) => ({ value: String(w.id), label: `${w.name} (${w.code})` })) ?? []),
+                ]}
+              />
             </Field>
           </Grid>
           <Hint>A schedule and an effective date are both needed. Leave blank to assign one later.</Hint>
@@ -1538,11 +1593,15 @@ function ScheduleSection({ form, workSchedules, days, onDay }: {
         <>
           <Grid>
             <Field label="Schedule Type *">
-              <Select {...form.register("schedule_type")}>
-                <option value="">Please select…</option>
-                <option value="fixed">Fixed</option>
-                <option value="flexible">Flexible</option>
-              </Select>
+              <SearchSelect
+                value={String(form.watch("schedule_type") ?? "")}
+                onChange={(v) => form.setValue("schedule_type", v as FormInput["schedule_type"])}
+                options={[
+                  { value: "", label: "Please select…" },
+                  { value: "fixed", label: "Fixed" },
+                  { value: "flexible", label: "Flexible" },
+                ]}
+              />
             </Field>
             <Field label="No. of hours to work including break hours *">
               <Input type="number" step="0.25" min="0" max="24" {...form.register("schedule_hours")} placeholder="9" />
@@ -1732,12 +1791,16 @@ function PayrollSection({ form, employeeType, employmentTypeName, dateHired, dat
           <Field label="Bank"><Input {...form.register("bank_name")} placeholder="BDO, BPI…" /></Field>
           <Field label="Bank Account Type">
             {/* BankAccountRequest allows only payroll | savings | others. */}
-            <Select {...form.register("bank_account_type")}>
-              <option value="">Select a bank account type…</option>
-              <option value="payroll">Payroll</option>
-              <option value="savings">Savings</option>
-              <option value="others">Others</option>
-            </Select>
+            <SearchSelect
+              value={String(form.watch("bank_account_type") ?? "")}
+              onChange={(v) => form.setValue("bank_account_type", v)}
+              options={[
+                { value: "", label: "Select a bank account type…" },
+                { value: "payroll", label: "Payroll" },
+                { value: "savings", label: "Savings" },
+                { value: "others", label: "Others" },
+              ]}
+            />
           </Field>
           <Field label="Bank Account Number"><Input {...form.register("bank_account_number")} /></Field>
         </Grid>
@@ -1758,12 +1821,16 @@ function PayrollSection({ form, employeeType, employmentTypeName, dateHired, dat
           <Field label="De Minimis"><Input type="number" step="0.01" min="0" {...form.register("de_minimis")} placeholder="0.00" /></Field>
 
           <Field label="Pay Group">
-            <Select {...form.register("pay_group")}>
-              <option value="">Select pay group…</option>
-              <option value="monthly">Monthly</option>
-              <option value="semi_monthly">Semi-monthly</option>
-              <option value="weekly">Weekly</option>
-            </Select>
+            <SearchSelect
+              value={String(form.watch("pay_group") ?? "")}
+              onChange={(v) => form.setValue("pay_group", v)}
+              options={[
+                { value: "", label: "Select pay group…" },
+                { value: "monthly", label: "Monthly" },
+                { value: "semi_monthly", label: "Semi-monthly" },
+                { value: "weekly", label: "Weekly" },
+              ]}
+            />
           </Field>
           <Field label="Consultant Percent Tax (%)">
             <Input type="number" step="0.01" min="0" max="100" {...form.register("consultant_percent_tax")} placeholder="Not a consultant" />
@@ -1772,11 +1839,15 @@ function PayrollSection({ form, employeeType, employmentTypeName, dateHired, dat
             <Input type="number" step="0.25" min="0" max="24" {...form.register("work_hours_per_day")} placeholder="8.00" />
           </Field>
           <Field label="OT Computation Table">
-            <Select {...form.register("ot_computation_table")}>
-              <option value="">Select OT computation table…</option>
-              <option value="standard">Standard (1.25×)</option>
-              <option value="none">No overtime</option>
-            </Select>
+            <SearchSelect
+              value={String(form.watch("ot_computation_table") ?? "")}
+              onChange={(v) => form.setValue("ot_computation_table", v)}
+              options={[
+                { value: "", label: "Select OT computation table…" },
+                { value: "standard", label: "Standard (1.25×)" },
+                { value: "none", label: "No overtime" },
+              ]}
+            />
           </Field>
         </Grid>
         <Hint>
@@ -1790,29 +1861,41 @@ function PayrollSection({ form, employeeType, employmentTypeName, dateHired, dat
         <GroupTitle>Government Contribution</GroupTitle>
         <Grid>
           <Field label="SSS Contribution">
-            <Select {...form.register("sss_contribution_mode")}>
-              <option value="system">Let System Decide</option>
-              <option value="fixed">Fixed amount</option>
-            </Select>
+            <SearchSelect
+              value={String(form.watch("sss_contribution_mode") ?? "system")}
+              onChange={(v) => form.setValue("sss_contribution_mode", v as FormInput["sss_contribution_mode"])}
+              options={[
+                { value: "system", label: "Let System Decide" },
+                { value: "fixed", label: "Fixed amount" },
+              ]}
+            />
           </Field>
           <Field label="SSS Fixed Amount">
             <Input type="number" step="0.01" min="0" disabled={!sssFixed} {...form.register("sss_fixed_amount")} placeholder="0.00" />
           </Field>
           <Field label="HDMF Contribution">
-            <Select {...form.register("hdmf_contribution_mode")}>
-              <option value="system">Let System Decide</option>
-              <option value="fixed">Fixed amount</option>
-            </Select>
+            <SearchSelect
+              value={String(form.watch("hdmf_contribution_mode") ?? "system")}
+              onChange={(v) => form.setValue("hdmf_contribution_mode", v as FormInput["hdmf_contribution_mode"])}
+              options={[
+                { value: "system", label: "Let System Decide" },
+                { value: "fixed", label: "Fixed amount" },
+              ]}
+            />
           </Field>
 
           <Field label="Additional HDMF Contribution">
             <Input type="number" step="0.01" min="0" {...form.register("hdmf_additional")} placeholder="0.00" />
           </Field>
           <Field label="PhilHealth Contribution">
-            <Select {...form.register("philhealth_contribution_mode")}>
-              <option value="system">Let System Decide</option>
-              <option value="fixed">Fixed amount</option>
-            </Select>
+            <SearchSelect
+              value={String(form.watch("philhealth_contribution_mode") ?? "system")}
+              onChange={(v) => form.setValue("philhealth_contribution_mode", v as FormInput["philhealth_contribution_mode"])}
+              options={[
+                { value: "system", label: "Let System Decide" },
+                { value: "fixed", label: "Fixed amount" },
+              ]}
+            />
           </Field>
           <Field label="PhilHealth Contribution Amount">
             <Input type="number" step="0.01" min="0" disabled={!phFixed} {...form.register("philhealth_fixed_amount")} placeholder="0.00" />
@@ -2010,12 +2093,17 @@ function BenefitsSection({ rows, onAdd, onRemove, onChange }: {
             <td className="px-3 py-2"><Input value={r.beneficiary} onChange={(e) => onChange(i, { beneficiary: e.target.value })} /></td>
             <td className="px-3 py-2"><Input value={r.notes} onChange={(e) => onChange(i, { notes: e.target.value })} /></td>
             <td className="px-3 py-2">
-              <Select value={r.payment_type} onChange={(e) => onChange(i, { payment_type: e.target.value })}>
-                <option value="">—</option>
-                <option value="employer">Employer-paid</option>
-                <option value="employee">Employee-paid</option>
-                <option value="shared">Shared</option>
-              </Select>
+              <SearchSelect
+                value={r.payment_type}
+                onChange={(v) => onChange(i, { payment_type: v })}
+                placeholder="—"
+                options={[
+                  { value: "", label: "—" },
+                  { value: "employer", label: "Employer-paid" },
+                  { value: "employee", label: "Employee-paid" },
+                  { value: "shared", label: "Shared" },
+                ]}
+              />
             </td>
             <td className="px-3 py-2 text-right"><RemoveButton onClick={() => onRemove(i)} /></td>
           </tr>
@@ -2057,21 +2145,29 @@ function DependentsSection({ rows, onAdd, onRemove, onChange }: {
             <td className="px-3 py-2"><Input value={r.middle_name} onChange={(e) => onChange(i, { middle_name: e.target.value })} /></td>
             <td className="px-3 py-2"><Input value={r.last_name} onChange={(e) => onChange(i, { last_name: e.target.value })} /></td>
             <td className="px-3 py-2">
-              <Select value={r.relationship} onChange={(e) => onChange(i, { relationship: e.target.value })}>
-                <option value="">Select…</option>
-                {RELATIONSHIPS.map((rel) => (
-                  <option key={rel} value={rel}>{rel.charAt(0).toUpperCase() + rel.slice(1)}</option>
-                ))}
-              </Select>
+              <SearchSelect
+                value={r.relationship}
+                onChange={(v) => onChange(i, { relationship: v })}
+                placeholder="Select…"
+                options={[
+                  { value: "", label: "Select…" },
+                  ...RELATIONSHIPS.map((rel) => ({ value: rel, label: rel.charAt(0).toUpperCase() + rel.slice(1) })),
+                ]}
+              />
             </td>
             <td className="px-3 py-2"><Input type="date" value={r.birth_date} onChange={(e) => onChange(i, { birth_date: e.target.value })} /></td>
             <td className="px-3 py-2">
-              <Select value={r.gender} onChange={(e) => onChange(i, { gender: e.target.value })}>
-                <option value="">—</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </Select>
+              <SearchSelect
+                value={r.gender}
+                onChange={(v) => onChange(i, { gender: v })}
+                placeholder="—"
+                options={[
+                  { value: "", label: "—" },
+                  { value: "male", label: "Male" },
+                  { value: "female", label: "Female" },
+                  { value: "other", label: "Other" },
+                ]}
+              />
             </td>
             <td className="px-3 py-2"><Input value={r.notes} onChange={(e) => onChange(i, { notes: e.target.value })} /></td>
             <td className="px-3 py-2 text-right"><RemoveButton onClick={() => onRemove(i)} /></td>
@@ -2188,10 +2284,15 @@ function EducationSection({ rows, onAdd, onRemove, onChange }: {
             {rows.map((r, i) => (
               <tr key={i}>
                 <td className="px-3 py-2">
-                  <Select value={r.level} onChange={(e) => onChange(i, { level: e.target.value })}>
-                    <option value="">Select…</option>
-                    {EDU_LEVELS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-                  </Select>
+                  <SearchSelect
+                    value={r.level}
+                    onChange={(v) => onChange(i, { level: v })}
+                    placeholder="Select…"
+                    options={[
+                      { value: "", label: "Select…" },
+                      ...EDU_LEVELS.map(([v, label]) => ({ value: v, label })),
+                    ]}
+                  />
                 </td>
                 <td className="px-3 py-2">
                   <Input value={r.school} onChange={(e) => onChange(i, { school: e.target.value })} />
@@ -2471,11 +2572,15 @@ function ContactSection({
           {addrRows.map((r, i) => (
             <tr key={i}>
               <td className="px-3 py-2">
-                <Select value={r.label} onChange={(e) => onAddr(i, { label: e.target.value })}>
-                  <option value="present">Present</option>
-                  <option value="permanent">Permanent</option>
-                  <option value="other">Other</option>
-                </Select>
+                <SearchSelect
+                  value={r.label}
+                  onChange={(v) => onAddr(i, { label: v })}
+                  options={[
+                    { value: "present", label: "Present" },
+                    { value: "permanent", label: "Permanent" },
+                    { value: "other", label: "Other" },
+                  ]}
+                />
               </td>
               <td className="px-3 py-2"><Input value={r.address_line1} onChange={(e) => onAddr(i, { address_line1: e.target.value })} /></td>
               <td className="px-3 py-2"><Input value={r.city} onChange={(e) => onAddr(i, { city: e.target.value })} /></td>
@@ -2567,10 +2672,15 @@ function PortalSection({ form, createAccount }: { form: FF; createAccount: boole
 
       {createAccount && (
         <Field label="Assign System Role">
-          <Select {...form.register("role")}>
-            <option value="">No role yet</option>
-            {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-          </Select>
+          <SearchSelect
+            value={String(form.watch("role") ?? "")}
+            onChange={(v) => form.setValue("role", v)}
+            options={[
+              { value: "", label: "No role yet" },
+              ...ASSIGNABLE_ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] })),
+            ]}
+          />
+
         </Field>
       )}
     </div>
@@ -2666,11 +2776,6 @@ const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputEl
   (props, ref) => <input ref={ref} className={baseCls} {...props} />,
 );
 Input.displayName = "Input";
-
-const Select = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
-  (props, ref) => <select ref={ref} className={baseCls} {...props} />,
-);
-Select.displayName = "Select";
 
 function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">{children}</div>;

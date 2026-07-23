@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { StatusPill } from "@/components/approvals/StatusPill";
 import { AppButton, AppCard, TableShell } from "@/components/ui";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
+import { SearchSelect } from "@/components/SearchSelect";
 import { getMe } from "@/lib/auth";
-import { listEmployees } from "@/lib/employees";
 import { leaveAppsApi, leaveTypesApi, type LeaveAppInput, type LeaveStatus } from "@/lib/leaves";
 import { inputCls, labelCls } from "@/lib/form-classes";
 
@@ -29,11 +30,6 @@ export function ApplicationsTab() {
   const showFile = Boolean(me?.user.employee) || canApproveAny;
 
   const { data: types = [] } = useQuery({ queryKey: ["leave-types"], queryFn: leaveTypesApi.list });
-  const { data: empPage } = useQuery({
-    queryKey: ["employees", { all: true }],
-    queryFn: () => listEmployees({ perPage: 100 }),
-    enabled: canApproveAny,
-  });
 
   const [status, setStatus] = useState<LeaveStatus | "">("");
   const [rejectingId, setRejectingId] = useState<number | null>(null);
@@ -125,18 +121,23 @@ export function ApplicationsTab() {
             {canApproveAny && (
               <div>
                 <label className={labelCls}>Employee *</label>
-                <select className={inputCls} value={form.employee_id ?? ""} onChange={(e) => setForm({ ...form, employee_id: e.target.value ? Number(e.target.value) : undefined })} required>
-                  <option value="">Select employee…</option>
-                  {empPage?.data.map((e) => (<option key={e.id} value={e.id}>{e.employee_no} — {e.full_name}</option>))}
-                </select>
+                <EmployeeSearchSelect
+                  className={inputCls}
+                  value={form.employee_id ?? ""}
+                  onChange={(id) => setForm({ ...form, employee_id: id === "" ? undefined : Number(id) })}
+                  placeholder="Select employee…"
+                />
               </div>
             )}
             <div>
               <label className={labelCls}>Leave type *</label>
-              <select className={inputCls} value={form.leave_type_id || ""} onChange={(e) => setForm({ ...form, leave_type_id: Number(e.target.value) })} required>
-                <option value="">Select type…</option>
-                {types.map((t) => (<option key={t.id} value={t.id}>{t.code} — {t.name}</option>))}
-              </select>
+              <SearchSelect
+                className={inputCls}
+                value={form.leave_type_id || ""}
+                onChange={(v) => setForm({ ...form, leave_type_id: Number(v) })}
+                placeholder="Select type…"
+                options={types.map((t) => ({ value: String(t.id), label: `${t.code} — ${t.name}` }))}
+              />
             </div>
             <div>
               <label className={labelCls}>From *</label>

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { PageHeader, TableShell } from "@/components/ui";
+import { SearchSelect } from "@/components/SearchSelect";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { compensationApi, type CompRow } from "@/lib/payroll";
 
@@ -76,14 +77,15 @@ export default function CompensationPage() {
                     </td>
                     <td className="px-4 py-2.5 text-slate-600">{r.department ?? "—"}</td>
                     <td className="px-4 py-2.5">
-                      <select
+                      <SearchSelect
                         className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
                         value={e.payType}
-                        onChange={(ev) => patch(r, { payType: ev.target.value as Edit["payType"] })}
-                      >
-                        <option value="monthly">Monthly</option>
-                        <option value="daily">Daily</option>
-                      </select>
+                        onChange={(v) => patch(r, { payType: v as Edit["payType"] })}
+                        options={[
+                          { value: "monthly", label: "Monthly" },
+                          { value: "daily", label: "Daily" },
+                        ]}
+                      />
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-1.5">

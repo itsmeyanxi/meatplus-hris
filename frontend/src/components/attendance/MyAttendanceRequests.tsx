@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { getMe } from "@/lib/auth";
 import { StatusPill } from "@/components/approvals/StatusPill";
 import { AppButton } from "@/components/ui";
+import { SearchSelect } from "@/components/SearchSelect";
 import {
   certificateOfAttendanceApi,
   correctionsApi,
@@ -252,12 +253,13 @@ function RequestFields({ type, form, set }: { type: ReqType; form: FormBag; set:
           {field("Work date", "work_date", "date")}
           <div>
             <label className={labelCls}>Field to correct *</label>
-            <select className={inputCls} value={form.field_to_correct ?? ""} onChange={(e) => set("field_to_correct", e.target.value)} required>
-              <option value="">Select field…</option>
-              {CORRECTION_FIELDS.map((f) => (
-                <option key={f.value} value={f.value}>{f.label}</option>
-              ))}
-            </select>
+            <SearchSelect
+              className={inputCls}
+              value={form.field_to_correct ?? ""}
+              onChange={(v) => set("field_to_correct", v)}
+              placeholder="Select field…"
+              options={CORRECTION_FIELDS.map((f) => ({ value: f.value, label: f.label }))}
+            />
           </div>
           {field("Correct value", "new_value", "text", true, true)}
           {reason()}

@@ -3,10 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { getMe } from "@/lib/auth";
-import { listEmployees } from "@/lib/employees";
 import { timeLogsApi, timeLogsExportUrl, type TimeLog, type TimeLogInput } from "@/lib/attendance";
 import { PunchLocation } from "@/components/attendance/PunchLocation";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
+import { SearchSelect } from "@/components/SearchSelect";
 import { AppButton, AppCard, PageHeader, TableShell } from "@/components/ui";
 import { inputCls, labelCls } from "@/lib/form-classes";
 
@@ -29,12 +29,6 @@ export default function TimeLogsPage() {
   const canViewAny = me?.user.permissions.includes("attendance.view.any") ?? false;
   // Creating manual logs is restricted to attendance.manage holders.
   const canManage = me?.user.permissions.includes("attendance.manage") ?? false;
-
-  const { data: empPage } = useQuery({
-    queryKey: ["employees", { all: true }],
-    queryFn: () => listEmployees({ perPage: 100 }),
-    enabled: canViewAny,
-  });
 
   const [employeeId, setEmployeeId] = useState<number | "">("");
   const [from, setFrom] = useState<string>("");
@@ -98,10 +92,7 @@ export default function TimeLogsPage() {
           )}
           <div>
             <label className={labelCls}>Device</label>
-            <select className={inputCls} value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
-              <option value="">All devices</option>
-              {devices.map((d) => (<option key={d.device_id} value={d.device_id}>{d.name}</option>))}
-            </select>
+            <SearchSelect className={inputCls} value={deviceId} onChange={setDeviceId} options={[{ value: "", label: "All devices" }, ...devices.map((d) => ({ value: d.device_id, label: d.name }))]} />
           </div>
           <div>
             <label className={labelCls}>From</label>
@@ -119,10 +110,7 @@ export default function TimeLogsPage() {
         <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="grid grid-cols-1 gap-4 sm:grid-cols-4">
           <div>
             <label className={labelCls}>Employee *</label>
-            <select className={inputCls} value={form.employee_id || ""} onChange={(e) => setForm({ ...form, employee_id: Number(e.target.value) })} required>
-              <option value="">Select…</option>
-              {empPage?.data.map((e) => (<option key={e.id} value={e.id}>{e.employee_no} — {e.full_name}</option>))}
-            </select>
+            <EmployeeSearchSelect value={form.employee_id || ""} onChange={(id) => setForm({ ...form, employee_id: id === "" ? 0 : Number(id) })} placeholder="Select…" />
           </div>
           <div>
             <label className={labelCls}>Logged at *</label>
@@ -130,12 +118,7 @@ export default function TimeLogsPage() {
           </div>
           <div>
             <label className={labelCls}>Direction</label>
-            <select className={inputCls} value={form.direction} onChange={(e) => setForm({ ...form, direction: e.target.value as TimeLogInput["direction"] })}>
-              <option value="in">In</option>
-              <option value="out">Out</option>
-              <option value="break_out">Break out</option>
-              <option value="break_in">Break in</option>
-            </select>
+            <SearchSelect className={inputCls} value={form.direction} onChange={(v) => setForm({ ...form, direction: v as TimeLogInput["direction"] })} options={[{ value: "in", label: "In" }, { value: "out", label: "Out" }, { value: "break_out", label: "Break out" }, { value: "break_in", label: "Break in" }]} />
           </div>
           <div className="flex items-end">
             <AppButton type="submit" className="w-full" disabled={create.isPending}>{create.isPending ? "Saving…" : "Add log"}</AppButton>

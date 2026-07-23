@@ -4,6 +4,7 @@ import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PageHeader, TableShell } from "@/components/ui";
+import { SearchSelect } from "@/components/SearchSelect";
 
 type Change = { field: string; old: string | number | boolean | null; new: string | number | boolean | null };
 type AuditEntry = {
@@ -65,18 +66,24 @@ export default function AuditTrailPage() {
           placeholder="Search person or description…"
           className={`${selectCls} min-w-[240px] flex-1`}
         />
-        <select value={logName} onChange={(e) => setLogName(e.target.value)} className={selectCls}>
-          <option value="">All areas</option>
-          {(data?.meta.log_names ?? []).map((l) => (
-            <option key={l} value={l} className="capitalize">{l}</option>
-          ))}
-        </select>
-        <select value={event} onChange={(e) => setEvent(e.target.value)} className={selectCls}>
-          <option value="">All actions</option>
-          {(data?.meta.events ?? []).map((ev) => (
-            <option key={ev} value={ev} className="capitalize">{ev}</option>
-          ))}
-        </select>
+        <SearchSelect
+          value={logName}
+          onChange={setLogName}
+          className={selectCls}
+          options={[
+            { value: "", label: "All areas" },
+            ...(data?.meta.log_names ?? []).map((l) => ({ value: l, label: l })),
+          ]}
+        />
+        <SearchSelect
+          value={event}
+          onChange={setEvent}
+          className={selectCls}
+          options={[
+            { value: "", label: "All actions" },
+            ...(data?.meta.events ?? []).map((ev) => ({ value: ev, label: ev })),
+          ]}
+        />
         {(q || logName || event) && (
           <button
             onClick={() => { setQ(""); setLogName(""); setEvent(""); }}

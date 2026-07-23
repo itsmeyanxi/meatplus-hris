@@ -6,6 +6,7 @@ import { useState } from "react";
 import { getEmployee, updateEmployee, getLookup, type EmployeeCreateInput } from "@/lib/employees";
 import { getMe } from "@/lib/auth";
 import { useBranchTerm } from "@/lib/terminology";
+import { SearchSelect } from "@/components/SearchSelect";
 
 export default function EditEmployeePage() {
   const router = useRouter();
@@ -126,22 +127,32 @@ export default function EditEmployeePage() {
             <input type="date" name="birth_date" value={form.birth_date} onChange={set} className={inp} />
           </Field>
           <Field label="Gender">
-            <select name="gender" value={form.gender} onChange={set} className={inp}>
-              <option value="">Select</option>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="other">Other</option>
-            </select>
+            <SearchSelect
+              className={inp}
+              value={form.gender}
+              onChange={(v) => setForm((p) => ({ ...p, gender: v }))}
+              placeholder="Select"
+              options={[
+                { value: "male", label: "Male" },
+                { value: "female", label: "Female" },
+                { value: "other", label: "Other" },
+              ]}
+            />
           </Field>
           <Field label="Civil status">
-            <select name="civil_status" value={form.civil_status} onChange={set} className={inp}>
-              <option value="">Select</option>
-              <option value="single">Single</option>
-              <option value="married">Married</option>
-              <option value="widowed">Widowed</option>
-              <option value="separated">Separated</option>
-              <option value="divorced">Divorced</option>
-            </select>
+            <SearchSelect
+              className={inp}
+              value={form.civil_status}
+              onChange={(v) => setForm((p) => ({ ...p, civil_status: v }))}
+              placeholder="Select"
+              options={[
+                { value: "single", label: "Single" },
+                { value: "married", label: "Married" },
+                { value: "widowed", label: "Widowed" },
+                { value: "separated", label: "Separated" },
+                { value: "divorced", label: "Divorced" },
+              ]}
+            />
           </Field>
           <Field label="Nationality">
             <input name="nationality" value={form.nationality} onChange={set} className={inp} />
@@ -171,28 +182,40 @@ export default function EditEmployeePage() {
       <FormSection title="Employment details" description={`Department, position, ${branch.singular} and employment dates.`}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label={branch.Singular}>
-            <select name="branch_id" value={form.branch_id} onChange={set} className={inp}>
-              <option value="">— Select {branch.singular} —</option>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
+            <SearchSelect
+              className={inp}
+              value={form.branch_id}
+              onChange={(v) => setForm((p) => ({ ...p, branch_id: v ? Number(v) : 0 }))}
+              placeholder={`— Select ${branch.singular} —`}
+              options={branches.map((b) => ({ value: String(b.id), label: b.name }))}
+            />
           </Field>
           <Field label="Department">
-            <select name="department_id" value={form.department_id} onChange={set} className={inp}>
-              <option value="">— Select department —</option>
-              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
+            <SearchSelect
+              className={inp}
+              value={form.department_id}
+              onChange={(v) => setForm((p) => ({ ...p, department_id: v ? Number(v) : 0 }))}
+              placeholder="— Select department —"
+              options={departments.map((d) => ({ value: String(d.id), label: d.name }))}
+            />
           </Field>
           <Field label="Position">
-            <select name="position_id" value={form.position_id} onChange={set} className={inp}>
-              <option value="">— Select position —</option>
-              {positions.map((p) => <option key={p.id} value={p.id}>{p.name ?? (p as any).title}</option>)}
-            </select>
+            <SearchSelect
+              className={inp}
+              value={form.position_id}
+              onChange={(v) => setForm((p) => ({ ...p, position_id: v ? Number(v) : 0 }))}
+              placeholder="— Select position —"
+              options={positions.map((p) => ({ value: String(p.id), label: p.name ?? (p as any).title }))}
+            />
           </Field>
           <Field label="Employment type">
-            <select name="employment_type_id" value={form.employment_type_id} onChange={set} className={inp}>
-              <option value="">— Select type —</option>
-              {empTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+            <SearchSelect
+              className={inp}
+              value={form.employment_type_id}
+              onChange={(v) => setForm((p) => ({ ...p, employment_type_id: v ? Number(v) : 0 }))}
+              placeholder="— Select type —"
+              options={empTypes.map((t) => ({ value: String(t.id), label: t.name }))}
+            />
           </Field>
           <Field label="Date hired">
             <input type="date" name="date_hired" value={form.date_hired} onChange={set} className={inp} />

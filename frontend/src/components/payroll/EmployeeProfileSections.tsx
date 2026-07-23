@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AppButton, TableShell } from "@/components/ui";
+import { SearchSelect } from "@/components/SearchSelect";
 import { inputCls, labelCls } from "@/lib/form-classes";
 import {
   employeeRecordsApi,
@@ -146,9 +147,12 @@ function RecordModal({
             <div key={fd.key} className={fd.full ? "col-span-2" : ""}>
               <label className={labelCls}>{fd.label}</label>
               {fd.type === "select" ? (
-                <select className={inputCls} value={f[fd.key]} onChange={(e) => setF((s) => ({ ...s, [fd.key]: e.target.value }))}>
-                  {fd.options?.map((o) => <option key={o} value={o}>{o}</option>)}
-                </select>
+                <SearchSelect
+                  className={inputCls}
+                  value={f[fd.key]}
+                  onChange={(v) => setF((s) => ({ ...s, [fd.key]: v }))}
+                  options={(fd.options ?? []).map((o) => ({ value: o, label: o }))}
+                />
               ) : (
                 <input className={inputCls} type={fd.type ?? "text"} value={f[fd.key]} onChange={(e) => setF((s) => ({ ...s, [fd.key]: e.target.value }))} />
               )}

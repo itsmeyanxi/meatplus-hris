@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 import { type Me } from "@/lib/auth";
-import { listEmployees } from "@/lib/employees";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import {
   certificateOfAttendanceApi,
   type CertificateOfAttendanceInput,
@@ -147,13 +147,6 @@ function CreateForm({
   const [adminEmployeeId, setAdminEmpId] = useState<number>(employeeId);
   const targetEmpId = canManage ? adminEmployeeId : employeeId;
 
-  const { data: empPage } = useQuery({
-    queryKey: ["employees", { all: true }],
-    queryFn:  () => listEmployees({ perPage: 200 }),
-    enabled:  canManage,
-    staleTime: 60_000,
-  });
-
   const create = useMutation({
     mutationFn: () => certificateOfAttendanceApi.create({
       ...form,
@@ -181,11 +174,12 @@ function CreateForm({
             </span>
           )}
           {canManage && (
-            <select value={adminEmployeeId} onChange={(e) => setAdminEmpId(Number(e.target.value))}
-              className="rounded-lg border border-green-300 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-green-500">
-              <option value="">Select employee…</option>
-              {empPage?.data.map((e) => <option key={e.id} value={e.id}>{e.full_name}</option>)}
-            </select>
+            <EmployeeSearchSelect
+              className="w-64"
+              value={adminEmployeeId || ""}
+              onChange={(id) => setAdminEmpId(id === "" ? 0 : Number(id))}
+              placeholder="Select employee…"
+            />
           )}
           <span className="text-xs text-green-700">Certificate of Attendance Application Form</span>
         </div>

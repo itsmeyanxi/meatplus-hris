@@ -12,7 +12,9 @@ import {
   downloadPayrollReport,
   downloadFullExport,
 } from "@/lib/reports";
-import { getLookup, listEmployees } from "@/lib/employees";
+import { getLookup } from "@/lib/employees";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
+import { SearchSelect } from "@/components/SearchSelect";
 
 const fieldCls =
   "mt-0.5 block rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900";
@@ -132,18 +134,6 @@ function FullExportCard() {
   );
 }
 
-/** Fetches employee list on first focus of the select — avoids the request until the user opens the dropdown. */
-function useLazyEmployees() {
-  const [enabled, setEnabled] = useState(false);
-  const { data } = useQuery({
-    queryKey: ["employees-lookup"],
-    queryFn: () => listEmployees({ perPage: 200 }),
-    enabled,
-    staleTime: 5 * 60 * 1000,
-  });
-  return { employees: data?.data ?? [], load: () => setEnabled(true) };
-}
-
 // RP-2 ─────────────────────────────────────────────────────────────────────────
 
 function EmployeeRosterCard() {
@@ -173,18 +163,15 @@ function EmployeeRosterCard() {
       <div className="flex gap-2 flex-wrap">
         <label className="block">
           <span className="text-xs text-slate-500">Department</span>
-          <select
+          <SearchSelect
             value={departmentId}
-            onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : "")}
+            onChange={(v) => setDepartmentId(v ? Number(v) : "")}
             className={fieldCls}
-          >
-            <option value="">All departments</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: "All departments" },
+              ...departments.map((d) => ({ value: String(d.id), label: d.name })),
+            ]}
+          />
         </label>
       </div>
       <DownloadButton onClick={download} loading={loading}>
@@ -211,8 +198,6 @@ function DtrReportCard() {
     queryFn: () => getLookup("departments"),
     staleTime: 5 * 60 * 1000,
   });
-
-  const { employees, load: loadEmployees } = useLazyEmployees();
 
   const download = async () => {
     if (!from || !to) {
@@ -258,34 +243,24 @@ function DtrReportCard() {
         </label>
         <label className="block">
           <span className="text-xs text-slate-500">Department</span>
-          <select
+          <SearchSelect
             value={departmentId}
-            onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : "")}
+            onChange={(v) => setDepartmentId(v ? Number(v) : "")}
             className={fieldCls}
-          >
-            <option value="">All departments</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: "All departments" },
+              ...departments.map((d) => ({ value: String(d.id), label: d.name })),
+            ]}
+          />
         </label>
         <label className="block">
           <span className="text-xs text-slate-500">Employee</span>
-          <select
+          <EmployeeSearchSelect
             value={employeeId}
-            onFocus={loadEmployees}
-            onChange={(e) => setEmployeeId(e.target.value ? Number(e.target.value) : "")}
+            onChange={(id) => setEmployeeId(id === "" ? "" : Number(id))}
+            placeholder="All employees"
             className={fieldCls}
-          >
-            <option value="">All employees</option>
-            {employees.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.full_name}
-              </option>
-            ))}
-          </select>
+          />
         </label>
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
@@ -313,8 +288,6 @@ function LeaveReportCard() {
     queryFn: () => getLookup("departments"),
     staleTime: 5 * 60 * 1000,
   });
-
-  const { employees, load: loadEmployees } = useLazyEmployees();
 
   const download = async () => {
     setLoading(true);
@@ -354,48 +327,39 @@ function LeaveReportCard() {
         </label>
         <label className="block">
           <span className="text-xs text-slate-500">Status</span>
-          <select
+          <SearchSelect
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={setStatus}
             className={fieldCls}
-          >
-            <option value="">All</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+            options={[
+              { value: "", label: "All" },
+              { value: "pending", label: "Pending" },
+              { value: "approved", label: "Approved" },
+              { value: "rejected", label: "Rejected" },
+              { value: "cancelled", label: "Cancelled" },
+            ]}
+          />
         </label>
         <label className="block">
           <span className="text-xs text-slate-500">Department</span>
-          <select
+          <SearchSelect
             value={departmentId}
-            onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : "")}
+            onChange={(v) => setDepartmentId(v ? Number(v) : "")}
             className={fieldCls}
-          >
-            <option value="">All departments</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: "All departments" },
+              ...departments.map((d) => ({ value: String(d.id), label: d.name })),
+            ]}
+          />
         </label>
         <label className="block">
           <span className="text-xs text-slate-500">Employee</span>
-          <select
+          <EmployeeSearchSelect
             value={employeeId}
-            onFocus={loadEmployees}
-            onChange={(e) => setEmployeeId(e.target.value ? Number(e.target.value) : "")}
+            onChange={(id) => setEmployeeId(id === "" ? "" : Number(id))}
+            placeholder="All employees"
             className={fieldCls}
-          >
-            <option value="">All employees</option>
-            {employees.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.full_name}
-              </option>
-            ))}
-          </select>
+          />
         </label>
       </div>
       <DownloadButton onClick={download} loading={loading}>
@@ -437,13 +401,18 @@ function OvertimeReportCard() {
         </label>
         <label className="block">
           <span className="text-xs text-slate-500">Status</span>
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className={fieldCls}>
-            <option value="">All</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+          <SearchSelect
+            value={status}
+            onChange={setStatus}
+            className={fieldCls}
+            options={[
+              { value: "", label: "All" },
+              { value: "pending", label: "Pending" },
+              { value: "approved", label: "Approved" },
+              { value: "rejected", label: "Rejected" },
+              { value: "cancelled", label: "Cancelled" },
+            ]}
+          />
         </label>
       </div>
       <DownloadButton onClick={download} loading={loading}>
@@ -480,18 +449,16 @@ function PayrollReportCard() {
 
   return (
     <ReportCard title="Payroll Report" description="Payslip breakdown for a specific payroll run.">
-      <select
+      <SearchSelect
         value={selected}
-        onChange={(e) => setSelected(e.target.value ? Number(e.target.value) : "")}
+        onChange={(v) => setSelected(v ? Number(v) : "")}
+        placeholder="Select payroll run…"
         className="block w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-      >
-        <option value="">Select payroll run…</option>
-        {runs.map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.name} ({r.period_start} – {r.period_end})
-          </option>
-        ))}
-      </select>
+        options={runs.map((r) => ({
+          value: String(r.id),
+          label: `${r.name} (${r.period_start} – ${r.period_end})`,
+        }))}
+      />
       {error && <p className="text-xs text-red-600">{error}</p>}
       <DownloadButton onClick={download} loading={loading}>
         Download CSV

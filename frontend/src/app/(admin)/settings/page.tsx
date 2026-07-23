@@ -10,6 +10,7 @@ import {
   type Position,
 } from "@/lib/master-data";
 import { PageHeader } from "@/components/ui";
+import { SearchSelect } from "@/components/SearchSelect";
 
 // ── Permission gate ───────────────────────────────────────────────────────
 
@@ -344,16 +345,15 @@ function PositionsSection({ canEdit }: { canEdit: boolean }) {
             </div>
             <div className="w-48">
               <label className="mb-1 block text-xs font-medium text-slate-600">Department</label>
-              <select
+              <SearchSelect
                 className={inputCls}
                 value={addDeptId}
-                onChange={(e) => setAddDeptId(e.target.value ? Number(e.target.value) : "")}
-              >
-                <option value="">None</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
+                onChange={(v) => setAddDeptId(v ? Number(v) : "")}
+                options={[
+                  { value: "", label: "None" },
+                  ...departments.map((d) => ({ value: String(d.id), label: d.name })),
+                ]}
+              />
             </div>
             <button
               type="submit"
@@ -389,16 +389,15 @@ function PositionsSection({ canEdit }: { canEdit: boolean }) {
                   />
                 </div>
                 <div className="w-48">
-                  <select
+                  <SearchSelect
                     className={inputCls}
                     value={editDeptId}
-                    onChange={(e) => setEditDeptId(e.target.value ? Number(e.target.value) : "")}
-                  >
-                    <option value="">None</option>
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => setEditDeptId(v ? Number(v) : "")}
+                    options={[
+                      { value: "", label: "None" },
+                      ...departments.map((d) => ({ value: String(d.id), label: d.name })),
+                    ]}
+                  />
                 </div>
                 <button
                   type="submit"

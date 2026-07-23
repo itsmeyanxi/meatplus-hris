@@ -24,8 +24,10 @@ function Badge({ item }: { item: ApprovalItem }) {
 /** Compact dashboard card: count + a few most-recent items, links to the full list. */
 export function ApprovalQuickCard() {
   const { data } = useQuery({ queryKey: ["my-approvals"], queryFn: getApprovals, refetchInterval: 60_000 });
-  const total = data?.total ?? 0;
-  if (total === 0) return null;
+  // Show for anyone who can approve — even at zero — so it's a reliable quick-access
+  // spot. Hidden only for users with no approval authority at all.
+  if (!data || !data.is_approver) return null;
+  const total = data.total;
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -34,23 +36,27 @@ export function ApprovalQuickCard() {
           <h3 className="text-sm font-semibold text-slate-800">Pending approvals</h3>
           <p className="text-xs text-slate-500">Requests waiting on you</p>
         </div>
-        <span className="flex h-9 min-w-9 items-center justify-center rounded-full bg-teal-600 px-2 text-sm font-bold text-white">{total}</span>
+        <span className={`flex h-9 min-w-9 items-center justify-center rounded-full px-2 text-sm font-bold text-white ${total > 0 ? "bg-teal-600" : "bg-slate-300"}`}>{total}</span>
       </div>
-      <ul className="mt-3 space-y-2">
-        {data!.items.slice(0, 4).map((it) => (
-          <li key={`${it.type}-${it.id}`}>
-            <Link href={it.url} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 transition hover:bg-slate-50">
-              <span className="flex min-w-0 items-center gap-2">
-                <Badge item={it} />
-                <span className="truncate text-sm text-slate-700">{it.employee_name}</span>
-              </span>
-              <span className="shrink-0 text-xs text-slate-400">{it.date}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {total === 0 ? (
+        <p className="mt-3 rounded-lg bg-slate-50 px-3 py-4 text-center text-xs text-slate-400">You’re all caught up — nothing waiting.</p>
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {data.items.slice(0, 4).map((it) => (
+            <li key={`${it.type}-${it.id}`}>
+              <Link href={it.url} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 transition hover:bg-slate-50">
+                <span className="flex min-w-0 items-center gap-2">
+                  <Badge item={it} />
+                  <span className="truncate text-sm text-slate-700">{it.employee_name}</span>
+                </span>
+                <span className="shrink-0 text-xs text-slate-400">{it.date}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
       <Link href="/my-team" className="mt-3 block text-center text-xs font-semibold text-teal-700 hover:underline">
-        Review all ({total}) →
+        {total > 0 ? `Review all (${total}) →` : "Open Approval Center →"}
       </Link>
     </div>
   );

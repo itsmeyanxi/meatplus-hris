@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { getMe, type Me } from "@/lib/auth";
-import { listEmployees } from "@/lib/employees";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import {
   certificateOfAttendanceApi,
   type CertificateOfAttendanceInput,
@@ -161,13 +161,6 @@ function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; ca
   const [adminEmployeeId, setAdminEmployeeId] = useState<number>(employeeId);
   const targetEmpId = canManage ? adminEmployeeId : employeeId;
 
-  const { data: empPage } = useQuery({
-    queryKey: ["employees", { all: true }],
-    queryFn: () => listEmployees({ perPage: 200 }),
-    enabled: canManage,
-    staleTime: 60_000,
-  });
-
   const create = useMutation({
     mutationFn: () => certificateOfAttendanceApi.create({
       ...form,
@@ -209,14 +202,12 @@ function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; ca
               {canManage && (
                 <div className="mb-3">
                   <label className="mb-1 block text-xs font-medium text-slate-500">Employee</label>
-                  <select
-                    className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-green-500"
-                    value={adminEmployeeId}
-                    onChange={(e) => setAdminEmployeeId(Number(e.target.value))}
-                  >
-                    <option value="">Selectâ¦</option>
-                    {empPage?.data.map((e) => <option key={e.id} value={e.id}>{e.full_name}</option>)}
-                  </select>
+                  <EmployeeSearchSelect
+                    className="w-full"
+                    value={adminEmployeeId || ""}
+                    onChange={(id) => setAdminEmployeeId(id === "" ? 0 : Number(id))}
+                    placeholder="Select…"
+                  />
                 </div>
               )}
               <InfoRow label="Name" value={employee?.full_name ?? "â"} />

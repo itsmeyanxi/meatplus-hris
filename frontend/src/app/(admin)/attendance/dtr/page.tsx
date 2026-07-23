@@ -3,9 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { getMe } from "@/lib/auth";
-import { getLookup, listEmployees } from "@/lib/employees";
+import { getLookup } from "@/lib/employees";
 import { dtrApi, type DailyTimeRecord, type DayStatus } from "@/lib/attendance";
 import { PageHeader } from "@/components/ui";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
+import { SearchSelect } from "@/components/SearchSelect";
 import { inputCls } from "@/lib/form-classes";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -154,13 +156,6 @@ export default function DtrMatrixPage() {
   const [cpTo, setCpTo] = useState("");
   const [cpDone, setCpDone] = useState(false);
 
-  const { data: empList } = useQuery({
-    queryKey: ["employees-all-lookup"],
-    queryFn: () => listEmployees({ perPage: 200 }),
-    enabled: canManage,
-    staleTime: 5 * 60_000,
-  });
-
   const computeOne = useMutation({
     mutationFn: () =>
       dtrApi.compute({ employee_id: Number(cpEmpId), from: cpFrom, to: cpTo }),
@@ -251,16 +246,12 @@ export default function DtrMatrixPage() {
 
         {/* Department */}
         {canViewAny && departments.length > 0 && (
-          <select
+          <SearchSelect
             className={inputCls + " min-w-[180px]"}
             value={deptId}
-            onChange={(e) => setDeptId(e.target.value === "" ? "" : Number(e.target.value))}
-          >
-            <option value="">All departments</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+            onChange={(v) => setDeptId(v === "" ? "" : Number(v))}
+            options={[{ value: "", label: "All departments" }, ...departments.map((d) => ({ value: String(d.id), label: d.name ?? "" }))]}
+          />
         )}
 
         {/* Search */}
@@ -315,18 +306,11 @@ export default function DtrMatrixPage() {
           <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-[220px] flex-1">
               <label className="mb-1 block text-xs font-medium text-slate-600">Employee</label>
-              <select
-                className={inputCls}
+              <EmployeeSearchSelect
                 value={cpEmpId}
-                onChange={(e) => setCpEmpId(e.target.value === "" ? "" : Number(e.target.value))}
-              >
-                <option value="">Select employee…</option>
-                {(empList?.data ?? []).map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.employee_no} — {e.full_name}
-                  </option>
-                ))}
-              </select>
+                onChange={(id) => setCpEmpId(id)}
+                placeholder="Select employee…"
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600">From</label>

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 import { getMe, type Me } from "@/lib/auth";
-import { listEmployees } from "@/lib/employees";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { dtrApi } from "@/lib/attendance";
 import { undertimeApi, type UndertimeInput, type UndertimeRequest } from "@/lib/approvals";
 
@@ -170,13 +170,6 @@ function FileUTForm({ employeeId, canManage, meData }: { employeeId: number; can
   const [adminEmployeeId, setAdminEmployeeId] = useState<number>(employeeId);
   const targetEmpId = canManage ? adminEmployeeId : employeeId;
 
-  const { data: empPage } = useQuery({
-    queryKey: ["employees", { all: true }],
-    queryFn: () => listEmployees({ perPage: 200 }),
-    enabled: canManage,
-    staleTime: 60_000,
-  });
-
   const { data: dtrs = [] } = useQuery({
     queryKey: ["dtr", targetEmpId, form.date],
     queryFn: () => dtrApi.list({ employee_id: targetEmpId, from: form.date, to: form.date }),
@@ -232,17 +225,12 @@ function FileUTForm({ employeeId, canManage, meData }: { employeeId: number; can
               {canManage && (
                 <div className="mb-3">
                   <label className="mb-1 block text-xs font-medium text-slate-500">Employee</label>
-                  <select
-                    className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-slate-400"
-                    value={adminEmployeeId}
-                    onChange={(e) => setAdminEmployeeId(Number(e.target.value))}
-                    required
-                  >
-                    <option value="">Select…</option>
-                    {empPage?.data.map((e) => (
-                      <option key={e.id} value={e.id}>{e.full_name}</option>
-                    ))}
-                  </select>
+                  <EmployeeSearchSelect
+                    className="w-full"
+                    value={adminEmployeeId || ""}
+                    onChange={(id) => setAdminEmployeeId(id === "" ? 0 : Number(id))}
+                    placeholder="Select…"
+                  />
                 </div>
               )}
               <InfoRow label="Name" value={employee?.full_name ?? "—"} />

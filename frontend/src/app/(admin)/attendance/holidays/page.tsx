@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppButton, AppCard, PageHeader, TableShell } from "@/components/ui";
 import { RoleGate, HR_ROLES } from "@/components/RoleGate";
+import { SearchSelect } from "@/components/SearchSelect";
 import { holidaysApi, type Holiday, type HolidayInput } from "@/lib/attendance";
 
 import { inputCls, labelCls } from "@/lib/form-classes";
@@ -93,9 +94,7 @@ function HolidaysPageInner() {
             </div>
             <div>
               <label className={labelCls}>Type</label>
-              <select className={inputCls} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as Holiday["type"] })}>
-                {Object.entries(TYPE_LABELS).map(([k, v]) => (<option key={k} value={k}>{v}</option>))}
-              </select>
+              <SearchSelect className={inputCls} value={form.type} onChange={(v) => setForm({ ...form, type: v as Holiday["type"] })} options={Object.entries(TYPE_LABELS).map(([k, v]) => ({ value: k, label: v }))} />
             </div>
             <div className="flex justify-end gap-2 sm:col-span-3">
               <AppButton type="button" variant="secondary" onClick={closeForm}>Cancel</AppButton>

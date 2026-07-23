@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { inputCls } from "@/components/employees/ChildList";
+import { SearchSelect } from "@/components/SearchSelect";
 import { PasswordField, isPasswordValid } from "@/components/PasswordField";
 import { ROLE_LABELS, usersApi, type Role, type StoreUserInput } from "@/lib/users";
 
@@ -55,9 +56,12 @@ export default function NewUserPage() {
         />
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-600">Role *</label>
-          <select className={inputCls} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
-            {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
+          <SearchSelect
+            className={inputCls}
+            value={form.role}
+            onChange={(v) => setForm({ ...form, role: v as Role })}
+            options={Object.entries(ROLE_LABELS).map(([k, v]) => ({ value: k, label: v }))}
+          />
         </div>
 
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

@@ -176,6 +176,7 @@ export type ApprovalItem = {
 };
 
 export type ApprovalCenter = {
+  is_approver: boolean;
   total: number;
   counts: Record<string, number>;
   items: ApprovalItem[];

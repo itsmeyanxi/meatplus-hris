@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ChildListShell, EmptyRow, inputCls } from "@/components/employees/ChildList";
+import { SearchSelect } from "@/components/SearchSelect";
 import {
   dtrApi,
   employeeSchedulesApi,
@@ -135,21 +136,15 @@ export default function EmployeeAttendanceTab() {
             }}
             className="rounded-xl border border-slate-200 bg-white p-4 grid grid-cols-1 gap-3 sm:grid-cols-3"
           >
-            <select
+            <SearchSelect
               className={inputCls}
               value={assignForm.work_schedule_id}
-              onChange={(e) =>
-                setAssignForm({ ...assignForm, work_schedule_id: Number(e.target.value) })
+              onChange={(v) =>
+                setAssignForm({ ...assignForm, work_schedule_id: Number(v) })
               }
-              required
-            >
-              <option value={0}>Schedule *</option>
-              {workSchedules.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+              placeholder="Schedule *"
+              options={workSchedules.map((s) => ({ value: String(s.id), label: s.name }))}
+            />
             <input
               type="date"
               className={inputCls}

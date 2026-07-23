@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PageHeader, AppButton, TableShell } from "@/components/ui";
+import { SearchSelect } from "@/components/SearchSelect";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { inputCls, labelCls } from "@/lib/form-classes";
 import {
@@ -159,11 +160,17 @@ function NewRunModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           </div>
           <div>
             <label className={labelCls}>Employee group</label>
-            <select className={inputCls} value={form.pay_group ?? ""} onChange={(e) => set("pay_group", e.target.value as NewRunInput["pay_group"])}>
-              <option value="">All employees</option>
-              <option value="non_confidential">Non-confidential only</option>
-              <option value="confidential">Confidential only</option>
-            </select>
+            <SearchSelect
+              className={inputCls}
+              value={form.pay_group ?? ""}
+              onChange={(v) => set("pay_group", v as NewRunInput["pay_group"])}
+              placeholder="All employees"
+              options={[
+                { value: "", label: "All employees" },
+                { value: "non_confidential", label: "Non-confidential only" },
+                { value: "confidential", label: "Confidential only" },
+              ]}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

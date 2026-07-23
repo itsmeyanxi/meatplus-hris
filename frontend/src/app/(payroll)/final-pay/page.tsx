@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 import axios from "axios";
+import { SearchSelect } from "@/components/SearchSelect";
 import { finalPayApi, SEPARATION_TYPES, type SeparationType } from "@/lib/final-pay";
 import { listEmployees, type EmployeeListItem } from "@/lib/employees";
 
@@ -284,10 +285,12 @@ function NewFinalPayForm({ onSaved, onBack }: {
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">Reason for Separation</label>
-                  <select value={sepType} onChange={(e) => setSepType(e.target.value as SeparationType)}
-                    className={selectCls}>
-                    {SEPARATION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
+                  <SearchSelect
+                    className={selectCls}
+                    value={sepType}
+                    onChange={(v) => setSepType(v as SeparationType)}
+                    options={SEPARATION_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+                  />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">Basic Monthly Salary</label>

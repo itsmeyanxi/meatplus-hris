@@ -7,6 +7,7 @@ import { PageHeader, AppButton, StatusBadge, TableShell } from "@/components/ui"
 import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { inputCls, labelCls } from "@/lib/form-classes";
+import { SearchSelect } from "@/components/SearchSelect";
 import { devicesApi, type Device, type DeviceInput, type SyncSummary, type EnrolledUser } from "@/lib/devices";
 import { branchTermFor } from "@/lib/terminology";
 
@@ -330,28 +331,27 @@ function DeviceFormModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Company</label>
-              <select
+              <SearchSelect
                 className={inputCls}
                 value={form.company_id ?? ""}
-                onChange={(e) => setForm({ ...form, company_id: Number(e.target.value), branch_id: null })}
-                required
-              >
-                <option value="" disabled>Select company…</option>
-                {companies?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+                onChange={(v) => setForm({ ...form, company_id: Number(v), branch_id: null })}
+                placeholder="Select company…"
+                options={(companies ?? []).map((c) => ({ value: String(c.id), label: c.name }))}
+              />
               <p className="mt-1 text-xs text-slate-400">Which location/company this terminal belongs to.</p>
             </div>
             <div>
               <label className={labelCls}>{branchTerm.Singular} (optional)</label>
-              <select
+              <SearchSelect
                 className={inputCls}
                 value={form.branch_id ?? ""}
-                onChange={(e) => set("branch_id", e.target.value ? Number(e.target.value) : null)}
+                onChange={(v) => set("branch_id", v ? Number(v) : null)}
                 disabled={!form.company_id}
-              >
-                <option value="">—</option>
-                {branches?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
+                options={[
+                  { value: "", label: "—" },
+                  ...(branches ?? []).map((b) => ({ value: String(b.id), label: b.name })),
+                ]}
+              />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">

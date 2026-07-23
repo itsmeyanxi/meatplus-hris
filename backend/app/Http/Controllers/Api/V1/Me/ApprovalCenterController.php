@@ -82,7 +82,15 @@ class ApprovalCenterController extends Controller
 
         $sorted = $items->sortByDesc('filed_at')->values();
 
+        // Whether this user is an approver at all (so the UI can show the panel
+        // with an empty state rather than hiding it when nothing is pending).
+        $isApprover = $globalLeave || $globalAttendance
+            || $user->can('leave.approve.self_dept')
+            || $user->can('attendance.approve.self_dept')
+            || ! empty($teamIds);
+
         return response()->json([
+            'is_approver' => $isApprover,
             'total' => $sorted->count(),
             'counts' => $counts,
             'items' => $sorted,

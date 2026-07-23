@@ -4,10 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 import { getMe, type Me } from "@/lib/auth";
-import { listEmployees } from "@/lib/employees";
 import { dtrApi } from "@/lib/attendance";
 import { overtimeApi, type OTClassification, type OvertimeInput, type OvertimeRequest } from "@/lib/approvals";
 import { ImportDataButton } from "@/components/ImportDataButton";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
+import { SearchSelect } from "@/components/SearchSelect";
 
 // ── helpers ───────────────────────────────────────────────────────────────
 
@@ -211,13 +212,6 @@ function FileOTForm({ employeeId, canManage, meData }: { employeeId: number; can
   const [adminEmployeeId, setAdminEmployeeId] = useState<number>(employeeId);
   const targetEmpId = canManage ? adminEmployeeId : employeeId;
 
-  const { data: empPage } = useQuery({
-    queryKey: ["employees", { all: true }],
-    queryFn: () => listEmployees({ perPage: 200 }),
-    enabled: canManage,
-    staleTime: 60_000,
-  });
-
   // Fetch DTR for selected date to show shift / biometric info
   const { data: dtrs = [] } = useQuery({
     queryKey: ["dtr", targetEmpId, form.date],
@@ -278,17 +272,11 @@ function FileOTForm({ employeeId, canManage, meData }: { employeeId: number; can
               {canManage && (
                 <div className="mb-3">
                   <label className="mb-1 block text-xs font-medium text-slate-500">Employee</label>
-                  <select
-                    className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-slate-400"
-                    value={adminEmployeeId}
-                    onChange={(e) => setAdminEmployeeId(Number(e.target.value))}
-                    required
-                  >
-                    <option value="">Select…</option>
-                    {empPage?.data.map((e) => (
-                      <option key={e.id} value={e.id}>{e.full_name}</option>
-                    ))}
-                  </select>
+                  <EmployeeSearchSelect
+                    value={adminEmployeeId || ""}
+                    onChange={(id) => setAdminEmployeeId(id === "" ? 0 : Number(id))}
+                    placeholder="Select employee…"
+                  />
                 </div>
               )}
               <InfoRow label="Name" value={employee?.full_name ?? "—"} />
@@ -370,15 +358,14 @@ function FileOTForm({ employeeId, canManage, meData }: { employeeId: number; can
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-500">OT Classification</label>
-                    <select
-                      className={inputCls}
+                    <SearchSelect
                       value={form.classification}
-                      onChange={(e) => setForm({ ...form, classification: e.target.value as OTClassification })}
-                      required
-                    >
-                      <option value="normal">Normal OT</option>
-                      <option value="early">Early OT</option>
-                    </select>
+                      onChange={(v) => setForm({ ...form, classification: v as OTClassification })}
+                      options={[
+                        { value: "normal", label: "Normal OT" },
+                        { value: "early", label: "Early OT" },
+                      ]}
+                    />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-500">Start</label>

@@ -1,10 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { inputCls } from "@/components/employees/ChildList";
 import { RequestTable } from "@/components/approvals/RequestTable";
-import { listEmployees } from "@/lib/employees";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
+import { SearchSelect } from "@/components/SearchSelect";
 import { correctionsApi, type AttendanceCorrection, type CorrectionInput } from "@/lib/approvals";
 import { useAttendancePerms } from "@/lib/permissions";
 
@@ -13,12 +14,6 @@ const FIELDS = ["actual_in", "actual_out", "hours_worked", "is_absent", "is_rest
 export default function CorrectionsPage() {
   const qc = useQueryClient();
   const { canManageAttendance } = useAttendancePerms();
-
-  const { data: empPage } = useQuery({
-    queryKey: ["employees", { all: true }],
-    queryFn: () => listEmployees({ perPage: 100 }),
-    enabled: canManageAttendance,
-  });
 
   const [isAdding, setIsAdding] = useState(false);
   const [form, setForm] = useState<CorrectionInput>({
@@ -55,15 +50,10 @@ export default function CorrectionsPage() {
       {isAdding && (
         <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3">
           {canManageAttendance && (
-            <select className={inputCls} value={form.employee_id ?? ""} onChange={(e) => setForm({ ...form, employee_id: e.target.value ? Number(e.target.value) : undefined })} required>
-              <option value="">Employee *</option>
-              {empPage?.data.map((e) => (<option key={e.id} value={e.id}>{e.employee_no} — {e.full_name}</option>))}
-            </select>
+            <EmployeeSearchSelect value={form.employee_id ?? ""} onChange={(id) => setForm({ ...form, employee_id: id === "" ? undefined : Number(id) })} placeholder="Employee *" />
           )}
           <input type="date" className={inputCls} value={form.work_date} onChange={(e) => setForm({ ...form, work_date: e.target.value })} required />
-          <select className={inputCls} value={form.field_to_correct} onChange={(e) => setForm({ ...form, field_to_correct: e.target.value })}>
-            {FIELDS.map((f) => (<option key={f} value={f}>{f}</option>))}
-          </select>
+          <SearchSelect className={inputCls} value={form.field_to_correct} onChange={(v) => setForm({ ...form, field_to_correct: v })} options={FIELDS.map((f) => ({ value: f, label: f }))} />
           <input className={inputCls} placeholder="Old value" value={form.old_value ?? ""} onChange={(e) => setForm({ ...form, old_value: e.target.value })} />
           <input className={`${inputCls} sm:col-span-2`} placeholder="New value *" value={form.new_value} onChange={(e) => setForm({ ...form, new_value: e.target.value })} required />
           <textarea className={`${inputCls} sm:col-span-3`} placeholder="Reason *" rows={2} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} required />

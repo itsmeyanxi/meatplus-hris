@@ -4,10 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { createEmployee, getLookup } from "@/lib/employees";
 import { useBranchTerm } from "@/lib/terminology";
+import { SearchSelect } from "@/components/SearchSelect";
 
 const schema = z.object({
   employee_no: z.string().min(1, "Required").max(30),
@@ -109,20 +110,42 @@ export default function NewEmployeePage() {
               <input type="date" className={inputCls} {...form.register("birth_date")} />
             </Field>
             <Field label="Gender *">
-              <select className={inputCls} {...form.register("gender")}>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
+              <Controller
+                control={form.control}
+                name="gender"
+                render={({ field }) => (
+                  <SearchSelect
+                    className={inputCls}
+                    value={field.value as string | number | undefined}
+                    onChange={field.onChange}
+                    options={[
+                      { value: "male", label: "Male" },
+                      { value: "female", label: "Female" },
+                      { value: "other", label: "Other" },
+                    ]}
+                  />
+                )}
+              />
             </Field>
             <Field label="Civil status *">
-              <select className={inputCls} {...form.register("civil_status")}>
-                <option value="single">Single</option>
-                <option value="married">Married</option>
-                <option value="widowed">Widowed</option>
-                <option value="separated">Separated</option>
-                <option value="divorced">Divorced</option>
-              </select>
+              <Controller
+                control={form.control}
+                name="civil_status"
+                render={({ field }) => (
+                  <SearchSelect
+                    className={inputCls}
+                    value={field.value as string | number | undefined}
+                    onChange={field.onChange}
+                    options={[
+                      { value: "single", label: "Single" },
+                      { value: "married", label: "Married" },
+                      { value: "widowed", label: "Widowed" },
+                      { value: "separated", label: "Separated" },
+                      { value: "divorced", label: "Divorced" },
+                    ]}
+                  />
+                )}
+              />
             </Field>
             <Field label="Nationality">
               <input className={inputCls} {...form.register("nationality")} />
@@ -156,36 +179,65 @@ export default function NewEmployeePage() {
         <Section title="Employment">
           <Grid>
             <Field label={`${branch.Singular} *`} error={form.formState.errors.branch_id?.message}>
-              <select className={inputCls} {...form.register("branch_id")}>
-                <option value="">Select {branch.singular}…</option>
-                {branches?.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
+              <Controller
+                control={form.control}
+                name="branch_id"
+                render={({ field }) => (
+                  <SearchSelect
+                    className={inputCls}
+                    value={field.value as string | number | undefined}
+                    onChange={field.onChange}
+                    placeholder={`Select ${branch.singular}…`}
+                    options={(branches ?? []).map((b) => ({ value: String(b.id), label: b.name }))}
+                  />
+                )}
+              />
             </Field>
             <Field label="Department *" error={form.formState.errors.department_id?.message}>
-              <select className={inputCls} {...form.register("department_id")}>
-                <option value="">Select department…</option>
-                {departments?.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
+              <Controller
+                control={form.control}
+                name="department_id"
+                render={({ field }) => (
+                  <SearchSelect
+                    className={inputCls}
+                    value={field.value as string | number | undefined}
+                    onChange={field.onChange}
+                    placeholder="Select department…"
+                    options={(departments ?? []).map((d) => ({ value: String(d.id), label: d.name }))}
+                  />
+                )}
+              />
             </Field>
             <Field label="Position *" error={form.formState.errors.position_id?.message}>
-              <select className={inputCls} {...form.register("position_id")} disabled={!departmentId}>
-                <option value="">{departmentId ? "Select position…" : "Pick department first"}</option>
-                {positions?.map((p) => (
-                  <option key={p.id} value={p.id}>{p.title}</option>
-                ))}
-              </select>
+              <Controller
+                control={form.control}
+                name="position_id"
+                render={({ field }) => (
+                  <SearchSelect
+                    className={inputCls}
+                    value={field.value as string | number | undefined}
+                    onChange={field.onChange}
+                    disabled={!departmentId}
+                    placeholder={departmentId ? "Select position…" : "Pick department first"}
+                    options={(positions ?? []).map((p) => ({ value: String(p.id), label: p.title }))}
+                  />
+                )}
+              />
             </Field>
             <Field label="Employment type *" error={form.formState.errors.employment_type_id?.message}>
-              <select className={inputCls} {...form.register("employment_type_id")}>
-                <option value="">Select type…</option>
-                {employmentTypes?.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
+              <Controller
+                control={form.control}
+                name="employment_type_id"
+                render={({ field }) => (
+                  <SearchSelect
+                    className={inputCls}
+                    value={field.value as string | number | undefined}
+                    onChange={field.onChange}
+                    placeholder="Select type…"
+                    options={(employmentTypes ?? []).map((t) => ({ value: String(t.id), label: t.name }))}
+                  />
+                )}
+              />
             </Field>
             <Field label="Date hired *" error={form.formState.errors.date_hired?.message}>
               <input type="date" className={inputCls} {...form.register("date_hired")} />

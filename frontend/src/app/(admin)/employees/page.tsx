@@ -17,6 +17,7 @@ import {
 import { invitationsApi } from "@/lib/invitations";
 import { getAdminStats } from "@/lib/dashboard";
 import { AppButton, AppInput, PageHeader, StatusBadge, TableShell } from "@/components/ui";
+import { SearchSelect } from "@/components/SearchSelect";
 import { inputCls, labelCls } from "@/lib/form-classes";
 
 // ── Access status badge ───────────────────────────────────────────────────────
@@ -304,29 +305,26 @@ export default function EmployeesPage() {
           <div className="grid gap-3 rounded-xl border border-slate-200 bg-white/80 p-3 sm:grid-cols-2">
             <div>
               <label className={labelCls}>Department</label>
-              <select className={inputCls} value={departmentId}
-                onChange={(e) => { setDepartmentId(e.target.value === "" ? "" : Number(e.target.value)); setPage(1); }}>
-                <option value="">All departments</option>
-                {departments?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
+              <SearchSelect className={inputCls} value={departmentId}
+                onChange={(v) => { setDepartmentId(v === "" ? "" : Number(v)); setPage(1); }}
+                options={[{ value: "", label: "All departments" }, ...(departments ?? []).map((d) => ({ value: String(d.id), label: d.name }))]} />
             </div>
             <div>
               <label className={labelCls}>Location</label>
-              <select className={inputCls} value={branchId}
-                onChange={(e) => { setBranchId(e.target.value === "" ? "" : Number(e.target.value)); setPage(1); }}>
-                <option value="">All locations</option>
-                {branches?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
+              <SearchSelect className={inputCls} value={branchId}
+                onChange={(v) => { setBranchId(v === "" ? "" : Number(v)); setPage(1); }}
+                options={[{ value: "", label: "All locations" }, ...(branches ?? []).map((b) => ({ value: String(b.id), label: b.name }))]} />
             </div>
             {canConfi && (
               <div>
                 <label className={labelCls}>Payroll group</label>
-                <select className={inputCls} value={isConfidential === "" ? "" : isConfidential ? "1" : "0"}
-                  onChange={(e) => { setIsConfidential(e.target.value === "" ? "" : e.target.value === "1"); setPage(1); }}>
-                  <option value="">All</option>
-                  <option value="1">Confidential</option>
-                  <option value="0">Non-confidential</option>
-                </select>
+                <SearchSelect className={inputCls} value={isConfidential === "" ? "" : isConfidential ? "1" : "0"}
+                  onChange={(v) => { setIsConfidential(v === "" ? "" : v === "1"); setPage(1); }}
+                  options={[
+                    { value: "", label: "All" },
+                    { value: "1", label: "Confidential" },
+                    { value: "0", label: "Non-confidential" },
+                  ]} />
               </div>
             )}
           </div>
@@ -707,10 +705,11 @@ function ImportModal({ companies, onClose, onDone }: { companies: { id: number; 
             {companies.length > 1 && (
               <div>
                 <label className={labelCls}>Import into company</label>
-                <select className={inputCls} value={companyId} onChange={(e) => setCompanyId(e.target.value === "" ? "" : Number(e.target.value))}>
-                  <option value="">Current company</option>
-                  {companies.map((c) => <option key={c.id} value={c.id}>{c.name ?? `Company ${c.id}`}</option>)}
-                </select>
+                <SearchSelect className={inputCls} value={companyId}
+                  onChange={(v) => setCompanyId(v === "" ? "" : Number(v))}
+                  placeholder="Current company"
+                  options={[{ value: "", label: "Current company" }, ...companies.map((c) => ({ value: String(c.id), label: c.name ?? `Company ${c.id}` }))]} />
+
                 <p className="mt-1 text-xs text-slate-400">Pick the company these employees belong to — no need to switch your active company.</p>
               </div>
             )}

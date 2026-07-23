@@ -1,7 +1,9 @@
 "use client";
 
 import { type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell, type NavItem } from "@/components/AppShell";
+import { getMe } from "@/lib/auth";
 
 const NAV: NavItem[] = [
   {
@@ -49,10 +51,15 @@ const NAV: NavItem[] = [
 ];
 
 export default function PayrollLayout({ children }: { children: ReactNode }) {
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const company = me?.user?.active_company;
+  // Brand the payroll module with the company you're currently in, e.g. "PMAI HRIS Payroll".
+  const brandTitle = company ? `${company.legal_name || company.code} HRIS Payroll` : "HRIS Payroll";
+
   return (
     <AppShell
       nav={NAV}
-      brandTitle="Meatplus Payroll"
+      brandTitle={brandTitle}
       backLink={{ href: "/dashboard", label: "Back to HR" }}
     >
       {children}

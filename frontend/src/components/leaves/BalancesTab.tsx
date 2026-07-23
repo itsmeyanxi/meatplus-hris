@@ -3,7 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
 import { TableShell } from "@/components/ui";
-import { listEmployees } from "@/lib/employees";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
+import { SearchSelect } from "@/components/SearchSelect";
 import { useAttendancePerms } from "@/lib/permissions";
 import { leaveBalancesApi } from "@/lib/leaves";
 import { inputCls, labelCls } from "@/lib/form-classes";
@@ -19,12 +20,6 @@ export function BalancesTab() {
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustNote, setAdjustNote] = useState("");
   const [adjustError, setAdjustError] = useState<string | null>(null);
-
-  const { data: empPage } = useQuery({
-    queryKey: ["employees", { all: true }],
-    queryFn: () => listEmployees({ perPage: 100 }),
-    enabled: canManageAttendance,
-  });
 
   const { data: balances = [] } = useQuery({
     queryKey: ["leave-balances", { year, employeeId }],
@@ -78,19 +73,25 @@ export function BalancesTab() {
         {canManageAttendance && (
           <div>
             <label className={labelCls}>Employee</label>
-            <select className={inputCls} value={employeeId} onChange={(e) => setEmployeeId(e.target.value === "" ? "" : Number(e.target.value))}>
-              <option value="">All employees</option>
-              {empPage?.data.map((e) => (<option key={e.id} value={e.id}>{e.employee_no} — {e.full_name}</option>))}
-            </select>
+            <EmployeeSearchSelect
+              className={inputCls}
+              value={employeeId}
+              onChange={(id) => setEmployeeId(id === "" ? "" : Number(id))}
+              placeholder="All employees"
+            />
           </div>
         )}
         <div>
           <label className={labelCls}>Year</label>
-          <select className={inputCls} value={year} onChange={(e) => setYear(Number(e.target.value))}>
-            {Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - i).map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+          <SearchSelect
+            className={inputCls}
+            value={year}
+            onChange={(v) => setYear(Number(v))}
+            options={Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - i).map((y) => ({
+              value: String(y),
+              label: String(y),
+            }))}
+          />
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ChildListShell, EmptyRow, inputCls } from "@/components/employees/ChildList";
+import { SearchSelect } from "@/components/SearchSelect";
 import {
   contractsApi,
   type Contract,
@@ -88,31 +89,23 @@ export default function ContractsTab() {
           }}
           className="rounded-xl border border-slate-200 bg-white p-4 grid grid-cols-1 gap-3 sm:grid-cols-2"
         >
-          <select
+          <SearchSelect
             className={inputCls}
             value={form.contract_type}
-            onChange={(e) => setForm({ ...form, contract_type: e.target.value })}
-          >
-            {CONTRACT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, " ")}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setForm({ ...form, contract_type: v })}
+            options={CONTRACT_TYPES.map((t) => ({
+              value: t,
+              label: t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, " "),
+            }))}
+          />
 
-          <select
+          <SearchSelect
             className={inputCls}
             value={form.position_id}
-            onChange={(e) => setForm({ ...form, position_id: e.target.value })}
-            required
-          >
-            <option value="">Select position *</option>
-            {positions.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.title}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setForm({ ...form, position_id: v })}
+            placeholder="Select position *"
+            options={positions.map((p) => ({ value: String(p.id), label: p.title }))}
+          />
 
           <div>
             <label className="text-xs text-slate-500">Effective from *</label>

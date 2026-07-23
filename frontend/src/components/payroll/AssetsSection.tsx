@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppButton, TableShell } from "@/components/ui";
+import { SearchSelect } from "@/components/SearchSelect";
 import { inputCls, labelCls } from "@/lib/form-classes";
 import { assetsApi, type Asset, type AssetInput } from "@/lib/employee-relations";
 import { referenceApi } from "@/lib/reference";
@@ -170,19 +171,25 @@ function AddAssetModal({
             <div>
               <label className={labelCls}>Category</label>
               {activeCategories.length > 0 ? (
-                <select className={inputCls} value={f.category} onChange={(e) => set("category", e.target.value)}>
-                  <option value="">Select category…</option>
-                  {activeCategories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-                </select>
+                <SearchSelect
+                  className={inputCls}
+                  value={f.category}
+                  onChange={(v) => set("category", v)}
+                  placeholder="Select category…"
+                  options={activeCategories.map((c) => ({ value: c.name, label: c.name }))}
+                />
               ) : (
                 <input className={inputCls} value={f.category} onChange={(e) => set("category", e.target.value)} placeholder="Add categories under Maintenance › Assets" />
               )}
             </div>
             <div>
               <label className={labelCls}>Condition</label>
-              <select className={inputCls} value={f.condition} onChange={(e) => set("condition", e.target.value)}>
-                {CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <SearchSelect
+                className={inputCls}
+                value={f.condition}
+                onChange={(v) => set("condition", v)}
+                options={CONDITIONS.map((c) => ({ value: c, label: c }))}
+              />
             </div>
             <div>
               <label className={labelCls}>Purchase Price</label>

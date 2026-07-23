@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { getMe } from "@/lib/auth";
-import { listEmployees } from "@/lib/employees";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import {
   employeeSchedulesApi,
   schedAdjApi,
@@ -59,13 +59,6 @@ export default function ScheduleAdjustmentsPage() {
   const [viewEmpId, setViewEmpId] = useState<number | null>(null);
   const targetEmpId = isHR ? (viewEmpId ?? null) : employeeId;
 
-  const { data: empPage } = useQuery({
-    queryKey: ["employees", { all: true }],
-    queryFn: () => listEmployees({ perPage: 200 }),
-    enabled: isHR,
-    staleTime: 60_000,
-  });
-
   const statusParam = tab === "pending" ? "pending_or_resubmitted" : tab === "rejected" ? "rejected" : "approved";
 
   const { data: requestsResult, isLoading } = useQuery({
@@ -120,7 +113,6 @@ export default function ScheduleAdjustmentsPage() {
         <ApplicationForm
           employeeId={employeeId ?? 0}
           canManage={canManage}
-          empPage={empPage?.data ?? []}
           onSuccess={() => {
             setShowForm(false);
             qc.invalidateQueries({ queryKey: ["sched-adj-requests"] });
@@ -129,19 +121,15 @@ export default function ScheduleAdjustmentsPage() {
       )}
 
       {/* HR employee filter */}
-      {isHR && empPage && (
+      {isHR && (
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-500">Filter by employee:</span>
-          <select
+          <EmployeeSearchSelect
             className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-teal-500 min-w-[200px]"
             value={viewEmpId ?? ""}
-            onChange={(e) => setViewEmpId(e.target.value ? Number(e.target.value) : null)}
-          >
-            <option value="">All employees</option>
-            {empPage.data.map((e) => (
-              <option key={e.id} value={e.id}>{e.full_name}</option>
-            ))}
-          </select>
+            onChange={(id) => setViewEmpId(id === "" ? null : Number(id))}
+            placeholder="All employees"
+          />
         </div>
       )}
 
@@ -340,12 +328,10 @@ function StatusBadge({ status }: { status: SchedAdjStatus }) {
 function ApplicationForm({
   employeeId,
   canManage,
-  empPage,
   onSuccess,
 }: {
   employeeId: number;
   canManage: boolean;
-  empPage: { id: number; full_name: string }[];
   onSuccess: () => void;
 }) {
   const [targetEmpId, setTargetEmpId] = useState(employeeId);
@@ -386,9 +372,12 @@ function ApplicationForm({
         {canManage && (
           <div className="w-64">
             <label className="mb-1 block text-xs font-medium text-slate-500">Employee</label>
-            <select className={inputCls} value={targetEmpId} onChange={(e) => setTargetEmpId(Number(e.target.value))}>
-              {empPage.map((e) => <option key={e.id} value={e.id}>{e.full_name}</option>)}
-            </select>
+            <EmployeeSearchSelect
+              className={inputCls}
+              value={targetEmpId}
+              onChange={(id) => setTargetEmpId(id === "" ? 0 : Number(id))}
+              placeholder="Select employee…"
+            />
           </div>
         )}
 

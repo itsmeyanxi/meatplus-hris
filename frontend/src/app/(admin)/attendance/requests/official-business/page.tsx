@@ -1,22 +1,16 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { inputCls } from "@/components/employees/ChildList";
 import { RequestTable } from "@/components/approvals/RequestTable";
-import { listEmployees } from "@/lib/employees";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { officialBusinessApi, type OfficialBusinessInput, type OfficialBusinessRequest } from "@/lib/approvals";
 import { useAttendancePerms } from "@/lib/permissions";
 
 export default function OBRequestsPage() {
   const qc = useQueryClient();
   const { canManageAttendance } = useAttendancePerms();
-
-  const { data: empPage } = useQuery({
-    queryKey: ["employees", { all: true }],
-    queryFn: () => listEmployees({ perPage: 100 }),
-    enabled: canManageAttendance,
-  });
 
   const [isAdding, setIsAdding] = useState(false);
   const [form, setForm] = useState<OfficialBusinessInput>({
@@ -51,10 +45,7 @@ export default function OBRequestsPage() {
       {isAdding && (
         <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3">
           {canManageAttendance && (
-            <select className={inputCls} value={form.employee_id ?? ""} onChange={(e) => setForm({ ...form, employee_id: e.target.value ? Number(e.target.value) : undefined })} required>
-              <option value="">Employee *</option>
-              {empPage?.data.map((e) => (<option key={e.id} value={e.id}>{e.employee_no} — {e.full_name}</option>))}
-            </select>
+            <EmployeeSearchSelect value={form.employee_id ?? ""} onChange={(id) => setForm({ ...form, employee_id: id === "" ? undefined : Number(id) })} placeholder="Employee *" />
           )}
           <input type="date" className={inputCls} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
           <input className={inputCls} placeholder="Location *" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} required />

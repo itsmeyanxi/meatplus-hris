@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { SearchSelect } from "@/components/SearchSelect";
 import { payrollAccessApi, type PayrollAccessRow } from "@/lib/payroll";
 import { usersApi } from "@/lib/users";
 
@@ -215,21 +216,23 @@ export default function PayrollAccessPage() {
 
             <div className="mt-4 space-y-4">
               <Field label="User">
-                <Select value={userId} onChange={(e) => setUserId(e.target.value)}>
-                  <option value="">Select a user…</option>
-                  {users?.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
-                  ))}
-                </Select>
+                <SearchSelect
+                  className={inputCls}
+                  value={userId}
+                  onChange={setUserId}
+                  placeholder="Select a user…"
+                  options={(users ?? []).map((u) => ({ value: String(u.id), label: `${u.name} (${u.email})` }))}
+                />
               </Field>
 
               <Field label="Payroll Role">
-                <Select value={role} onChange={(e) => setRole(e.target.value)}>
-                  <option value="">Select a payroll role…</option>
-                  {options?.roles.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </Select>
+                <SearchSelect
+                  className={inputCls}
+                  value={role}
+                  onChange={setRole}
+                  placeholder="Select a payroll role…"
+                  options={(options?.roles ?? []).map((r) => ({ value: r, label: r }))}
+                />
                 {role && ROLE_BLURB[role] && (
                   <p className="mt-1.5 text-xs text-slate-500">{ROLE_BLURB[role]}</p>
                 )}
@@ -266,10 +269,6 @@ export default function PayrollAccessPage() {
 
 const inputCls =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100 transition";
-
-function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={inputCls} {...props} />;
-}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

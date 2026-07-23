@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ChildListShell, EmptyRow, inputCls } from "@/components/employees/ChildList";
+import { SearchSelect } from "@/components/SearchSelect";
 import {
   dependentsApi,
   type Dependent,
@@ -71,17 +72,12 @@ export default function DependentsTab() {
             onChange={(e) => setForm({ ...form, full_name: e.target.value })}
             required
           />
-          <select
+          <SearchSelect
             className={inputCls}
             value={form.relationship}
-            onChange={(e) => setForm({ ...form, relationship: e.target.value })}
-          >
-            {RELATIONSHIPS.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setForm({ ...form, relationship: v })}
+            options={RELATIONSHIPS.map((r) => ({ value: r, label: r }))}
+          />
           <input
             type="date"
             className={inputCls}

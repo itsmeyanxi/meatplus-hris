@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ChildListShell, EmptyRow, inputCls } from "@/components/employees/ChildList";
+import { SearchSelect } from "@/components/SearchSelect";
 import {
   educationApi,
   type Education,
@@ -67,17 +68,12 @@ export default function EducationTab() {
           }}
           className="rounded-xl border border-slate-200 bg-white p-4 grid grid-cols-1 gap-3 sm:grid-cols-3"
         >
-          <select
+          <SearchSelect
             className={inputCls}
             value={form.level}
-            onChange={(e) => setForm({ ...form, level: e.target.value })}
-          >
-            {LEVELS.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setForm({ ...form, level: v })}
+            options={LEVELS.map((l) => ({ value: l, label: l }))}
+          />
           <input
             className={`${inputCls} sm:col-span-2`}
             placeholder="School *"
