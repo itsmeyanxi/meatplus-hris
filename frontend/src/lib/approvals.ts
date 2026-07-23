@@ -160,6 +160,32 @@ export const overtimeApi = {
     return data;
   },
 };
+// ── Approval Center — every pending request the signed-in user can act on ──
+
+export type ApprovalItem = {
+  type: string;
+  type_label: string;
+  id: number;
+  employee_name: string;
+  employee_no: string | null;
+  company: string | null;
+  date: string;
+  summary: string;
+  url: string;
+  filed_at: string;
+};
+
+export type ApprovalCenter = {
+  total: number;
+  counts: Record<string, number>;
+  items: ApprovalItem[];
+};
+
+export async function getApprovals(): Promise<ApprovalCenter> {
+  const { data } = await api.get<ApprovalCenter>("/api/v1/my/approvals");
+  return data;
+}
+
 export const undertimeApi = makeApi<UndertimeRequest, UndertimeInput>("undertime-requests");
 export const officialBusinessApi = makeApi<OfficialBusinessRequest, OfficialBusinessInput>("official-business-requests");
 export const certificateOfAttendanceApi = makeApi<CertificateOfAttendanceRequest, CertificateOfAttendanceInput>(

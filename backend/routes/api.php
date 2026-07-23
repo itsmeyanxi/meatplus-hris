@@ -69,6 +69,7 @@ Route::prefix('v1')->group(function () {
         Route::get('me', MeController::class);
         Route::get('my/pending-summary', PendingSummaryController::class);
         Route::get('my/team', \App\Http\Controllers\Api\V1\Me\TeamController::class);
+        Route::get('my/approvals', \App\Http\Controllers\Api\V1\Me\ApprovalCenterController::class);
         Route::get('my/time-clock', [\App\Http\Controllers\Api\V1\Me\TimeClockController::class, 'show']);
         Route::post('my/time-clock', [\App\Http\Controllers\Api\V1\Me\TimeClockController::class, 'store']);
         Route::get('audit-trail', [\App\Http\Controllers\Api\V1\Admin\AuditTrailController::class, 'index']);

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { PageHeader, TableShell } from "@/components/ui";
+import { ApprovalList } from "@/components/ApprovalCenter";
 
 type TeamMember = {
   id: number;
@@ -80,6 +81,8 @@ export default function MyTeamPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="My Team" description="Your reporting line — who you report to, your teammates, and your direct reports." />
+
+      <ApprovalList />
 
       {isLoading ? (
         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-10 text-center text-sm text-slate-400">Loading…</div>

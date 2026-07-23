@@ -12,6 +12,7 @@ import { ROLE_LABELS } from "@/lib/users";
 import { getMyAccessRequests } from "@/lib/access-requests";
 import { PageHeader } from "@/components/ui";
 import { TimeClockCard } from "@/components/TimeClockCard";
+import { ApprovalQuickCard } from "@/components/ApprovalCenter";
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 
@@ -225,6 +226,9 @@ export default function DashboardPage() {
 
       {/* ── Web time clock (anyone linked to an employee record) ── */}
       {hasEmployee && <TimeClockCard />}
+
+      {/* ── Quick access: requests awaiting my approval (hidden when none) ── */}
+      <ApprovalQuickCard />
 
       {/* ── Role-specific views ── */}
       {viewGroup === "admin"      && <AdminView      {...sharedProps} payrollRuns={recentRuns} personal={personalProps} />}
