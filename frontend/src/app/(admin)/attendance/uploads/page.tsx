@@ -63,7 +63,9 @@ export default function TimeLogUploadsPage() {
       {canUpload && (
         <AppCard title="Upload time logs">
           <p className="mb-3 text-sm text-slate-500">
-            Columns: <span className="font-medium text-slate-700">Employee ID · Date · Time In · Time Out</span> (one row per employee per day).{" "}
+            Two formats accepted:{" "}
+            <span className="font-medium text-slate-700">Employee ID · Date · Time In · Time Out</span> (one row per day),{" "}
+            or a raw biometric log <span className="font-medium text-slate-700">Biometric ID · LogTime · In/Out</span> (one row per scan — grouped into days automatically).{" "}
             <a href={timeLogRequestsApi.templateUrl} className="font-medium text-teal-700 hover:underline">Download template</a>
           </p>
           <div className="flex flex-wrap items-center gap-3">

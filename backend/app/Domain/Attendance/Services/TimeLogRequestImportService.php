@@ -18,10 +18,13 @@ class TimeLogRequestImportService
 {
     /** Canonical column => accepted header aliases (lower-cased, space-collapsed). */
     private const ALIASES = [
-        'employee_no' => ['employee id', 'employee no', 'employee number', 'emp id', 'id', 'employee_no', 'biometric id', 'device pin'],
+        'employee_no' => ['employee id', 'employee no', 'employee number', 'emp id', 'id', 'employee_no', 'biometric id', 'biometricid', 'device pin', 'empidno', 'emp id no', 'id no'],
         'work_date' => ['date', 'work date', 'work_date', 'day', 'attendance date'],
         'time_in' => ['time in', 'time_in', 'in', 'clock in', 'am in', 'time-in'],
         'time_out' => ['time out', 'time_out', 'out', 'clock out', 'pm out', 'time-out'],
+        // Event/punch-level format (one row per scan): a single timestamp + direction.
+        'log_time' => ['logtime', 'log time', 'log_time', 'datetime', 'date time', 'punch time', 'timestamp', 'time stamp'],
+        'direction' => ['inoutmode', 'in out mode', 'in/out', 'inout', 'direction', 'mode', 'log type', 'punch type'],
     ];
 
     /**
@@ -37,10 +40,22 @@ class TimeLogRequestImportService
         }
 
         $map = $this->mapHeader(array_shift($rows));
+
+        // Event/punch-level sheet (BiometricID | LogTime | In/Out): one row per scan.
+        // Aggregate to day level (first IN, last OUT) before creating requests.
+        if (isset($map['log_time']) && ! isset($map['time_in']) && ! isset($map['time_out'])) {
+            if (! isset($map['employee_no'])) {
+                return ['batch_id' => $batchId, 'created' => 0, 'total' => 0,
+                    'errors' => [['row' => 1, 'message' => 'Missing required column: Employee/Biometric ID.']]];
+            }
+
+            return $this->importEventRows($rows, $map, $companyId, $uploadedBy, $batchId);
+        }
+
         foreach (['employee_no', 'work_date'] as $required) {
             if (! isset($map[$required])) {
                 return ['batch_id' => $batchId, 'created' => 0, 'total' => 0,
-                    'errors' => [['row' => 1, 'message' => "Missing required column for: {$required} (need at least Employee ID and Date)."]]];
+                    'errors' => [['row' => 1, 'message' => "Missing required column for: {$required} (need Employee ID + Date + Time, or Biometric ID + LogTime + In/Out)."]]];
             }
         }
 
@@ -96,6 +111,83 @@ class TimeLogRequestImportService
                 'uploaded_by' => $uploadedBy,
             ]);
             $created++;
+        }
+
+        return ['batch_id' => $batchId, 'created' => $created, 'total' => count($rows), 'errors' => $errors];
+    }
+
+    /**
+     * Import a punch-level sheet (one row per scan) by grouping rows into one
+     * day-level request per employee/date: earliest IN and latest OUT.
+     *
+     * @param  array<int,array<int,string>>  $rows
+     * @param  array<string,int>  $map
+     * @return array{batch_id:string, created:int, errors:array<int,array{row:int,message:string}>, total:int}
+     */
+    private function importEventRows(array $rows, array $map, int $companyId, ?int $uploadedBy, string $batchId): array
+    {
+        $empCache = [];
+        $errors = [];
+        $line = 1;
+        $groups = []; // employeeId => date => ['in' => [times], 'out' => [times]]
+
+        foreach ($rows as $cells) {
+            $line++;
+            if (! array_filter(array_map(fn ($c) => trim((string) $c), $cells))) {
+                continue;
+            }
+
+            $get = fn (string $key) => isset($map[$key]) ? trim((string) ($cells[$map[$key]] ?? '')) : '';
+
+            $empNo = $get('employee_no');
+            $logRaw = $get('log_time');
+            $dir = strtolower($get('direction'));
+
+            if ($empNo === '') {
+                $errors[] = ['row' => $line, 'message' => 'Missing Employee/Biometric ID.'];
+
+                continue;
+            }
+            $employeeId = $this->resolveEmployee($companyId, $empNo, $empCache);
+            if (! $employeeId) {
+                $errors[] = ['row' => $line, 'message' => "No employee found for ID \"{$empNo}\" in this company."];
+
+                continue;
+            }
+            try {
+                $ts = Carbon::parse($logRaw);
+            } catch (\Throwable) {
+                $errors[] = ['row' => $line, 'message' => "Unreadable timestamp \"{$logRaw}\"."];
+
+                continue;
+            }
+
+            // "out"/"break out" → out; anything else (in, break in, blank) → in.
+            $isOut = str_starts_with($dir, 'out') || $dir === 'break out';
+            $groups[$employeeId][$ts->toDateString()][$isOut ? 'out' : 'in'][] = $ts->format('H:i:s');
+        }
+
+        $created = 0;
+        foreach ($groups as $employeeId => $dates) {
+            foreach ($dates as $date => $io) {
+                $timeIn = ! empty($io['in']) ? min($io['in']) : null;
+                $timeOut = ! empty($io['out']) ? max($io['out']) : null;
+                if (! $timeIn && ! $timeOut) {
+                    continue;
+                }
+
+                TimeLogRequest::create([
+                    'company_id' => $companyId,
+                    'employee_id' => $employeeId,
+                    'batch_id' => $batchId,
+                    'work_date' => $date,
+                    'time_in' => $timeIn,
+                    'time_out' => $timeOut,
+                    'status' => 'pending',
+                    'uploaded_by' => $uploadedBy,
+                ]);
+                $created++;
+            }
         }
 
         return ['batch_id' => $batchId, 'created' => $created, 'total' => count($rows), 'errors' => $errors];
