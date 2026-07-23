@@ -73,3 +73,7 @@ backups/
 
 # Downloaded binaries (Caddy, etc.)
 tools/
+
+# Ad-hoc HR working exports (contain employee PII)
+missing-positions-to-fill.xlsx
+*-to-fill.xlsx
