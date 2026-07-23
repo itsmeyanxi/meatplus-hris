@@ -281,8 +281,25 @@ class DtrComputer
         $isRestDay = (bool) ($scheduleDay?->is_rest_day);
         $hasAnyLogs = $dayLogs->isNotEmpty();
 
-        $actualIn = $dayLogs->firstWhere('direction', 'in')?->logged_at;
-        $actualOut = $dayLogs->where('direction', 'out')->last()?->logged_at;
+        // Clock ORDER decides in/out — not the device's in/out flag. Biometric units
+        // often report the wrong status (or none, leaving it to be guessed), which
+        // produced days with the "in" later than the "out" and zero hours worked.
+        // The first punch of the day is the arrival, the last is the departure.
+        $sortedLogs = $dayLogs->sortBy('logged_at')->values();
+        $actualIn = $sortedLogs->first()?->logged_at;
+        $actualOut = $sortedLogs->count() > 1 ? $sortedLogs->last()?->logged_at : null;
+
+        // A single punch is ambiguous: count it as a departure when it falls nearer
+        // the scheduled end than the scheduled start, otherwise as an arrival.
+        if ($sortedLogs->count() === 1 && $scheduleDay && ! $isRestDay
+            && $scheduleDay->time_in && $scheduleDay->time_out) {
+            $only = $sortedLogs->first()->logged_at;
+            [$si, $so] = $this->scheduledWindow($day->toDateString(), $scheduleDay->time_in, $scheduleDay->time_out);
+            if (abs($only->diffInMinutes($so)) < abs($only->diffInMinutes($si))) {
+                $actualIn = null;
+                $actualOut = $only;
+            }
+        }
 
         $hoursWorked = 0.0;
         $lateMinutes = 0;
