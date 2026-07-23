@@ -11,6 +11,7 @@ type TeamMember = {
   full_name: string;
   position: string | null;
   department: string | null;
+  company: string | null;
   is_active: boolean;
 };
 
@@ -22,28 +23,33 @@ export default function MyTeamPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="My Team" description="Your direct reports — the people who report to you." />
+      <PageHeader title="My Team" description="Your direct reports — the people who report to you (across all companies)." />
 
       <TableShell>
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-slate-50">
             <tr>
-              {["Employee", "Position", "Department", "Status", ""].map((h) => (
+              {["Employee", "Company", "Position", "Department", "Status", ""].map((h) => (
                 <th key={h} className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
             {isLoading ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-slate-400">Loading…</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-xs text-slate-400">Loading…</td></tr>
             ) : (team?.length ?? 0) === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-slate-400">No one reports to you yet.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-xs text-slate-400">No one reports to you yet.</td></tr>
             ) : (
               team!.map((m) => (
                 <tr key={m.id} className="hover:bg-slate-50/60">
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-slate-800">{m.full_name}</div>
                     <div className="font-mono text-xs text-slate-400">{m.employee_no}</div>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {m.company ? (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{m.company}</span>
+                    ) : "—"}
                   </td>
                   <td className="px-4 py-2.5 text-slate-600">{m.position ?? "—"}</td>
                   <td className="px-4 py-2.5 text-slate-600">{m.department ?? "—"}</td>
