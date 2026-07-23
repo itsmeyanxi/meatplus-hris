@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export type SearchOption = { value: string; label?: string; hint?: string };
 
@@ -9,6 +10,10 @@ export type SearchOption = { value: string; label?: string; hint?: string };
  * to filter the options, or click and pick. A drop-in replacement for a plain
  * <select> — pass `value`, `onChange(value)`, and an `options` array. Keeps
  * string values (like a native select); numeric callers coerce on their side.
+ *
+ * The option panel is rendered in a portal with fixed positioning, so it always
+ * floats above surrounding cards/tables and is never clipped by an ancestor's
+ * overflow or stacking context (e.g. a card's backdrop-blur).
  */
 export function SearchSelect({
   value,
@@ -34,8 +39,9 @@ export function SearchSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
+  const panelRef = useRef<HTMLUListElement>(null);
   const reactId = useId();
   const listId = `${id ?? name ?? reactId}-listbox`;
 
@@ -49,13 +55,31 @@ export function SearchSelect({
     return options.filter((o) => o.label?.toLowerCase().includes(q) || o.hint?.toLowerCase().includes(q));
   }, [options, query]);
 
-  // Close on outside click.
+  const updateRect = () => {
+    const r = boxRef.current?.getBoundingClientRect();
+    if (r) setRect({ top: r.bottom + 4, left: r.left, width: r.width });
+  };
+
+  // Reposition the portalled panel while open (on scroll/resize).
+  useEffect(() => {
+    if (!open) return;
+    updateRect();
+    const h = () => updateRect();
+    window.addEventListener("scroll", h, true);
+    window.addEventListener("resize", h);
+    return () => {
+      window.removeEventListener("scroll", h, true);
+      window.removeEventListener("resize", h);
+    };
+  }, [open]);
+
+  // Close on outside click (accounting for the portalled panel).
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setQuery("");
-      }
+      const t = e.target as Node;
+      if (boxRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+      setOpen(false);
+      setQuery("");
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -63,8 +87,8 @@ export function SearchSelect({
 
   // Keep the active option in view.
   useEffect(() => {
-    if (!open || !listRef.current) return;
-    const el = listRef.current.children[active] as HTMLElement | undefined;
+    if (!open || !panelRef.current) return;
+    const el = panelRef.current.children[active] as HTMLElement | undefined;
     el?.scrollIntoView({ block: "nearest" });
   }, [active, open]);
 
@@ -76,6 +100,7 @@ export function SearchSelect({
 
   const openList = () => {
     if (disabled) return;
+    updateRect();
     setOpen(true);
     setActive(Math.max(0, filtered.findIndex((o) => o.value === val)));
   };
@@ -125,12 +150,13 @@ export function SearchSelect({
         </button>
       </div>
 
-      {open && (
+      {open && rect && typeof document !== "undefined" && createPortal(
         <ul
-          ref={listRef}
+          ref={panelRef}
           id={listId}
           role="listbox"
-          className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg"
+          style={{ position: "fixed", top: rect.top, left: rect.left, width: rect.width, zIndex: 9999 }}
+          className="max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg"
         >
           {filtered.length === 0 ? (
             <li className="px-3 py-2 text-xs text-slate-400">No matches{query ? ` for “${query}”` : ""}.</li>
@@ -149,7 +175,8 @@ export function SearchSelect({
               </li>
             ))
           )}
-        </ul>
+        </ul>,
+        document.body,
       )}
     </div>
   );

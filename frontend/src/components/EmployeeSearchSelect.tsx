@@ -2,11 +2,16 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { listEmployees, type EmployeeListItem } from "@/lib/employees";
 
 /**
  * Type-to-search employee picker. Unlike a plain <select> capped at the first N
  * employees, this queries the API as you type, so every employee is reachable.
+ *
+ * The results panel is rendered in a portal with fixed positioning so it floats
+ * above surrounding cards/tables and is never clipped by an ancestor's overflow
+ * or stacking context.
  */
 export function EmployeeSearchSelect({
   value,
@@ -25,17 +30,38 @@ export function EmployeeSearchSelect({
   const [term, setTerm] = useState("");
   const [debounced, setDebounced] = useState("");
   const [selectedLabel, setSelectedLabel] = useState<string>("");
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(term.trim()), 250);
     return () => clearTimeout(t);
   }, [term]);
 
-  // Close on outside click.
+  const updateRect = () => {
+    const r = boxRef.current?.getBoundingClientRect();
+    if (r) setRect({ top: r.bottom + 4, left: r.left, width: r.width });
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    updateRect();
+    const h = () => updateRect();
+    window.addEventListener("scroll", h, true);
+    window.addEventListener("resize", h);
+    return () => {
+      window.removeEventListener("scroll", h, true);
+      window.removeEventListener("resize", h);
+    };
+  }, [open]);
+
+  // Close on outside click (accounting for the portalled panel).
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (boxRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -57,11 +83,13 @@ export function EmployeeSearchSelect({
     setTerm("");
   };
 
+  const openList = () => { updateRect(); setOpen(true); };
+
   return (
     <div ref={boxRef} className={`relative ${className}`}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => (open ? setOpen(false) : openList())}
         className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm outline-none focus:border-teal-500"
       >
         <span className={value === "" ? "text-slate-400" : "text-slate-800"}>
@@ -72,8 +100,12 @@ export function EmployeeSearchSelect({
         </svg>
       </button>
 
-      {open && (
-        <div className="absolute z-30 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg">
+      {open && rect && typeof document !== "undefined" && createPortal(
+        <div
+          ref={panelRef}
+          style={{ position: "fixed", top: rect.top, left: rect.left, width: rect.width, zIndex: 9999 }}
+          className="rounded-lg border border-slate-200 bg-white shadow-lg"
+        >
           <div className="border-b border-slate-100 p-2">
             {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
             <input
@@ -109,7 +141,8 @@ export function EmployeeSearchSelect({
               </li>
             ))}
           </ul>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
