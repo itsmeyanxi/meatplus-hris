@@ -237,6 +237,8 @@ Route::prefix('v1')->group(function () {
         Route::get('reports/payroll/{payrollRun}', [ReportController::class, 'payroll']);
 
         // Payroll
+        Route::get('payroll/timekeeping', [\App\Http\Controllers\Api\V1\Payroll\PayrollTimekeepingController::class, 'index']);
+        Route::post('payroll/timekeeping/remind', [\App\Http\Controllers\Api\V1\Payroll\PayrollTimekeepingController::class, 'remind']);
         Route::get('compensations', [\App\Http\Controllers\Api\V1\Payroll\CompensationController::class, 'index']);
         Route::post('compensations', [\App\Http\Controllers\Api\V1\Payroll\CompensationController::class, 'store']);
         // Payroll User Access — per-company payroll role grants.

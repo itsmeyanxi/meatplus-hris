@@ -81,6 +81,43 @@ export const payrollApi = {
   deleteRun: async (id: number) => (await api.delete(`/api/v1/payroll-runs/${id}`)).data,
 };
 
+// ── Payroll timekeeping review ──────────────────────────────────────────────
+
+export type TimekeepingHead = { employee_id: number; name: string; email: string | null; mobile: string | null };
+export type TimekeepingRow = {
+  employee_id: number;
+  employee_no: string;
+  name: string;
+  department: string | null;
+  attendance: {
+    scheduled_days: number; present_days: number; absent_days: number; leave_days: number;
+    late_minutes: number; ot_minutes: number; undertime_minutes: number; night_minutes: number;
+  };
+  floating_total: number;
+  floating: Record<string, number>;
+  head: TimekeepingHead | null;
+};
+export type TimekeepingReview = {
+  period: { from: string; to: string };
+  summary: { employees: number; with_floating: number; floating_total: number };
+  items: TimekeepingRow[];
+};
+
+export const FLOATING_LABELS: Record<string, string> = {
+  overtime: "OT", undertime: "UT", official_business: "OB", coa: "COA", correction: "Correction",
+};
+
+export const timekeepingApi = {
+  review: async (from?: string, to?: string): Promise<TimekeepingReview> => {
+    const { data } = await api.get<TimekeepingReview>("/api/v1/payroll/timekeeping", { params: { from, to } });
+    return data;
+  },
+  remind: async (employee_id: number, from?: string, to?: string): Promise<{ message: string; sent: number }> => {
+    const { data } = await api.post("/api/v1/payroll/timekeeping/remind", { employee_id, from, to });
+    return data;
+  },
+};
+
 export type SalaryRecord = {
   id: number;
   basic_monthly: string;
