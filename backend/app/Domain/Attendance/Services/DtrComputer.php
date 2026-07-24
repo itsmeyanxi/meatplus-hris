@@ -307,6 +307,31 @@ class DtrComputer
             }
         }
 
+        // An approved COA is the employee's declaration of the punch they missed, so
+        // it supplies whichever side has no punch. Previously the day was only marked
+        // excused: the claimed time never appeared and no hours were credited.
+        if ($coa) {
+            $asTime = static function ($v): ?string {
+                if ($v === null || $v === '') {
+                    return null;
+                }
+
+                return $v instanceof \DateTimeInterface ? $v->format('H:i:s') : substr((string) $v, 0, 8);
+            };
+            $claimedIn = $asTime($coa->claimed_time_in);
+            $claimedOut = $asTime($coa->claimed_time_out);
+
+            if (! $actualIn && $claimedIn) {
+                $actualIn = CarbonImmutable::parse($day->toDateString().' '.$claimedIn);
+            }
+            if (! $actualOut && $claimedOut) {
+                $actualOut = CarbonImmutable::parse($day->toDateString().' '.$claimedOut);
+                if ($actualIn && $actualOut->lessThanOrEqualTo($actualIn)) {
+                    $actualOut = $actualOut->addDay(); // shift ran past midnight
+                }
+            }
+        }
+
         $hoursWorked = 0.0;
         $lateMinutes = 0;
         $undertimeMinutes = 0;

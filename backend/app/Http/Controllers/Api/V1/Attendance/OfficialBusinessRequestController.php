@@ -72,6 +72,8 @@ class OfficialBusinessRequestController extends Controller
             'decision_remarks' => $request->validated('decision_remarks'),
         ]);
 
+        $this->recomputeRequestDays($officialBusinessRequest);
+
         return new OfficialBusinessRequestResource($officialBusinessRequest->load(['employee', 'approver:id,name']));
     }
 
@@ -86,6 +88,8 @@ class OfficialBusinessRequestController extends Controller
             'decision_remarks' => $request->validated('decision_remarks'),
         ]);
 
+        $this->recomputeRequestDays($officialBusinessRequest);
+
         return new OfficialBusinessRequestResource($officialBusinessRequest->load(['employee', 'approver:id,name']));
     }
 
@@ -94,6 +98,8 @@ class OfficialBusinessRequestController extends Controller
         $this->assertCanCancel($request, $officialBusinessRequest);
 
         $officialBusinessRequest->update(['status' => 'cancelled']);
+
+        $this->recomputeRequestDays($officialBusinessRequest);
 
         return new OfficialBusinessRequestResource($officialBusinessRequest->load(['employee']));
     }

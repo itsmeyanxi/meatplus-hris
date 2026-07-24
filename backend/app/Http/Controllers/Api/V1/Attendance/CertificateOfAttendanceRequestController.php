@@ -78,6 +78,8 @@ class CertificateOfAttendanceRequestController extends Controller
             'decision_remarks' => $request->validated('decision_remarks'),
         ]);
 
+        $this->recomputeRequestDays($certificateOfAttendanceRequest);
+
         return new CertificateOfAttendanceRequestResource($certificateOfAttendanceRequest->load(['employee', 'approver:id,name']));
     }
 
@@ -92,6 +94,8 @@ class CertificateOfAttendanceRequestController extends Controller
             'decision_remarks' => $request->validated('decision_remarks'),
         ]);
 
+        $this->recomputeRequestDays($certificateOfAttendanceRequest);
+
         return new CertificateOfAttendanceRequestResource($certificateOfAttendanceRequest->load(['employee', 'approver:id,name']));
     }
 
@@ -100,6 +104,8 @@ class CertificateOfAttendanceRequestController extends Controller
         $this->assertCanCancel($request, $certificateOfAttendanceRequest);
 
         $certificateOfAttendanceRequest->update(['status' => 'cancelled']);
+
+        $this->recomputeRequestDays($certificateOfAttendanceRequest);
 
         return new CertificateOfAttendanceRequestResource($certificateOfAttendanceRequest->load(['employee']));
     }

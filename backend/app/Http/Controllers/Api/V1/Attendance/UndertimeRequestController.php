@@ -74,6 +74,8 @@ class UndertimeRequestController extends Controller
             'decision_remarks' => $request->validated('decision_remarks'),
         ]);
 
+        $this->recomputeRequestDays($undertimeRequest);
+
         return new UndertimeRequestResource($undertimeRequest->load(['employee', 'approver:id,name']));
     }
 
@@ -88,6 +90,8 @@ class UndertimeRequestController extends Controller
             'decision_remarks' => $request->validated('decision_remarks'),
         ]);
 
+        $this->recomputeRequestDays($undertimeRequest);
+
         return new UndertimeRequestResource($undertimeRequest->load(['employee', 'approver:id,name']));
     }
 
@@ -96,6 +100,8 @@ class UndertimeRequestController extends Controller
         $this->assertCanCancel($request, $undertimeRequest);
 
         $undertimeRequest->update(['status' => 'cancelled']);
+
+        $this->recomputeRequestDays($undertimeRequest);
 
         return new UndertimeRequestResource($undertimeRequest->load(['employee']));
     }

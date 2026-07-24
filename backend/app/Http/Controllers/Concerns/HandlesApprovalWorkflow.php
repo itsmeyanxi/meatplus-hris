@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Concerns;
 
+use App\Domain\Attendance\Services\DtrComputer;
 use App\Domain\HRIS\Models\Employee;
 use App\Models\User;
 use App\Notifications\AttendanceRequestAwaitingApproval;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -176,6 +178,36 @@ trait HandlesApprovalWorkflow
         }
 
         abort(403, 'You do not have permission to cancel this request.');
+    }
+
+    /**
+     * Recompute the DTR for the day(s) a decided request covers, so an approval is
+     * reflected in attendance immediately instead of waiting for the next sync.
+     * Handles both `work_date` (COA, correction) and `date`/`date_to` (OT, OB, UT).
+     * Never let a recompute failure break the approval itself.
+     */
+    protected function recomputeRequestDays(Model $model): void
+    {
+        try {
+            $start = $model->work_date ?? $model->date ?? null;
+            if (! $start) {
+                return;
+            }
+            $end = $model->date_to ?? $start;
+
+            $employee = $model->employee ?? Employee::withoutGlobalScopes()->find($model->employee_id);
+            if (! $employee) {
+                return;
+            }
+
+            app(DtrComputer::class)->computeForEmployee(
+                $employee,
+                CarbonImmutable::parse($start),
+                CarbonImmutable::parse($end),
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**
