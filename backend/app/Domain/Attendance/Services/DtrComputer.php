@@ -54,12 +54,31 @@ class DtrComputer
             ->get()
             ->keyBy(fn ($h) => $h->holiday_date->toDateString());
 
+        // Punches belong to a SHIFT, not a calendar day. On an overnight shift
+        // (22:00-07:00) the exit lands on the next date, so grouping by calendar day
+        // would pair last night's exit with tonight's entry — inventing a 14-hour day.
+        // Attribute an early punch to the previous day when that day's shift crossed
+        // midnight and the punch falls inside its window (plus room for overtime).
         $logs = TimeLog::query()
             ->where('employee_id', $employee->id)
-            ->whereBetween('logged_at', [$from, $to])
+            ->whereBetween('logged_at', [$from->subDay(), $to->addDay()])
             ->orderBy('logged_at')
             ->get()
-            ->groupBy(fn (TimeLog $l) => $l->logged_at->toDateString());
+            ->groupBy(function (TimeLog $l) use ($assignments) {
+                $date = $l->logged_at->toDateString();
+                $prevDay = $l->logged_at->subDay()->startOfDay();
+                $prev = $this->resolveScheduleDay($assignments, $prevDay);
+
+                if ($prev && ! $prev->is_rest_day && $prev->time_in && $prev->time_out) {
+                    [$si, $so] = $this->scheduledWindow($prevDay->toDateString(), $prev->time_in, $prev->time_out);
+                    // $so rolls past midnight only when the shift is overnight.
+                    if ($si && $so && $so->greaterThan($si->endOfDay()) && $l->logged_at->lessThanOrEqualTo($so->addHours(4))) {
+                        return $prevDay->toDateString();
+                    }
+                }
+
+                return $date;
+            });
 
         $adjustments = ShiftAdjustment::query()
             ->where('employee_id', $employee->id)
