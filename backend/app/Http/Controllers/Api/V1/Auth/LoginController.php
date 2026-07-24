@@ -58,8 +58,12 @@ class LoginController extends Controller
                 ->distinct()->pluck('roles.name');
 
             if ($adminRoles->isNotEmpty()) {
+                // Sandbox companies are left out: an admin should not be swept into
+                // the demo company just by logging in. Demo accounts are attached to
+                // it explicitly, so they still work.
                 $ids = \Illuminate\Support\Facades\DB::table('companies')
-                    ->where('is_active', true)->whereNull('deleted_at')->pluck('id')->all();
+                    ->where('is_active', true)->where('is_demo', false)
+                    ->whereNull('deleted_at')->pluck('id')->all();
                 $user->companies()->syncWithoutDetaching($ids);
 
                 setPermissionsTeamId($user->active_company_id);

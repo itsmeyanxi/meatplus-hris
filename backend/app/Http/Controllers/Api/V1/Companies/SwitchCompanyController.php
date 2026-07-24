@@ -12,11 +12,17 @@ class SwitchCompanyController extends Controller
     /** Roles that make a user a company-wide admin (member of every company). */
     public const ADMIN_ROLES = ['it_admin', 'hr_admin'];
 
-    /** IDs of every active company. */
+    /**
+     * IDs of every active company an admin implicitly belongs to. Sandbox (demo)
+     * companies are excluded: they exist for testing, and sweeping them in here
+     * put the demo company in every real admin's switcher. Demo accounts are
+     * attached to their company explicitly, so they are unaffected.
+     */
     private function allCompanyIds(): array
     {
         return \Illuminate\Support\Facades\DB::table('companies')
-            ->where('is_active', true)->whereNull('deleted_at')->pluck('id')->all();
+            ->where('is_active', true)->where('is_demo', false)
+            ->whereNull('deleted_at')->pluck('id')->all();
     }
 
     /** True if the user holds an admin role in ANY company (roles are team-scoped). */
