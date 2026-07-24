@@ -70,6 +70,16 @@ return [
             'channel' => env('MAIL_LOG_CHANNEL'),
         ],
 
+        // Microsoft 365 via the Graph API (OAuth2 client credentials). Set
+        // MAIL_MAILER=microsoft-graph to use it. Registered in AppServiceProvider.
+        'microsoft-graph' => [
+            'transport' => 'microsoft-graph',
+            'tenant_id' => env('MS_GRAPH_TENANT_ID'),
+            'client_id' => env('MS_GRAPH_CLIENT_ID'),
+            'client_secret' => env('MS_GRAPH_CLIENT_SECRET'),
+            'from' => env('MS_GRAPH_FROM', env('MAIL_FROM_ADDRESS')),
+        ],
+
         'array' => [
             'transport' => 'array',
         ],

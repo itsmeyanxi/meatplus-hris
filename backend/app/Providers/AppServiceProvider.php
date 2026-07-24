@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Mail\Transport\MicrosoftGraphTransport;
 use Illuminate\Auth\Events\Authenticated;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Spatie\Permission\PermissionRegistrar;
@@ -24,6 +26,16 @@ class AppServiceProvider extends ServiceProvider
         // number and symbol. Length min is 8 here; the 20-char max is applied
         // alongside via a 'max:20' rule at each call site.
         Password::defaults(fn () => Password::min(8)->mixedCase()->numbers()->symbols());
+
+        // Microsoft 365 mail transport (Graph API). Enabled by MAIL_MAILER=microsoft-graph.
+        Mail::extend('microsoft-graph', function (array $config) {
+            return new MicrosoftGraphTransport(
+                (string) ($config['tenant_id'] ?? ''),
+                (string) ($config['client_id'] ?? ''),
+                (string) ($config['client_secret'] ?? ''),
+                (string) ($config['from'] ?? ''),
+            );
+        });
 
         Gate::before(function ($user, string $ability) {
             // The `admin` super-role and IT Admin both bypass every ability check
