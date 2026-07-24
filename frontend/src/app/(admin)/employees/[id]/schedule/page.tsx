@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { getMe } from "@/lib/auth";
+import { getEmployee, updateEmployee } from "@/lib/employees";
 import { workSchedulesApi, employeeSchedulesApi, type WorkSchedule } from "@/lib/attendance";
 import { SearchSelect } from "@/components/SearchSelect";
 
@@ -32,6 +33,18 @@ export default function EmployeeSchedulePage() {
     queryFn: () => employeeSchedulesApi.list(employeeId),
   });
   const { data: schedules = [] } = useQuery({ queryKey: ["work-schedules"], queryFn: workSchedulesApi.list, enabled: canManage });
+
+  // The employee, for the exempt (time-in/out) status.
+  const { data: emp } = useQuery({ queryKey: ["employee", employeeId], queryFn: () => getEmployee(employeeId) });
+  const exempt = emp ? emp.time_in_out_required === false : false;
+  const setType = useMutation({
+    mutationFn: (required: boolean) => updateEmployee(employeeId, { time_in_out_required: required }),
+    onSuccess: (_d, required) => {
+      toast.success(required ? "Set to Regular — must time in/out." : "Set to Exempted — always present.");
+      qc.invalidateQueries({ queryKey: ["employee", employeeId] });
+    },
+    onError: () => toast.error("Couldn't change the schedule type."),
+  });
 
   const current = assignments[0]; // newest effective_from first
   const [wsId, setWsId] = useState("");
@@ -62,6 +75,38 @@ export default function EmployeeSchedulePage() {
 
   return (
     <div className="space-y-6">
+      {/* Schedule TYPE: Regular vs Exempted */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="text-sm font-semibold text-slate-800">Schedule type</h3>
+        <p className="text-xs text-slate-400">Whether this employee must clock in/out, or is exempted (always present).</p>
+        <div className="mt-3 flex flex-wrap gap-3">
+          {[
+            { req: true, label: "Regular", desc: "Must time in / out. Tracked for lates & absences." },
+            { req: false, label: "Exempted", desc: "Doesn't punch — always present, credited scheduled hours." },
+          ].map((opt) => {
+            const active = exempt === !opt.req;
+            return (
+              <button
+                key={opt.label}
+                type="button"
+                disabled={!canManage || setType.isPending || !emp}
+                onClick={() => setType.mutate(opt.req)}
+                className={`flex-1 min-w-[220px] rounded-xl border p-4 text-left transition disabled:opacity-60 ${active ? "border-teal-500 bg-teal-50/60 ring-1 ring-teal-500" : "border-slate-200 hover:bg-slate-50"}`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`flex h-4 w-4 items-center justify-center rounded-full border ${active ? "border-teal-600 bg-teal-600" : "border-slate-300"}`}>
+                    {active && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-800">{opt.label}</span>
+                </div>
+                <p className="mt-1 pl-6 text-xs text-slate-500">{opt.desc}</p>
+              </button>
+            );
+          })}
+        </div>
+        {!canManage && <p className="mt-2 text-xs text-slate-400">You don&apos;t have permission to change this.</p>}
+      </div>
+
       {/* Current scheduling type */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-start justify-between">
