@@ -44,8 +44,25 @@ class Employee extends Model
         'client_name', 'billability', 'designated_workplace', 'payroll_run_type',
         'date_hired', 'expected_regularization_date',
         'date_regularized', 'date_separated', 'separation_reason', 'remarks',
-        'is_active', 'is_confidential', 'time_in_out_required', 'photo_path',
+        'is_active', 'is_confidential', 'time_in_out_required', 'schedule_type', 'photo_path',
     ];
+
+    /** Schedule types that don't punch (always present). */
+    public const NO_PUNCH_TYPES = ['exempted', 'field'];
+
+    /** Schedule types where lateness is not penalised. */
+    public const NO_LATE_TYPES = ['flexible'];
+
+    protected static function booted(): void
+    {
+        // Keep the time_in_out_required flag in sync with the schedule type, so the
+        // DTR (which reads the flag) and any type change stay consistent.
+        static::saving(function (self $e) {
+            if ($e->isDirty('schedule_type') && $e->schedule_type !== null) {
+                $e->time_in_out_required = ! in_array($e->schedule_type, self::NO_PUNCH_TYPES, true);
+            }
+        });
+    }
 
     protected function casts(): array
     {

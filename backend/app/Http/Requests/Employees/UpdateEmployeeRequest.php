@@ -78,6 +78,7 @@ class UpdateEmployeeRequest extends FormRequest
             'is_active' => ['sometimes', 'boolean'],
             'is_confidential' => ['sometimes', 'boolean'],
             'time_in_out_required' => ['sometimes', 'boolean'],
+            'schedule_type' => ['sometimes', 'string', 'in:regular,flexible,shifting,part_time,exempted,field'],
         ];
     }
 }

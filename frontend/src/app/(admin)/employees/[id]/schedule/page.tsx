@@ -12,8 +12,12 @@ import { SearchSelect } from "@/components/SearchSelect";
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const SCHED_TYPES = [
-  { value: "regular", label: "Regular (must time in/out)", hint: "punches", desc: "Must time in / out on scheduled days. Tracked for lates, undertime and absences." },
-  { value: "exempted", label: "Exempted (always present)", hint: "no punch", desc: "Doesn't punch — never marked absent, and automatically credited the scheduled hours (for supervisors, managers, office staff)." },
+  { value: "regular", label: "Regular", hint: "punches", desc: "Must time in / out on scheduled days. Tracked for lates, undertime and absences." },
+  { value: "flexible", label: "Flexible / Flexi-time", hint: "no late", desc: "Punches, but no late penalty — arrive anytime and complete the required hours. Still absent if there's no punch at all." },
+  { value: "shifting", label: "Shifting / Rotating", hint: "punches", desc: "Punches; lates and absences tracked against the shift assigned for the day. Use schedule adjustments for rotating shifts." },
+  { value: "part_time", label: "Part-time", hint: "hourly", desc: "Punches; tracked; paid for the hours actually worked (set pay type to Hourly in Compensation)." },
+  { value: "exempted", label: "Exempted (always present)", hint: "no punch", desc: "Doesn't punch — never marked absent, automatically credited the scheduled hours (supervisors, managers, office staff)." },
+  { value: "field", label: "Field personnel", hint: "no punch", desc: "Works off-site and doesn't punch — always present, credited the scheduled hours." },
 ];
 
 function t12(t: string | null): string {
@@ -39,13 +43,15 @@ export default function EmployeeSchedulePage() {
   });
   const { data: schedules = [] } = useQuery({ queryKey: ["work-schedules"], queryFn: workSchedulesApi.list, enabled: canManage });
 
-  // The employee, for the exempt (time-in/out) status.
+  // The employee, for the schedule type.
   const { data: emp } = useQuery({ queryKey: ["employee", employeeId], queryFn: () => getEmployee(employeeId) });
-  const exempt = emp ? emp.time_in_out_required === false : false;
+  const schedType = emp?.schedule_type ?? "regular";
+  const typeInfo = SCHED_TYPES.find((t) => t.value === schedType) ?? SCHED_TYPES[0];
+  const noPunch = schedType === "exempted" || schedType === "field";
   const setType = useMutation({
-    mutationFn: (required: boolean) => updateEmployee(employeeId, { time_in_out_required: required }),
-    onSuccess: (_d, required) => {
-      toast.success(required ? "Set to Regular — must time in/out." : "Set to Exempted — always present.");
+    mutationFn: (value: string) => updateEmployee(employeeId, { schedule_type: value }),
+    onSuccess: (_d, value) => {
+      toast.success(`Schedule type set to ${SCHED_TYPES.find((t) => t.value === value)?.label ?? value}.`);
       qc.invalidateQueries({ queryKey: ["employee", employeeId] });
     },
     onError: () => toast.error("Couldn't change the schedule type."),
@@ -87,17 +93,17 @@ export default function EmployeeSchedulePage() {
             <label className="mb-1 block text-sm font-semibold text-slate-800">Schedule type</label>
             <p className="mb-2 text-xs text-slate-400">Whether this employee must clock in/out, or is exempted (always present).</p>
             <SearchSelect
-              value={exempt ? "exempted" : "regular"}
-              onChange={(v) => setType.mutate(v === "regular")}
+              value={schedType}
+              onChange={(v) => setType.mutate(v)}
               disabled={!canManage || setType.isPending || !emp}
               options={SCHED_TYPES.map((t) => ({ value: t.value, label: t.label, hint: t.hint }))}
             />
           </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${exempt ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-600"}`}>
-            {exempt ? "Exempted — always present" : "Regular — punches"}
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${noPunch ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-600"}`}>
+            {noPunch ? "Always present — no punch" : "Punches in / out"}
           </span>
         </div>
-        <p className="mt-3 text-xs text-slate-500">{SCHED_TYPES.find((t) => t.value === (exempt ? "exempted" : "regular"))?.desc}</p>
+        <p className="mt-3 text-xs text-slate-500">{typeInfo.desc}</p>
         {!canManage && <p className="mt-1 text-xs text-slate-400">You don&apos;t have permission to change this.</p>}
       </div>
 

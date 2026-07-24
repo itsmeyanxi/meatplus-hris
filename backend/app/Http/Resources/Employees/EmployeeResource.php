@@ -82,6 +82,7 @@ class EmployeeResource extends JsonResource
             'user_type' => $this->user_type,
             'is_confidential' => (bool) $this->is_confidential,
             'time_in_out_required' => (bool) ($this->time_in_out_required ?? true),
+            'schedule_type' => $this->schedule_type ?? 'regular',
             // Basic pay: included only when compensation is loaded AND the viewer is
             // allowed — for a confidential employee that means employee.view.sensitive
             // (senior HR/IT), otherwise the normal compensation.view.

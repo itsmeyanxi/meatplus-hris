@@ -398,6 +398,10 @@ class DtrComputer
                 if ($lateMinutes <= self::LATE_GRACE_MINUTES) {
                     $lateMinutes = 0;
                 }
+                // Flexible-schedule staff aren't penalised for arrival time.
+                if (in_array($employee->schedule_type ?? 'regular', Employee::NO_LATE_TYPES, true)) {
+                    $lateMinutes = 0;
+                }
             }
             if ($schedOut && ! $isRestDay) {
                 $undertimeMinutes = max(0, (int) round($actualOut->diffInMinutes($schedOut, false)));

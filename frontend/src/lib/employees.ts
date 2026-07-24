@@ -42,6 +42,7 @@ export type EmployeeDetail = EmployeeListItem & {
   separation_reason: string | null;
   is_confidential: boolean;
   time_in_out_required?: boolean;
+  schedule_type?: string;
   // Present only when the viewer is allowed to see it (confidential-aware on the server).
   basic_pay?: string | number | null;
 };
@@ -173,6 +174,7 @@ export type EmployeeCreateInput = {
   expected_regularization_date?: string | null;
   date_regularized?: string | null;
   time_in_out_required?: boolean;
+  schedule_type?: string;
 };
 
 export async function createEmployee(input: EmployeeCreateInput): Promise<EmployeeDetail> {
