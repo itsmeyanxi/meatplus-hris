@@ -28,6 +28,7 @@ export default function EditEmployeePage() {
     date_hired: "", date_regularized: "",
     is_active: true,
     is_confidential: false,
+    time_in_out_required: true,
   });
 
   const [hydrated, setHydrated] = useState(false);
@@ -61,6 +62,7 @@ export default function EditEmployeePage() {
       date_regularized: emp.date_regularized ?? "",
       is_active: emp.is_active,
       is_confidential: emp.is_confidential,
+      time_in_out_required: emp.time_in_out_required ?? true,
     });
   }
 
@@ -255,6 +257,22 @@ export default function EditEmployeePage() {
             </div>
           </div>
         )}
+
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={form.time_in_out_required}
+            onClick={() => setForm((p) => ({ ...p, time_in_out_required: !p.time_in_out_required }))}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.time_in_out_required ? "bg-slate-900" : "bg-teal-600"}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.time_in_out_required ? "translate-x-6" : "translate-x-1"}`} />
+          </button>
+          <div>
+            <span className="text-sm font-medium text-slate-700">Time in/out required: {form.time_in_out_required ? "Yes" : "No — always present"}</span>
+            <p className="text-xs text-slate-400">Turn off for supervisors/office staff who don&apos;t punch. They&apos;re never marked absent and are credited their scheduled hours automatically.</p>
+          </div>
+        </div>
       </FormSection>
 
       {/* ── Section: System ── */}

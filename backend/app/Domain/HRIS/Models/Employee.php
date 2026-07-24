@@ -44,7 +44,7 @@ class Employee extends Model
         'client_name', 'billability', 'designated_workplace', 'payroll_run_type',
         'date_hired', 'expected_regularization_date',
         'date_regularized', 'date_separated', 'separation_reason', 'remarks',
-        'is_active', 'is_confidential', 'photo_path',
+        'is_active', 'is_confidential', 'time_in_out_required', 'photo_path',
     ];
 
     protected function casts(): array
@@ -57,6 +57,7 @@ class Employee extends Model
             'date_separated' => 'date',
             'is_active' => 'boolean',
             'is_confidential' => 'boolean',
+            'time_in_out_required' => 'boolean',
         ];
     }
 

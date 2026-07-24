@@ -434,10 +434,18 @@ class DtrComputer
             $hoursWorked = $requiredHours;
         }
 
+        // Staff not required to time in/out (supervisors, office staff) are treated as
+        // ALWAYS PRESENT: never absent, and on a scheduled workday with no punches they
+        // are credited their scheduled hours so payroll pays them a full day.
+        $punchExempt = ! (bool) ($employee->time_in_out_required ?? true);
+        if ($punchExempt && ! $hasAnyLogs && ! $isRestDay && $requiredHours > 0) {
+            $hoursWorked = $requiredHours;
+        }
+
         // Absent = a SCHEDULED workday with no attendance and nothing that excuses it
-        // (rest day, holiday, paid leave, COA, or OB). Unscheduled/contractual staff
-        // are never absent.
-        $isAbsent = $hasSchedule && ! $hasAnyLogs && ! $isRestDay && ! $holiday && ! $leavePaid && ! $excused;
+        // (rest day, holiday, paid leave, COA, OB, or being punch-exempt). Unscheduled/
+        // contractual staff are never absent.
+        $isAbsent = $hasSchedule && ! $hasAnyLogs && ! $isRestDay && ! $holiday && ! $leavePaid && ! $excused && ! $punchExempt;
 
         return [
             'company_id' => $employee->company_id,

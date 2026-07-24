@@ -77,6 +77,7 @@ class UpdateEmployeeRequest extends FormRequest
             'separation_reason' => ['nullable', 'string', 'max:150'],
             'is_active' => ['sometimes', 'boolean'],
             'is_confidential' => ['sometimes', 'boolean'],
+            'time_in_out_required' => ['sometimes', 'boolean'],
         ];
     }
 }

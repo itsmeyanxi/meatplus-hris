@@ -41,6 +41,7 @@ export type EmployeeDetail = EmployeeListItem & {
   date_separated: string | null;
   separation_reason: string | null;
   is_confidential: boolean;
+  time_in_out_required?: boolean;
   // Present only when the viewer is allowed to see it (confidential-aware on the server).
   basic_pay?: string | number | null;
 };
