@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 class SwitchCompanyController extends Controller
 {
     /** Roles that make a user a company-wide admin (member of every company). */
-    public const ADMIN_ROLES = ['it_admin', 'hr_admin'];
+    public const ADMIN_ROLES = ['admin', 'it_admin', 'hr_admin'];
 
     /**
      * IDs of every active company an admin implicitly belongs to. Sandbox (demo)

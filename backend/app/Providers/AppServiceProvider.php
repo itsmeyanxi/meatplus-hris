@@ -26,8 +26,12 @@ class AppServiceProvider extends ServiceProvider
         Password::defaults(fn () => Password::min(8)->mixedCase()->numbers()->symbols());
 
         Gate::before(function ($user, string $ability) {
-            // IT Admin is the top-level super-admin: it bypasses every ability check
-            // in every company, regardless of the active team.
+            // The `admin` super-role and IT Admin both bypass every ability check
+            // in every company, regardless of the active team. (admin additionally
+            // bypasses the company scope — see CompanyScope.)
+            if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
+                return true;
+            }
             if (method_exists($user, 'isItAdmin') && $user->isItAdmin()) {
                 return true;
             }

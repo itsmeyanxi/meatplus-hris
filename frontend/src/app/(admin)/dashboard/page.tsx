@@ -45,7 +45,7 @@ type PunchEvent = { id: string; date: string; dir: "IN" | "OUT"; ts: string; lat
 type ViewGroup = "admin" | "hr" | "payroll" | "manager" | "timekeeper" | "dept_admin" | "employee";
 
 function getViewGroup(roles: string[]): ViewGroup {
-  if (roles.includes("it_admin")) return "admin";
+  if (roles.includes("admin") || roles.includes("it_admin")) return "admin";
   if (roles.some((r) => ["hr_admin", "hr_officer", "hr_coordinator"].includes(r))) return "hr";
   if (roles.includes("payroll_officer")) return "payroll";
   if (roles.some((r) => ["dept_head", "supervisor", "team_lead", "garahe_teamlead"].includes(r))) return "manager";

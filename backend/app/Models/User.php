@@ -82,6 +82,8 @@ class User extends Authenticatable
     /** Cached per-instance result of the global it_admin check. */
     protected ?bool $itAdminResolved = null;
 
+    protected ?bool $superAdminResolved = null;
+
     /**
      * True if the user is an IT Admin in ANY company. This is intentionally global
      * and team-independent: it_admin is the top-level super-admin and bypasses both
@@ -95,6 +97,22 @@ class User extends Authenticatable
             ->where('model_has_roles.model_id', $this->id)
             ->where('model_has_roles.model_type', $this->getMorphClass())
             ->where('roles.name', 'it_admin')
+            ->exists();
+    }
+
+    /**
+     * The `admin` super-role: the single most powerful role. It bypasses BOTH the
+     * ability checks (Gate::before) AND the company scope (CompanyScope), so it sees
+     * every company's data at once with no active-company limitation — unlike
+     * it_admin, which can do anything but still views one company at a time.
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->superAdminResolved ??= \Illuminate\Support\Facades\DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $this->id)
+            ->where('model_has_roles.model_type', $this->getMorphClass())
+            ->where('roles.name', 'admin')
             ->exists();
     }
 

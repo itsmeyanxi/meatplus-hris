@@ -44,6 +44,10 @@ class PermissionsSeeder extends Seeder
         }
 
         $rolePermissions = [
+            // admin = the single most powerful role. Holds every permission AND
+            // bypasses the company scope (see User::isSuperAdmin / CompanyScope), so
+            // it sees every company's data at once with no limitation.
+            'admin' => $permissions,
             'hr_admin' => [
                 'employee.view', 'employee.create', 'employee.update', 'employee.view.sensitive',
                 'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',

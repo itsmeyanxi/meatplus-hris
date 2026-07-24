@@ -16,7 +16,7 @@ use App\Models\User;
 final class AdminRoleGuard
 {
     /** Roles that may only be granted by someone who already holds them. */
-    private const GUARDED = ['it_admin', 'hr_admin'];
+    private const GUARDED = ['admin', 'it_admin', 'hr_admin'];
 
     public static function rule(?User $actor): \Closure
     {
@@ -25,8 +25,9 @@ final class AdminRoleGuard
                 return;
             }
 
-            // it_admin is the top-level role and may grant either.
-            if ($actor?->hasRole('it_admin') || $actor?->hasRole($value)) {
+            // admin (super-admin) and it_admin are top-level and may grant any of
+            // these; otherwise you may only grant a role you already hold yourself.
+            if ($actor?->hasRole('admin') || $actor?->hasRole('it_admin') || $actor?->hasRole($value)) {
                 return;
             }
 
