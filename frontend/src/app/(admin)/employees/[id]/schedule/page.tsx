@@ -11,6 +11,11 @@ import { SearchSelect } from "@/components/SearchSelect";
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+const SCHED_TYPES = [
+  { value: "regular", label: "Regular (must time in/out)", hint: "punches", desc: "Must time in / out on scheduled days. Tracked for lates, undertime and absences." },
+  { value: "exempted", label: "Exempted (always present)", hint: "no punch", desc: "Doesn't punch — never marked absent, and automatically credited the scheduled hours (for supervisors, managers, office staff)." },
+];
+
 function t12(t: string | null): string {
   if (!t) return "—";
   const [h, m] = t.split(":").map(Number);
@@ -75,36 +80,25 @@ export default function EmployeeSchedulePage() {
 
   return (
     <div className="space-y-6">
-      {/* Schedule TYPE: Regular vs Exempted */}
+      {/* Schedule TYPE: Regular vs Exempted — dropdown */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-slate-800">Schedule type</h3>
-        <p className="text-xs text-slate-400">Whether this employee must clock in/out, or is exempted (always present).</p>
-        <div className="mt-3 flex flex-wrap gap-3">
-          {[
-            { req: true, label: "Regular", desc: "Must time in / out. Tracked for lates & absences." },
-            { req: false, label: "Exempted", desc: "Doesn't punch — always present, credited scheduled hours." },
-          ].map((opt) => {
-            const active = exempt === !opt.req;
-            return (
-              <button
-                key={opt.label}
-                type="button"
-                disabled={!canManage || setType.isPending || !emp}
-                onClick={() => setType.mutate(opt.req)}
-                className={`flex-1 min-w-[220px] rounded-xl border p-4 text-left transition disabled:opacity-60 ${active ? "border-teal-500 bg-teal-50/60 ring-1 ring-teal-500" : "border-slate-200 hover:bg-slate-50"}`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`flex h-4 w-4 items-center justify-center rounded-full border ${active ? "border-teal-600 bg-teal-600" : "border-slate-300"}`}>
-                    {active && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
-                  </span>
-                  <span className="text-sm font-semibold text-slate-800">{opt.label}</span>
-                </div>
-                <p className="mt-1 pl-6 text-xs text-slate-500">{opt.desc}</p>
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-[260px]">
+            <label className="mb-1 block text-sm font-semibold text-slate-800">Schedule type</label>
+            <p className="mb-2 text-xs text-slate-400">Whether this employee must clock in/out, or is exempted (always present).</p>
+            <SearchSelect
+              value={exempt ? "exempted" : "regular"}
+              onChange={(v) => setType.mutate(v === "regular")}
+              disabled={!canManage || setType.isPending || !emp}
+              options={SCHED_TYPES.map((t) => ({ value: t.value, label: t.label, hint: t.hint }))}
+            />
+          </div>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${exempt ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-600"}`}>
+            {exempt ? "Exempted — always present" : "Regular — punches"}
+          </span>
         </div>
-        {!canManage && <p className="mt-2 text-xs text-slate-400">You don&apos;t have permission to change this.</p>}
+        <p className="mt-3 text-xs text-slate-500">{SCHED_TYPES.find((t) => t.value === (exempt ? "exempted" : "regular"))?.desc}</p>
+        {!canManage && <p className="mt-1 text-xs text-slate-400">You don&apos;t have permission to change this.</p>}
       </div>
 
       {/* Current scheduling type */}
