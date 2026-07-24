@@ -18,7 +18,9 @@ class InvitationController extends Controller
     // POST /v1/employees/{employee}/invite
     public function send(Request $request, Employee $employee): JsonResponse
     {
-        abort_unless($request->user()->can('user.manage'), 403);
+        // Onboarding only needs the narrow user.invite; user.manage (which also
+        // covers roles/passwords) naturally includes it.
+        abort_unless($request->user()->canAny(['user.invite', 'user.manage']), 403);
 
         $request->validate([
             'email' => ['nullable', 'email'],
@@ -60,7 +62,7 @@ class InvitationController extends Controller
     // POST /v1/employees/bulk-invite
     public function bulkSend(Request $request): JsonResponse
     {
-        abort_unless($request->user()->can('user.manage'), 403);
+        abort_unless($request->user()->canAny(['user.invite', 'user.manage']), 403);
 
         $request->validate([
             'employee_ids'   => ['required', 'array', 'min:1', 'max:100'],

@@ -28,7 +28,11 @@ class PermissionsSeeder extends Seeder
             'payroll.view', 'payroll.run', 'payroll.approve', 'payroll.post',
             'compensation.view', 'compensation.manage',
             'gov_report.view', 'gov_report.generate',
-            'company.manage', 'user.manage', 'role.manage',
+            // user.invite is the narrow half of user.manage: send an invitation or
+            // provision a login, WITHOUT the power to assign roles, reset passwords
+            // or deactivate accounts. Lets HR onboard staff without handing them
+            // the keys to privilege assignment.
+            'company.manage', 'user.manage', 'user.invite', 'role.manage',
             'device.manage',
             'audit.view',
             'access_request.view',
@@ -50,12 +54,15 @@ class PermissionsSeeder extends Seeder
                 'device.manage',
             ],
             // HR Officer: full HR operations (employees, attendance, leave) but WITHOUT
-            // system administration — no user/role management, device management, or audit.
+            // system administration — no role management, device management, or audit.
+            // They MAY invite staff and provision logins (user.invite), since onboarding
+            // is HR's job, but not assign roles or reset passwords (user.manage).
             'hr_officer' => [
                 'employee.view', 'employee.create', 'employee.update',
                 'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',
                 'leave.view', 'leave.file', 'leave.manage_types',
                 'compensation.view',
+                'user.invite',
                 'access_request.view', 'access_request.approve.hr',
             ],
             // IT is the top-level administrator: full access to every function of the system.

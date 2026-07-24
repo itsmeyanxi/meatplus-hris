@@ -157,7 +157,9 @@ class UserController extends Controller
      */
     public function provisionForEmployee(Request $request, \App\Domain\HRIS\Models\Employee $employee): JsonResponse
     {
-        abort_unless($request->user()->can('user.manage'), 403);
+        // Provisioning grants only the baseline `employee` role, so the narrow
+        // user.invite is enough — no role assignment happens here.
+        abort_unless($request->user()->canAny(['user.invite', 'user.manage']), 403);
 
         if ($employee->user_id) {
             throw ValidationException::withMessages([
