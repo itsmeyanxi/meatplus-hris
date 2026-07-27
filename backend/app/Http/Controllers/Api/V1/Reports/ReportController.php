@@ -182,7 +182,7 @@ class ReportController extends Controller
         $lines[] = implode(',', [
             'Employee No', 'Name',
             'Days Worked', 'Days Absent', 'Late (min)', 'OT (min)',
-            'Basic Pay', 'OT Pay', 'Night Diff', 'Allowance', 'Gross Pay',
+            'Basic Pay', 'OT Pay', 'Night Diff', 'Holiday Pay', 'Rest Day Pay', 'Allowance', 'Gross Pay',
             'SSS', 'PhilHealth', 'Pag-IBIG', 'W/Tax',
             'Absence Deduction', 'Tardiness Deduction', 'Total Deductions',
             'Net Pay',
@@ -199,6 +199,8 @@ class ReportController extends Controller
                 $r->basic_pay,
                 $r->overtime_pay,
                 $r->night_diff_pay,
+                $r->holiday_pay,
+                $r->rest_day_pay,
                 $r->allowance,
                 $r->gross_pay,
                 $r->sss,

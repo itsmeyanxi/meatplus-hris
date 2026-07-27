@@ -20,6 +20,9 @@ class PayrollComputer
     /** Average working days per month, used to derive the daily rate. */
     private const WORKDAYS_PER_MONTH = 22;
 
+    /** Hours in a standard working day, used to convert between daily and hourly. */
+    private const HOURS_PER_DAY = 8;
+
     public function __construct(private readonly StatutoryCalculator $statutory) {}
 
     /**
@@ -70,20 +73,48 @@ class PayrollComputer
         return ['employees' => $employees, 'skipped' => $skipped, 'gross' => round($gross, 2), 'net' => round($net, 2)];
     }
 
+    /**
+     * The premium OVER ordinary pay (100%) for regular hours worked on a special
+     * day, per DOLE. Ordinary days = 0. Rest day or special non-working day = +30%.
+     * Regular holiday = +100%. Combinations stack (e.g. a regular holiday that is
+     * also the employee's rest day = +160%).
+     */
+    private function premiumExtra(?string $holidayType, bool $isRestDay): float
+    {
+        $extra = 0.0;
+        if ($holidayType === 'regular') {
+            $extra += 1.00;
+        } elseif ($holidayType === 'special_non_working') {
+            $extra += 0.30;
+        }
+        if ($isRestDay) {
+            $extra += 0.30;
+        }
+
+        return $extra;
+    }
+
     private function computeEmployee(PayrollRun $run, EmployeeCompensation $comp): Payslip
     {
-        // Two pay models. Daily-paid staff earn per day actually worked; monthly-
-        // salaried earn a fixed amount reduced by absences. Statutory contributions
-        // and tax are always based on the MONTHLY-equivalent salary.
+        // Three pay models. Hourly (part-time) staff earn per hour actually worked;
+        // daily-paid earn per day worked; monthly-salaried earn a fixed amount
+        // reduced by absences. Statutory contributions and tax are always based on
+        // the MONTHLY-equivalent salary.
         $isDaily = $comp->pay_type === 'daily';
-        if ($isDaily) {
-            $dailyRate = (float) $comp->daily_rate;
+        $isHourly = $comp->pay_type === 'hourly';
+        if ($isHourly) {
+            $hourlyRate = (float) $comp->hourly_rate;
+            $dailyRate = $hourlyRate * self::HOURS_PER_DAY;
             $basicMonthly = $dailyRate * self::WORKDAYS_PER_MONTH; // monthly-equivalent for statutory/tax
+        } elseif ($isDaily) {
+            $dailyRate = (float) $comp->daily_rate;
+            $basicMonthly = $dailyRate * self::WORKDAYS_PER_MONTH;
+            $hourlyRate = $dailyRate / self::HOURS_PER_DAY;
         } else {
             $basicMonthly = (float) $comp->basic_monthly;
             $dailyRate = $basicMonthly / self::WORKDAYS_PER_MONTH;
+            $hourlyRate = $dailyRate / self::HOURS_PER_DAY;
         }
-        $hourlyRate = $dailyRate / 8;
         $minuteRate = $dailyRate / 480;
 
         // Attendance totals for the cutoff.
@@ -98,6 +129,10 @@ class PayrollComputer
         $lateMinutes = 0;
         $otMinutes = 0;
         $nightMinutes = 0;
+        // Premium pay accrued for hours actually worked on holidays / rest days,
+        // over and above the ordinary pay those hours already earn (see below).
+        $holidayPremium = 0.0;
+        $restDayPremium = 0.0;
         foreach ($dtrs as $d) {
             if (! $d->is_rest_day) {
                 $scheduledDays++;
@@ -110,7 +145,28 @@ class PayrollComputer
             $lateMinutes += (int) $d->late_minutes;
             $otMinutes += (int) $d->overtime_minutes;
             $nightMinutes += (int) $d->night_diff_minutes;
+
+            // Premium for the regular (first 8h) hours worked on a special day.
+            // Ordinary hours already earn 100% via basic pay above, so we add only
+            // the EXTRA over 100%: regular holiday +100%, special day/rest day +30%,
+            // and the combinations stack (per DOLE). No work on the day → no premium.
+            $regularHours = min((float) $d->hours_worked, self::HOURS_PER_DAY);
+            if ($regularHours <= 0) {
+                continue;
+            }
+            $extra = $this->premiumExtra($d->holiday_type, (bool) $d->is_rest_day);
+            if ($extra <= 0) {
+                continue;
+            }
+            $amount = round($hourlyRate * $regularHours * $extra, 2);
+            if ($d->holiday_type) {
+                $holidayPremium += $amount;
+            } else {
+                $restDayPremium += $amount;
+            }
         }
+        $holidayPremium = round($holidayPremium, 2);
+        $restDayPremium = round($restDayPremium, 2);
 
         // Pay strictly by attendance.
         //  • Daily-paid: rate × days worked.
@@ -132,7 +188,7 @@ class PayrollComputer
         $nightDiffPay = round(($nightMinutes / 60) * $hourlyRate * 0.10, 2); // 10% night differential
         $tardinessDeduction = round($lateMinutes * $minuteRate, 2);
 
-        $grossPay = round($basicPay + $allowance + $overtimePay + $nightDiffPay, 2);
+        $grossPay = round($basicPay + $allowance + $overtimePay + $nightDiffPay + $holidayPremium + $restDayPremium, 2);
 
         // Statutory + tax (monthly figures, split across two cutoffs).
         $contrib = $this->statutory->monthlyContributions($basicMonthly);
@@ -163,6 +219,8 @@ class PayrollComputer
             'basic_pay' => $basicPay,
             'overtime_pay' => $overtimePay,
             'night_diff_pay' => $nightDiffPay,
+            'holiday_pay' => $holidayPremium,
+            'rest_day_pay' => $restDayPremium,
             'allowance' => $allowance,
             'gross_pay' => $grossPay,
             'sss' => $sss,
