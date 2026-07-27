@@ -22,6 +22,24 @@ class LeaveBalanceService
     }
 
     /**
+     * Whether a leave type draws down a running credit balance. Only paid types
+     * that carry an actual allocation (a default grant, an opening balance, an
+     * ad-hoc grant, or accrual) are credit-tracked. Unpaid leaves (e.g. LWOP)
+     * and paid-but-uncredited statutory leaves (Maternity, Paternity, Solo
+     * Parent, Bereavement) are NOT — they're filed freely and the approver is
+     * the control, so they must never be blocked by a zero balance.
+     */
+    public function isCreditTracked(LeaveType $type, LeaveBalance $balance): bool
+    {
+        return $type->is_paid && (
+            (float) $type->default_credits_per_year > 0
+            || (float) $balance->opening_balance > 0
+            || (float) $balance->granted_adhoc > 0
+            || (float) $balance->accrued > 0
+        );
+    }
+
+    /**
      * Consume balance when a leave is approved.
      * Uses the leave's date_from year as the bucket — single-year leaves only for now.
      * Cross-year leaves are deferred to Phase 3.1.

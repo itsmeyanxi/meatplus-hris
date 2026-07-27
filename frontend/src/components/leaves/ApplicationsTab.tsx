@@ -32,12 +32,20 @@ export function ApplicationsTab() {
   const { data: types = [] } = useQuery({ queryKey: ["leave-types"], queryFn: leaveTypesApi.list });
 
   const [status, setStatus] = useState<LeaveStatus | "">("");
+  // Dept-head/HR filters: find a specific employee's or leave type's requests fast.
+  const [filterEmployee, setFilterEmployee] = useState<number | "">("");
+  const [filterType, setFilterType] = useState<number | "">("");
   const [rejectingId, setRejectingId] = useState<number | null>(null);
   const [rejectRemarks, setRejectRemarks] = useState("");
   const { data: items = [] } = useQuery({
-    queryKey: ["leave-apps", { status }],
-    queryFn: () => leaveAppsApi.list({ status: status || undefined }),
+    queryKey: ["leave-apps", { status, filterEmployee, filterType }],
+    queryFn: () => leaveAppsApi.list({
+      status: status || undefined,
+      employee_id: filterEmployee === "" ? undefined : Number(filterEmployee),
+      leave_type_id: filterType === "" ? undefined : Number(filterType),
+    }),
   });
+  const pendingCount = items.filter((r) => r.status === "pending").length;
 
   const [isAdding, setIsAdding] = useState(false);
   const [form, setForm] = useState<LeaveAppInput>({
@@ -107,6 +115,11 @@ export function ApplicationsTab() {
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-500">
           {items.length} shown{canApproveAny ? "" : canApprove ? " — your team" : " — your own only"}
+          {canApprove && pendingCount > 0 && (
+            <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+              {pendingCount} pending
+            </span>
+          )}
         </p>
         {showFile && (
           <AppButton variant={isAdding ? "secondary" : "primary"} onClick={() => { if (isAdding) resetForm(); else setIsAdding(true); }}>
@@ -219,6 +232,39 @@ export function ApplicationsTab() {
           </button>
         ))}
       </div>
+
+      {/* Approver search: jump straight to one employee's or one type's requests. */}
+      {canApprove && (
+        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+          <div className="min-w-[240px] flex-1">
+            <label className="mb-1 block text-xs font-medium text-slate-500">Find employee</label>
+            <EmployeeSearchSelect
+              className={inputCls}
+              value={filterEmployee}
+              onChange={(id) => setFilterEmployee(id === "" ? "" : Number(id))}
+              placeholder="Search by name or ID…"
+            />
+          </div>
+          <div className="min-w-[200px]">
+            <label className="mb-1 block text-xs font-medium text-slate-500">Leave type</label>
+            <SearchSelect
+              className={inputCls}
+              value={filterType === "" ? "" : String(filterType)}
+              onChange={(v) => setFilterType(v === "" ? "" : Number(v))}
+              placeholder="All types"
+              options={[{ value: "", label: "All types" }, ...types.map((t) => ({ value: String(t.id), label: `${t.code} — ${t.name}` }))]}
+            />
+          </div>
+          {(filterEmployee !== "" || filterType !== "") && (
+            <button
+              onClick={() => { setFilterEmployee(""); setFilterType(""); }}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
 
       <TableShell>
         <table className="w-full text-sm">

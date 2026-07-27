@@ -108,7 +108,7 @@ export const leaveBalancesApi = {
 };
 
 export const leaveAppsApi = {
-  list: async (params: { status?: LeaveStatus; employee_id?: number; from?: string; to?: string } = {}): Promise<LeaveApplication[]> => {
+  list: async (params: { status?: LeaveStatus; employee_id?: number; leave_type_id?: number; from?: string; to?: string } = {}): Promise<LeaveApplication[]> => {
     const { data } = await api.get<Listed<LeaveApplication>>("/api/v1/leave-applications", { params });
     return data.data;
   },

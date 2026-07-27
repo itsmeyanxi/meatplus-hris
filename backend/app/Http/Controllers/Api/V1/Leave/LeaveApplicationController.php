@@ -156,10 +156,12 @@ class LeaveApplicationController extends Controller
             }
         }
 
-        // Balance check (uses date_from year — single-year leaves only in Phase 3.0)
+        // Balance check (uses date_from year — single-year leaves only in Phase 3.0).
+        // Only enforced for credit-tracked leaves; uncredited/unpaid types file
+        // freely (the approver is the control there).
         $year = (int) $from->year;
         $balance = $this->balanceService->ensureBalance($employee, $type, $year);
-        if ($balance->current_balance < $days) {
+        if ($this->balanceService->isCreditTracked($type, $balance) && $balance->current_balance < $days) {
             throw ValidationException::withMessages([
                 'days_count' => "Insufficient {$type->code} balance: have {$balance->current_balance}, requested {$days}.",
             ]);
@@ -202,14 +204,17 @@ class LeaveApplicationController extends Controller
                 'decision_remarks' => $request->validated('decision_remarks'),
             ]);
 
-            // Consume balance
+            // Consume balance — only for credit-tracked leaves, so uncredited
+            // statutory/unpaid types don't push the balance negative.
             $year = (int) $leaveApplication->date_from->year;
             $balance = $this->balanceService->ensureBalance(
                 $leaveApplication->employee,
                 $leaveApplication->leaveType,
                 $year,
             );
-            $this->balanceService->consume($balance, (float) $leaveApplication->days_count);
+            if ($this->balanceService->isCreditTracked($leaveApplication->leaveType, $balance)) {
+                $this->balanceService->consume($balance, (float) $leaveApplication->days_count);
+            }
 
             // Post the leave onto the daily time records for the covered dates.
             $dtr->computeForEmployee(
@@ -285,7 +290,9 @@ class LeaveApplicationController extends Controller
                     $leaveApplication->leaveType,
                     $year,
                 );
-                $this->balanceService->restore($balance, (float) $leaveApplication->days_count);
+                if ($this->balanceService->isCreditTracked($leaveApplication->leaveType, $balance)) {
+                    $this->balanceService->restore($balance, (float) $leaveApplication->days_count);
+                }
 
                 // Un-post the leave from the daily time records.
                 $dtr->computeForEmployee(
