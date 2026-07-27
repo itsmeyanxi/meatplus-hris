@@ -65,10 +65,19 @@ export default function TimeLogUploadsPage() {
           <p className="mb-3 text-sm text-slate-500">
             Two formats accepted:{" "}
             <span className="font-medium text-slate-700">Employee ID · Date · Time In · Time Out</span> (one row per day),{" "}
-            or a raw biometric log <span className="font-medium text-slate-700">Biometric ID · LogTime · In/Out</span> (one row per scan — grouped into days automatically).{" "}
-            <a href={timeLogRequestsApi.templateUrl} className="font-medium text-teal-700 hover:underline">Download template</a>
+            or a raw biometric log <span className="font-medium text-slate-700">Biometric ID · LogTime · In/Out</span> (one row per scan — grouped into days automatically).
           </p>
           <div className="flex flex-wrap items-center gap-3">
+            <a
+              href={timeLogRequestsApi.templateUrl}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              title="Download a blank CSV template to fill in and upload"
+            >
+              <svg className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download template
+            </a>
             <input
               ref={fileRef}
               type="file"
