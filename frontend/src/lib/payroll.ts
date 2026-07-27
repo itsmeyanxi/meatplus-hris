@@ -242,15 +242,19 @@ export type MyPayslipListItem = {
   net_pay: number;
 };
 
+export type PayslipLine = { label: string; note?: string; amount: number };
+
 export type MyPayslipDetail = {
   id: number;
-  company: { name: string };
-  employee: { employee_no: string; name: string; department: string | null; position: string | null };
-  run: { name: string; period_start: string; period_end: string; pay_date: string };
-  attendance: { days_worked: number; days_absent: number; late_minutes: number; overtime_minutes: number; night_diff_minutes: number };
-  earnings: { basic_pay: number; overtime_pay: number; night_diff_pay: number; holiday_pay: number; rest_day_pay: number; allowance: number; other_earnings: number; gross_pay: number };
-  deductions: { sss: number; philhealth: number; pagibig: number; withholding_tax: number; tardiness_deduction: number; loans_deduction: number; other_deductions: number; total_deductions: number };
-  breakdown: { loans?: { type: string; amount: number }[]; adjustments?: { label: string; kind: string; amount: number }[] } | null;
+  company: { name: string; address: string };
+  employee: { employee_no: string; name: string; department: string | null; position: string | null; tin: string | null; sss_no: string | null; philhealth_no: string | null; hdmf_no: string | null };
+  payroll_date: string;
+  date_covered: string;
+  compensation: PayslipLine[];
+  deductions: PayslipLine[];
+  ytd: { taxable_gross: number; tax: number; sss: number; phic: number; hdmf: number; gross_income: number; non_taxable: number };
+  total_compensation: number;
+  total_deductions: number;
   net_pay: number;
 };
 
