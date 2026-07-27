@@ -90,6 +90,8 @@ export type PayslipAdjustment = {
   notes: string | null;
 };
 
+export type LoanImportResult = { created: number; updated: number; skipped: number; total: number; errors: { row: number; message: string }[] };
+
 export const loansApi = {
   list: async (params: { employee_id?: number; active_only?: boolean } = {}): Promise<EmployeeLoan[]> =>
     (await api.get<Listed<EmployeeLoan>>("/api/v1/payroll/loans", { params })).data.data,
@@ -98,6 +100,13 @@ export const loansApi = {
   update: async (id: number, body: Partial<LoanInput>): Promise<EmployeeLoan> =>
     (await api.patch<{ data: EmployeeLoan }>(`/api/v1/payroll/loans/${id}`, body)).data.data,
   remove: async (id: number) => (await api.delete(`/api/v1/payroll/loans/${id}`)).data,
+  importTemplateUrl: "/api/v1/payroll/loans/import/template",
+  exportUrl: "/api/v1/payroll/loans/export",
+  import: async (file: File): Promise<LoanImportResult> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return (await api.post<LoanImportResult>("/api/v1/payroll/loans/import", fd)).data;
+  },
 };
 
 export const adjustmentsApi = {

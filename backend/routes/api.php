@@ -269,6 +269,9 @@ Route::prefix('v1')->group(function () {
 
         // Recurring loans / amortized deductions
         Route::get('payroll/loans', [\App\Http\Controllers\Api\V1\Payroll\EmployeeLoanController::class, 'index']);
+        Route::get('payroll/loans/export', [\App\Http\Controllers\Api\V1\Payroll\EmployeeLoanController::class, 'export']);
+        Route::get('payroll/loans/import/template', [\App\Http\Controllers\Api\V1\Payroll\EmployeeLoanController::class, 'importTemplate']);
+        Route::post('payroll/loans/import', [\App\Http\Controllers\Api\V1\Payroll\EmployeeLoanController::class, 'import']);
         Route::post('payroll/loans', [\App\Http\Controllers\Api\V1\Payroll\EmployeeLoanController::class, 'store']);
         Route::patch('payroll/loans/{loan}', [\App\Http\Controllers\Api\V1\Payroll\EmployeeLoanController::class, 'update']);
         Route::delete('payroll/loans/{loan}', [\App\Http\Controllers\Api\V1\Payroll\EmployeeLoanController::class, 'destroy']);

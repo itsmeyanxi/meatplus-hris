@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { PageHeader, AppButton, AppCard, TableShell } from "@/components/ui";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { SearchSelect } from "@/components/SearchSelect";
+import { ImportDataButton } from "@/components/ImportDataButton";
 import { getMe } from "@/lib/auth";
 import { loansApi, peso, LOAN_TYPES, type LoanInput } from "@/lib/payroll";
 import { inputCls, labelCls } from "@/lib/form-classes";
@@ -53,11 +54,29 @@ export default function LoansPage() {
       <PageHeader
         title="Loans & Deductions"
         description="Recurring amortized deductions (SSS/Pag-IBIG loans, cash advances, company loans). Each cutoff deducts the amortization; the balance draws down when a run is posted."
-        actions={canManage ? (
-          <AppButton variant={adding ? "secondary" : "primary"} onClick={() => (adding ? reset() : setAdding(true))}>
-            {adding ? "Cancel" : "+ New loan"}
-          </AppButton>
-        ) : undefined}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <a href={loansApi.exportUrl} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+              Export
+            </a>
+            {canManage && (
+              <ImportDataButton
+                label="Import loans"
+                title="Import loans (SSS / Pag-IBIG schedule)"
+                description="Upload an SSS/Pag-IBIG loan schedule or any loan list. Matches employees by ID; re-importing the same loan refreshes its amortization + balance."
+                columns="EmployeeID · LoanType · ReferenceNo · Principal · Amortization · OutstandingBalance · StartDate"
+                templateUrl={loansApi.importTemplateUrl}
+                importFn={loansApi.import}
+                invalidateKeys={[["loans"]]}
+              />
+            )}
+            {canManage && (
+              <AppButton variant={adding ? "secondary" : "primary"} onClick={() => (adding ? reset() : setAdding(true))}>
+                {adding ? "Cancel" : "+ New loan"}
+              </AppButton>
+            )}
+          </div>
+        }
       />
 
       {adding && canManage && (
