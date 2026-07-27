@@ -7,6 +7,7 @@ import { PageHeader, TableShell } from "@/components/ui";
 import { SearchSelect } from "@/components/SearchSelect";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { timekeepingApi, FLOATING_LABELS, type TimekeepingRow } from "@/lib/payroll";
+import { TimekeepingReviewDrawer } from "@/components/payroll/TimekeepingReviewDrawer";
 
 function hrs(min: number): string {
   if (!min) return "—";
@@ -19,6 +20,7 @@ export default function PayrollTimekeepingPage() {
   const [onlyFloating, setOnlyFloating] = useState(true);
   const [search, setSearch] = useState("");
   const [dept, setDept] = useState("");
+  const [reviewId, setReviewId] = useState<number | null>(null);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["payroll-timekeeping", from, to],
@@ -135,7 +137,11 @@ export default function PayrollTimekeepingPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
               {rows.map((r) => (
-                <tr key={r.employee_id} className={r.floating_total > 0 ? "bg-amber-50/40" : "hover:bg-slate-50/60"}>
+                <tr
+                  key={r.employee_id}
+                  onClick={() => setReviewId(r.employee_id)}
+                  className={`cursor-pointer ${r.floating_total > 0 ? "bg-amber-50/40 hover:bg-amber-50" : "hover:bg-slate-50/60"}`}
+                >
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-slate-800">{r.name}</div>
                     <div className="text-xs text-slate-400">{r.employee_no}{r.department ? ` · ${r.department}` : ""}</div>
@@ -166,21 +172,38 @@ export default function PayrollTimekeepingPage() {
                     ) : <span className="text-xs text-slate-400">— none —</span>}
                   </td>
                   <td className="px-4 py-2.5 text-right">
-                    {r.floating_total > 0 && r.head && (
+                    <div className="flex items-center justify-end gap-2">
+                      {r.floating_total > 0 && r.head && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); remind.mutate(r); }}
+                          disabled={remind.isPending}
+                          className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-50"
+                        >
+                          Remind head
+                        </button>
+                      )}
                       <button
-                        onClick={() => remind.mutate(r)}
-                        disabled={remind.isPending}
-                        className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-50"
+                        onClick={(e) => { e.stopPropagation(); setReviewId(r.employee_id); }}
+                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
-                        Remind head
+                        Review
                       </button>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </TableShell>
+      )}
+
+      {reviewId !== null && (
+        <TimekeepingReviewDrawer
+          employeeId={reviewId}
+          from={from || undefined}
+          to={to || undefined}
+          onClose={() => setReviewId(null)}
+        />
       )}
     </div>
   );

@@ -127,6 +127,109 @@ class PayrollTimekeepingController extends Controller
     }
 
     /**
+     * Day-by-day review for one employee over the cutoff: every daily record with
+     * its schedule, actual punches, computed totals and status, plus the specific
+     * floating requests to clear. This is the drill-down behind a row.
+     */
+    public function detail(Request $request, Employee $employee): JsonResponse
+    {
+        abort_unless($request->user()->can('payroll.view') || $request->user()->can('attendance.view.any'), 403);
+        [$from, $to] = $this->period($request);
+
+        $employee->load([
+            'department:id,name,head_employee_id',
+            'position:id,title',
+            'manager:id,first_name,last_name,email_company,email_personal,mobile',
+            'department.head:id,first_name,last_name,email_company,email_personal,mobile',
+        ]);
+
+        $t = fn ($v) => $v ? CarbonImmutable::parse($v)->format('g:i A') : null;
+
+        $days = DailyTimeRecord::query()
+            ->where('employee_id', $employee->id)
+            ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])
+            ->orderBy('work_date')
+            ->get()
+            ->map(fn (DailyTimeRecord $d) => [
+                'date' => $d->work_date?->toDateString(),
+                'dow' => $d->work_date?->format('D'),
+                'scheduled_in' => $t($d->scheduled_in),
+                'scheduled_out' => $t($d->scheduled_out),
+                'actual_in' => $t($d->actual_in),
+                'actual_out' => $t($d->actual_out),
+                'hours_worked' => (float) $d->hours_worked,
+                'late_minutes' => (int) $d->late_minutes,
+                'undertime_minutes' => (int) $d->undertime_minutes,
+                'overtime_minutes' => (int) $d->overtime_minutes,
+                'night_diff_minutes' => (int) $d->night_diff_minutes,
+                'status' => $this->dayStatus($d),
+            ]);
+
+        // Floating (pending) requests with their dates, so the reviewer sees exactly what's open.
+        $floating = [];
+        foreach (self::REQUESTS as $r) {
+            $rows = $r['model']::query()
+                ->where('employee_id', $employee->id)
+                ->where('status', 'pending')
+                ->whereBetween($r['date'], [$from->toDateString(), $to->toDateString()])
+                ->orderBy($r['date'])
+                ->get();
+            foreach ($rows as $req) {
+                $floating[] = [
+                    'type' => $r['key'],
+                    'label' => $r['label'],
+                    'date' => $req->{$r['date']} ? CarbonImmutable::parse($req->{$r['date']})->toDateString() : null,
+                    'reason' => $req->reason ?? $req->remarks ?? null,
+                    'id' => $req->id,
+                ];
+            }
+        }
+
+        $head = $employee->manager ?? $employee->department?->head;
+
+        return response()->json([
+            'period' => ['from' => $from->toDateString(), 'to' => $to->toDateString()],
+            'employee' => [
+                'employee_id' => $employee->id,
+                'employee_no' => $employee->employee_no,
+                'name' => $employee->full_name,
+                'department' => $employee->department?->name,
+                'position' => $employee->position?->title,
+            ],
+            'totals' => [
+                'scheduled_days' => $days->where('status', '!=', 'Rest day')->count(),
+                'present_days' => $days->whereIn('status', ['Present', 'Holiday worked'])->count(),
+                'absent_days' => $days->where('status', 'Absent')->count(),
+                'leave_days' => $days->where('status', 'On leave')->count(),
+                'late_minutes' => (int) $days->sum('late_minutes'),
+                'ot_minutes' => (int) $days->sum('overtime_minutes'),
+                'undertime_minutes' => (int) $days->sum('undertime_minutes'),
+                'night_minutes' => (int) $days->sum('night_diff_minutes'),
+            ],
+            'days' => $days,
+            'floating' => $floating,
+            'head' => $head ? [
+                'employee_id' => $head->id,
+                'name' => trim(($head->first_name ?? '').' '.($head->last_name ?? '')),
+                'email' => $head->email_company ?: $head->email_personal,
+                'mobile' => $head->mobile,
+            ] : null,
+        ]);
+    }
+
+    /** A short display status for one daily record. */
+    private function dayStatus(DailyTimeRecord $d): string
+    {
+        if ($d->is_rest_day) return 'Rest day';
+        if ($d->is_on_leave) return 'On leave';
+        if ($d->is_absent) return 'Absent';
+        if ($d->holiday_type) return ($d->actual_in || (float) $d->hours_worked > 0) ? 'Holiday worked' : 'Holiday';
+        if ($d->actual_in || (float) $d->hours_worked > 0) return 'Present';
+
+        return 'No record';
+    }
+
+    /**
      * Nudge the head/approver about an employee's floating requests: re-sends the
      * in-app "awaiting approval" notification for each pending item in the cutoff.
      */
