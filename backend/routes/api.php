@@ -70,6 +70,8 @@ Route::prefix('v1')->group(function () {
         Route::get('my/pending-summary', PendingSummaryController::class);
         Route::get('my/team', \App\Http\Controllers\Api\V1\Me\TeamController::class);
         Route::get('my/approvals', \App\Http\Controllers\Api\V1\Me\ApprovalCenterController::class);
+        Route::get('my/payslips', [\App\Http\Controllers\Api\V1\Me\PayslipController::class, 'index']);
+        Route::get('my/payslips/{payslip}', [\App\Http\Controllers\Api\V1\Me\PayslipController::class, 'show']);
         Route::get('my/time-clock', [\App\Http\Controllers\Api\V1\Me\TimeClockController::class, 'show']);
         Route::post('my/time-clock', [\App\Http\Controllers\Api\V1\Me\TimeClockController::class, 'store']);
         Route::get('audit-trail', [\App\Http\Controllers\Api\V1\Admin\AuditTrailController::class, 'index']);
@@ -258,6 +260,7 @@ Route::prefix('v1')->group(function () {
         Route::post('payroll-runs/{payrollRun}/approve', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'approve']);
         Route::post('payroll-runs/{payrollRun}/post', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'post']);
         Route::delete('payroll-runs/{payrollRun}', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'destroy']);
+        Route::get('payroll-runs/{payrollRun}/bank-file', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'bankFile']);
 
         // One-off adjustments on a run (earnings/deductions)
         Route::get('payroll-runs/{payrollRun}/adjustments', [\App\Http\Controllers\Api\V1\Payroll\PayslipAdjustmentController::class, 'index']);
