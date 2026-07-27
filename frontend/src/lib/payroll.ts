@@ -27,6 +27,9 @@ export type Payslip = {
   basic_pay: string | number;
   overtime_pay: string | number;
   night_diff_pay?: string | number;
+  holiday_pay?: string | number;
+  rest_day_pay?: string | number;
+  other_earnings?: string | number;
   allowance: string | number;
   gross_pay: string | number;
   sss: string | number;
@@ -35,9 +38,80 @@ export type Payslip = {
   withholding_tax: string | number;
   absences_deduction: string | number;
   tardiness_deduction: string | number;
+  loans_deduction?: string | number;
+  other_deductions?: string | number;
   total_deductions: string | number;
   net_pay: string | number;
 };
+
+export const LOAN_TYPES: { value: string; label: string }[] = [
+  { value: "sss_salary", label: "SSS Salary Loan" },
+  { value: "sss_calamity", label: "SSS Calamity Loan" },
+  { value: "pagibig_mpl", label: "Pag-IBIG MPL" },
+  { value: "pagibig_calamity", label: "Pag-IBIG Calamity" },
+  { value: "company", label: "Company Loan" },
+  { value: "cash_advance", label: "Cash Advance" },
+  { value: "other", label: "Other" },
+];
+
+export type EmployeeLoan = {
+  id: number;
+  employee?: { id: number; employee_no: string; name: string } | null;
+  employee_id: number;
+  type: string;
+  reference_no: string | null;
+  principal: number;
+  amortization: number;
+  outstanding_balance: number;
+  start_date: string | null;
+  is_active: boolean;
+  notes: string | null;
+};
+
+export type LoanInput = {
+  employee_id: number;
+  type: string;
+  reference_no?: string | null;
+  principal?: number;
+  amortization: number;
+  outstanding_balance?: number;
+  start_date?: string | null;
+  is_active?: boolean;
+  notes?: string | null;
+};
+
+export type PayslipAdjustment = {
+  id: number;
+  employee?: { id: number; employee_no: string; name: string } | null;
+  employee_id: number;
+  label: string;
+  kind: "earning" | "deduction";
+  amount: number;
+  notes: string | null;
+};
+
+export const loansApi = {
+  list: async (params: { employee_id?: number; active_only?: boolean } = {}): Promise<EmployeeLoan[]> =>
+    (await api.get<Listed<EmployeeLoan>>("/api/v1/payroll/loans", { params })).data.data,
+  create: async (body: LoanInput): Promise<EmployeeLoan> =>
+    (await api.post<{ data: EmployeeLoan }>("/api/v1/payroll/loans", body)).data.data,
+  update: async (id: number, body: Partial<LoanInput>): Promise<EmployeeLoan> =>
+    (await api.patch<{ data: EmployeeLoan }>(`/api/v1/payroll/loans/${id}`, body)).data.data,
+  remove: async (id: number) => (await api.delete(`/api/v1/payroll/loans/${id}`)).data,
+};
+
+export const adjustmentsApi = {
+  list: async (runId: number): Promise<PayslipAdjustment[]> =>
+    (await api.get<Listed<PayslipAdjustment>>(`/api/v1/payroll-runs/${runId}/adjustments`)).data.data,
+  create: async (runId: number, body: { employee_id: number; label: string; kind: "earning" | "deduction"; amount: number; notes?: string }): Promise<PayslipAdjustment> =>
+    (await api.post<{ data: PayslipAdjustment }>(`/api/v1/payroll-runs/${runId}/adjustments`, body)).data.data,
+  remove: async (id: number) => (await api.delete(`/api/v1/payroll-adjustments/${id}`)).data,
+};
+
+/** Bank disbursement CSV — download via a plain link (uses the session cookie). */
+export function bankFileUrl(runId: number): string {
+  return `/api/v1/payroll-runs/${runId}/bank-file`;
+}
 
 export type CompRow = {
   employee_id: number;
@@ -147,6 +221,35 @@ export const compensationApi = {
   },
   destroy: (employeeId: number, id: number) =>
     api.delete(`/api/v1/employees/${employeeId}/compensations/${id}`),
+};
+
+// ── Employee's own payslips ─────────────────────────────────────────────────
+
+export type MyPayslipListItem = {
+  id: number;
+  run: { name: string; period_start: string; period_end: string; pay_date: string; status: string };
+  gross_pay: number;
+  total_deductions: number;
+  net_pay: number;
+};
+
+export type MyPayslipDetail = {
+  id: number;
+  company: { name: string };
+  employee: { employee_no: string; name: string; department: string | null; position: string | null };
+  run: { name: string; period_start: string; period_end: string; pay_date: string };
+  attendance: { days_worked: number; days_absent: number; late_minutes: number; overtime_minutes: number; night_diff_minutes: number };
+  earnings: { basic_pay: number; overtime_pay: number; night_diff_pay: number; holiday_pay: number; rest_day_pay: number; allowance: number; other_earnings: number; gross_pay: number };
+  deductions: { sss: number; philhealth: number; pagibig: number; withholding_tax: number; tardiness_deduction: number; loans_deduction: number; other_deductions: number; total_deductions: number };
+  breakdown: { loans?: { type: string; amount: number }[]; adjustments?: { label: string; kind: string; amount: number }[] } | null;
+  net_pay: number;
+};
+
+export const myPayslipsApi = {
+  list: async (): Promise<MyPayslipListItem[]> =>
+    (await api.get<Listed<MyPayslipListItem>>("/api/v1/my/payslips")).data.data,
+  get: async (id: number): Promise<MyPayslipDetail> =>
+    (await api.get<{ data: MyPayslipDetail }>(`/api/v1/my/payslips/${id}`)).data.data,
 };
 
 /** Format a peso amount from a string|number value. */
