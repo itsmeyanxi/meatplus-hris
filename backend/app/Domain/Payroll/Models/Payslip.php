@@ -14,9 +14,9 @@ class Payslip extends Model
     protected $fillable = [
         'payroll_run_id', 'company_id', 'employee_id',
         'days_worked', 'days_absent', 'late_minutes', 'overtime_minutes', 'night_diff_minutes',
-        'basic_pay', 'overtime_pay', 'night_diff_pay', 'holiday_pay', 'rest_day_pay', 'allowance', 'gross_pay',
+        'basic_pay', 'overtime_pay', 'night_diff_pay', 'holiday_pay', 'rest_day_pay', 'other_earnings', 'allowance', 'gross_pay',
         'sss', 'philhealth', 'pagibig', 'withholding_tax',
-        'absences_deduction', 'tardiness_deduction', 'total_deductions',
+        'absences_deduction', 'tardiness_deduction', 'loans_deduction', 'other_deductions', 'total_deductions',
         'net_pay', 'breakdown',
     ];
 
@@ -29,6 +29,9 @@ class Payslip extends Model
             'night_diff_pay' => 'decimal:2',
             'holiday_pay' => 'decimal:2',
             'rest_day_pay' => 'decimal:2',
+            'other_earnings' => 'decimal:2',
+            'loans_deduction' => 'decimal:2',
+            'other_deductions' => 'decimal:2',
             'allowance' => 'decimal:2',
             'gross_pay' => 'decimal:2',
             'sss' => 'decimal:2',

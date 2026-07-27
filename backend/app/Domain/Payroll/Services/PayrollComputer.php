@@ -4,8 +4,10 @@ namespace App\Domain\Payroll\Services;
 
 use App\Domain\Attendance\Models\DailyTimeRecord;
 use App\Domain\Payroll\Models\EmployeeCompensation;
+use App\Domain\Payroll\Models\EmployeeLoan;
 use App\Domain\Payroll\Models\PayrollRun;
 use App\Domain\Payroll\Models\Payslip;
+use App\Domain\Payroll\Models\PayslipAdjustment;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -74,6 +76,64 @@ class PayrollComputer
     }
 
     /**
+     * Recurring loan amortizations for the employee, each capped at its remaining
+     * balance. Balances are NOT drawn down here (compute is re-runnable) — that
+     * happens once, when the run is posted, from the stored breakdown.
+     *
+     * @return array{0: float, 1: array<int, array{loan_id:int, type:string, amount:float}>}
+     */
+    private function loansFor(int $employeeId): array
+    {
+        $total = 0.0;
+        $items = [];
+        $loans = EmployeeLoan::query()
+            ->where('employee_id', $employeeId)
+            ->where('is_active', true)
+            ->where('outstanding_balance', '>', 0)
+            ->where('amortization', '>', 0)
+            ->get();
+
+        foreach ($loans as $loan) {
+            $amount = round(min((float) $loan->amortization, (float) $loan->outstanding_balance), 2);
+            if ($amount <= 0) {
+                continue;
+            }
+            $total += $amount;
+            $items[] = ['loan_id' => $loan->id, 'type' => $loan->type, 'amount' => $amount];
+        }
+
+        return [round($total, 2), $items];
+    }
+
+    /**
+     * One-off earnings/deductions applied to this employee in this run.
+     *
+     * @return array{0: float, 1: float, 2: array<int, array{label:string, kind:string, amount:float}>}
+     */
+    private function adjustmentsFor(PayrollRun $run, int $employeeId): array
+    {
+        $earnings = 0.0;
+        $deductions = 0.0;
+        $items = [];
+        $adjustments = PayslipAdjustment::query()
+            ->where('payroll_run_id', $run->id)
+            ->where('employee_id', $employeeId)
+            ->get();
+
+        foreach ($adjustments as $adj) {
+            $amount = round((float) $adj->amount, 2);
+            if ($adj->kind === 'earning') {
+                $earnings += $amount;
+            } else {
+                $deductions += $amount;
+            }
+            $items[] = ['label' => $adj->label, 'kind' => $adj->kind, 'amount' => $amount];
+        }
+
+        return [round($earnings, 2), round($deductions, 2), $items];
+    }
+
+    /**
      * The premium OVER ordinary pay (100%) for regular hours worked on a special
      * day, per DOLE. Ordinary days = 0. Rest day or special non-working day = +30%.
      * Regular holiday = +100%. Combinations stack (e.g. a regular holiday that is
@@ -92,6 +152,32 @@ class PayrollComputer
         }
 
         return $extra;
+    }
+
+    /**
+     * Draw each employee's loan amortizations off their outstanding balance when a
+     * run is posted. Uses the amounts recorded on each payslip's breakdown so it
+     * matches exactly what was deducted, and runs once (posted runs can't recompute
+     * or re-post). Deactivates loans that reach a zero balance.
+     */
+    public function drawDownLoans(PayrollRun $run): void
+    {
+        DB::transaction(function () use ($run) {
+            $payslips = $run->payslips()->whereNotNull('breakdown')->get();
+            foreach ($payslips as $slip) {
+                foreach ($slip->breakdown['loans'] ?? [] as $line) {
+                    $loan = EmployeeLoan::find($line['loan_id'] ?? null);
+                    if (! $loan) {
+                        continue;
+                    }
+                    $newBalance = max(0, round((float) $loan->outstanding_balance - (float) $line['amount'], 2));
+                    $loan->forceFill([
+                        'outstanding_balance' => $newBalance,
+                        'is_active' => $newBalance > 0 ? $loan->is_active : false,
+                    ])->save();
+                }
+            }
+        });
     }
 
     private function computeEmployee(PayrollRun $run, EmployeeCompensation $comp): Payslip
@@ -188,7 +274,10 @@ class PayrollComputer
         $nightDiffPay = round(($nightMinutes / 60) * $hourlyRate * 0.10, 2); // 10% night differential
         $tardinessDeduction = round($lateMinutes * $minuteRate, 2);
 
-        $grossPay = round($basicPay + $allowance + $overtimePay + $nightDiffPay + $holidayPremium + $restDayPremium, 2);
+        // One-off adjustments for this run (bonus, backpay, uniform, correction…).
+        [$otherEarnings, $otherDeductions, $adjustmentBreakdown] = $this->adjustmentsFor($run, $comp->employee_id);
+
+        $grossPay = round($basicPay + $allowance + $overtimePay + $nightDiffPay + $holidayPremium + $restDayPremium + $otherEarnings, 2);
 
         // Statutory + tax (monthly figures, split across two cutoffs).
         $contrib = $this->statutory->monthlyContributions($basicMonthly);
@@ -199,13 +288,22 @@ class PayrollComputer
         $taxableMonthly = max(0, $basicMonthly - ($contrib['sss'] + $contrib['philhealth'] + $contrib['pagibig']));
         $tax = round($this->statutory->monthlyTax($taxableMonthly) / 2, 2);
 
+        // Recurring loan amortizations (capped at each loan's remaining balance).
+        [$loansDeduction, $loanBreakdown] = $this->loansFor($comp->employee_id);
+
         $totalDeductions = round(
-            $sss + $philhealth + $pagibig + $tax + $absencesDeduction + $tardinessDeduction,
+            $sss + $philhealth + $pagibig + $tax + $absencesDeduction + $tardinessDeduction + $loansDeduction + $otherDeductions,
             2,
         );
         // Net can never be negative — a shortfall (deductions > earnings) is carried
         // by the employer for the cutoff rather than billed back to the employee.
         $netPay = max(0.0, round($grossPay - $totalDeductions, 2));
+
+        // Itemized detail for transparency + the post() loan draw-down.
+        $breakdown = array_filter([
+            'loans' => $loanBreakdown ?: null,
+            'adjustments' => $adjustmentBreakdown ?: null,
+        ]);
 
         return Payslip::create([
             'payroll_run_id' => $run->id,
@@ -221,6 +319,7 @@ class PayrollComputer
             'night_diff_pay' => $nightDiffPay,
             'holiday_pay' => $holidayPremium,
             'rest_day_pay' => $restDayPremium,
+            'other_earnings' => $otherEarnings,
             'allowance' => $allowance,
             'gross_pay' => $grossPay,
             'sss' => $sss,
@@ -229,8 +328,11 @@ class PayrollComputer
             'withholding_tax' => $tax,
             'absences_deduction' => $absencesDeduction,
             'tardiness_deduction' => $tardinessDeduction,
+            'loans_deduction' => $loansDeduction,
+            'other_deductions' => $otherDeductions,
             'total_deductions' => $totalDeductions,
             'net_pay' => $netPay,
+            'breakdown' => $breakdown ?: null,
         ]);
     }
 }

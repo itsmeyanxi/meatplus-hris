@@ -73,10 +73,13 @@ class PayrollRunController extends Controller
         return new PayrollRunResource($payrollRun);
     }
 
-    public function post(Request $request, PayrollRun $payrollRun): PayrollRunResource
+    public function post(Request $request, PayrollRun $payrollRun, PayrollComputer $computer): PayrollRunResource
     {
         abort_unless($request->user()->can('payroll.post'), 403);
         $this->assertStatus($payrollRun, ['approved'], 'post');
+
+        // Draw loan amortizations off their balances (once — posting is terminal).
+        $computer->drawDownLoans($payrollRun);
 
         $payrollRun->forceFill(['status' => 'posted', 'posted_at' => now()])->save();
 

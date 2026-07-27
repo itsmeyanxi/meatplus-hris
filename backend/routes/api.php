@@ -259,6 +259,17 @@ Route::prefix('v1')->group(function () {
         Route::post('payroll-runs/{payrollRun}/post', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'post']);
         Route::delete('payroll-runs/{payrollRun}', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'destroy']);
 
+        // One-off adjustments on a run (earnings/deductions)
+        Route::get('payroll-runs/{payrollRun}/adjustments', [\App\Http\Controllers\Api\V1\Payroll\PayslipAdjustmentController::class, 'index']);
+        Route::post('payroll-runs/{payrollRun}/adjustments', [\App\Http\Controllers\Api\V1\Payroll\PayslipAdjustmentController::class, 'store']);
+        Route::delete('payroll-adjustments/{adjustment}', [\App\Http\Controllers\Api\V1\Payroll\PayslipAdjustmentController::class, 'destroy']);
+
+        // Recurring loans / amortized deductions
+        Route::get('payroll/loans', [\App\Http\Controllers\Api\V1\Payroll\EmployeeLoanController::class, 'index']);
+        Route::post('payroll/loans', [\App\Http\Controllers\Api\V1\Payroll\EmployeeLoanController::class, 'store']);
+        Route::patch('payroll/loans/{loan}', [\App\Http\Controllers\Api\V1\Payroll\EmployeeLoanController::class, 'update']);
+        Route::delete('payroll/loans/{loan}', [\App\Http\Controllers\Api\V1\Payroll\EmployeeLoanController::class, 'destroy']);
+
         // Final pay
         Route::get('final-pays', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'index']);
         Route::post('final-pays/compute', [\App\Http\Controllers\Api\V1\Payroll\FinalPayController::class, 'compute']);
