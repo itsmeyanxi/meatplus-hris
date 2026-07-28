@@ -8,20 +8,24 @@ import { SearchSelect } from "@/components/SearchSelect";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { compensationApi, type CompRow } from "@/lib/payroll";
 
-type Edit = { payType: "monthly" | "daily"; rate: string; allowance: string };
+type Edit = { payType: "monthly" | "daily"; rate: string; allowance: string; effectiveFrom: string };
+
+const TODAY = new Date().toISOString().slice(0, 10);
 
 export default function CompensationPage() {
   const qc = useQueryClient();
   const { data: rows, isLoading } = useQuery({ queryKey: ["compensations"], queryFn: compensationApi.list });
   const [edits, setEdits] = useState<Record<number, Edit>>({});
 
-  // The row's edit state, falling back to its saved values.
+  // The row's edit state, falling back to its saved values. A new rate defaults
+  // to taking effect today; HR sets the real effective date for a future raise.
   const base = (r: CompRow): Edit => ({
     payType: r.pay_type === "daily" ? "daily" : "monthly",
     rate: r.pay_type === "daily"
       ? (r.daily_rate != null ? String(r.daily_rate) : "")
       : (r.basic_monthly != null ? String(r.basic_monthly) : ""),
     allowance: r.allowance_monthly != null ? String(r.allowance_monthly) : "",
+    effectiveFrom: TODAY,
   });
   const cur = (r: CompRow): Edit => edits[r.employee_id] ?? base(r);
   const patch = (r: CompRow, p: Partial<Edit>) =>
@@ -37,6 +41,7 @@ export default function CompensationPage() {
           ? { daily_rate: Number(e.rate || 0) }
           : { basic_monthly: Number(e.rate || 0) }),
         allowance_monthly: Number(e.allowance || 0),
+        effective_from: e.effectiveFrom || TODAY,
       });
     },
     onSuccess: () => {
@@ -47,7 +52,7 @@ export default function CompensationPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Compensation" description="Set each employee's pay type and rate. Monthly = fixed salary; Daily = paid per day worked." />
+      <PageHeader title="Compensation" description="Set each employee's pay type and rate. Monthly = fixed salary; Daily = paid per day worked. The Effective date decides which payroll cutoff a new rate starts in — a raise effective mid-cutoff is paid at the new rate for that cutoff." />
 
       {isLoading ? (
         <TableShell><TableSkeleton rows={6} cols={4} /></TableShell>
@@ -63,6 +68,7 @@ export default function CompensationPage() {
                 <th className="px-4 py-3">Pay type</th>
                 <th className="px-4 py-3">Rate</th>
                 <th className="px-4 py-3">Allowance / month</th>
+                <th className="px-4 py-3">Effective date <span className="text-rose-400">*</span></th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -108,10 +114,20 @@ export default function CompensationPage() {
                         placeholder="0.00"
                       />
                     </td>
+                    <td className="px-4 py-2.5">
+                      <input
+                        type="date"
+                        className={`rounded-lg border px-2 py-1 text-sm ${e.effectiveFrom ? "border-slate-200" : "border-rose-300 bg-rose-50"}`}
+                        value={e.effectiveFrom}
+                        onChange={(ev) => patch(r, { effectiveFrom: ev.target.value })}
+                        title="When this rate starts. Payroll pays this rate from this date onward."
+                      />
+                    </td>
                     <td className="px-4 py-2.5 text-right">
                       <button
                         onClick={() => save.mutate(r)}
-                        disabled={save.isPending}
+                        disabled={save.isPending || !e.effectiveFrom}
+                        title={!e.effectiveFrom ? "Set an effective date first" : "Save this rate"}
                         className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-40"
                       >
                         Save
