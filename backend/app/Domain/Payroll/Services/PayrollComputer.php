@@ -5,6 +5,7 @@ namespace App\Domain\Payroll\Services;
 use App\Domain\Attendance\Models\DailyTimeRecord;
 use App\Domain\Payroll\Models\EmployeeCompensation;
 use App\Domain\Payroll\Models\EmployeeLoan;
+use App\Domain\Payroll\Models\EmployeePayrollProfile;
 use App\Domain\Payroll\Models\PayrollRun;
 use App\Domain\Payroll\Models\Payslip;
 use App\Domain\Payroll\Models\PayslipAdjustment;
@@ -281,6 +282,9 @@ class PayrollComputer
         }
         $absencesDeduction = 0.0;
         $allowance = round((float) $comp->allowance_monthly / 2, 2);
+        // De-minimis benefit (tax-exempt) from the payroll profile — fixed per
+        // cutoff (halved from the monthly figure), added to pay but NOT taxed.
+        $deMinimis = round((float) (EmployeePayrollProfile::where('employee_id', $comp->employee_id)->value('de_minimis') ?? 0) / 2, 2);
         $overtimePay = round(($otMinutes / 60) * $hourlyRate * 1.25, 2);
         $nightDiffPay = round(($nightMinutes / 60) * $hourlyRate * 0.10, 2); // 10% night differential
         $tardinessDeduction = round($lateMinutes * $minuteRate, 2);
@@ -288,7 +292,7 @@ class PayrollComputer
         // One-off adjustments for this run (bonus, backpay, uniform, correction…).
         [$otherEarnings, $otherDeductions, $adjustmentBreakdown] = $this->adjustmentsFor($run, $comp->employee_id);
 
-        $grossPay = round($basicPay + $allowance + $overtimePay + $nightDiffPay + $holidayPremium + $restDayPremium + $otherEarnings, 2);
+        $grossPay = round($basicPay + $allowance + $deMinimis + $overtimePay + $nightDiffPay + $holidayPremium + $restDayPremium + $otherEarnings, 2);
 
         // Statutory + tax (monthly figures, split across two cutoffs).
         $contrib = $this->statutory->monthlyContributions($basicMonthly);
@@ -332,6 +336,7 @@ class PayrollComputer
             'rest_day_pay' => $restDayPremium,
             'other_earnings' => $otherEarnings,
             'allowance' => $allowance,
+            'de_minimis' => $deMinimis,
             'gross_pay' => $grossPay,
             'sss' => $sss,
             'philhealth' => $philhealth,

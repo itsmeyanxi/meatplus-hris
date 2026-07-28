@@ -31,6 +31,7 @@ export type Payslip = {
   rest_day_pay?: string | number;
   other_earnings?: string | number;
   allowance: string | number;
+  de_minimis?: string | number;
   gross_pay: string | number;
   sss: string | number;
   philhealth: string | number;

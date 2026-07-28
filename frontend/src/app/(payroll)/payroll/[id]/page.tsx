@@ -153,11 +153,13 @@ export default function PayrollRunPage() {
                 <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
                   <th className="px-3 py-3">Employee</th>
                   <th className="px-3 py-3 text-right">Days</th>
+                  <th className="px-3 py-3 text-right">De Minimis</th>
                   <th className="px-3 py-3 text-right">Gross</th>
                   <th className="px-3 py-3 text-right">SSS</th>
                   <th className="px-3 py-3 text-right">PhilHealth</th>
                   <th className="px-3 py-3 text-right">Pag-IBIG</th>
                   <th className="px-3 py-3 text-right">Tax</th>
+                  <th className="px-3 py-3 text-right">Loans</th>
                   <th className="px-3 py-3 text-right">Deductions</th>
                   <th className="px-3 py-3 text-right">Net pay</th>
                 </tr>
@@ -174,11 +176,13 @@ export default function PayrollRunPage() {
                       <div className="font-mono text-xs text-slate-400">{s.employee.employee_no}</div>
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{Number(s.days_worked)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{peso(s.de_minimis ?? 0)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{peso(s.gross_pay)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{peso(s.sss)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{peso(s.philhealth)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{peso(s.pagibig)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{peso(s.withholding_tax)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{peso(s.loans_deduction ?? 0)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{peso(s.total_deductions)}</td>
                     <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-900">{peso(s.net_pay)}</td>
                   </tr>

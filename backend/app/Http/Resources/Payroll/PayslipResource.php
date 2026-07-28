@@ -27,6 +27,8 @@ class PayslipResource extends JsonResource
             'holiday_pay' => $this->holiday_pay,
             'rest_day_pay' => $this->rest_day_pay,
             'allowance' => $this->allowance,
+            'de_minimis' => $this->de_minimis,
+            'loans_deduction' => $this->loans_deduction,
             'gross_pay' => $this->gross_pay,
             'sss' => $this->sss,
             'philhealth' => $this->philhealth,
