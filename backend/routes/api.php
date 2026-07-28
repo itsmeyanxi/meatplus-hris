@@ -236,6 +236,8 @@ Route::prefix('v1')->group(function () {
         // Reports (CSV exports)
         Route::get('reports/full-export', [ReportController::class, 'fullExport']);
         Route::get('reports/dtr', [ReportController::class, 'dtr']);
+        Route::get('reports/attendance-summary', [ReportController::class, 'attendanceSummary']);
+        Route::get('reports/compensation', [ReportController::class, 'compensation']);
         Route::get('reports/leave', [ReportController::class, 'leave']);
         Route::get('reports/overtime', [ReportController::class, 'overtime']);
         Route::get('reports/payroll/{payrollRun}', [ReportController::class, 'payroll']);

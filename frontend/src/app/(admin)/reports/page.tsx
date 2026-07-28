@@ -11,7 +11,12 @@ import {
   downloadOvertimeReport,
   downloadPayrollReport,
   downloadFullExport,
+  downloadAttendanceSummary,
+  downloadTimeLogsReport,
+  downloadCompensationReport,
+  downloadLoansReport,
 } from "@/lib/reports";
+import { getMe } from "@/lib/auth";
 import { getLookup } from "@/lib/employees";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { SearchSelect } from "@/components/SearchSelect";
@@ -20,18 +25,137 @@ const fieldCls =
   "mt-0.5 block rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900";
 
 export default function ReportsPage() {
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const canPayroll = me?.user.permissions?.includes("payroll.view") ?? false;
+
   return (
     <div className="space-y-6">
       <PageHeader title="Reports" description="Download data exports as CSV files, or the full company dataset as a zipped Excel bundle." />
+
+      <SectionTitle>Attendance</SectionTitle>
       <div className="grid gap-4 sm:grid-cols-2">
-        <FullExportCard />
-        <EmployeeRosterCard />
+        <AttendanceSummaryCard />
         <DtrReportCard />
+        <TimeLogsCard />
         <LeaveReportCard />
         <OvertimeReportCard />
-        <PayrollReportCard />
+      </div>
+
+      <SectionTitle>Employees</SectionTitle>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <EmployeeRosterCard />
+        {canPayroll && <CompensationCard />}
+      </div>
+
+      {canPayroll && (
+        <>
+          <SectionTitle>Payroll</SectionTitle>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <PayrollReportCard />
+            <LoansCard />
+          </div>
+        </>
+      )}
+
+      <SectionTitle>Everything</SectionTitle>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FullExportCard />
       </div>
     </div>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h2 className="pt-2 text-xs font-bold uppercase tracking-wide text-slate-500">{children}</h2>;
+}
+
+// ── simple one-click download card ──────────────────────────────────────────
+function SimpleDownloadCard({ title, description, fn }: { title: string; description: string; fn: () => Promise<void> }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const download = async () => {
+    setError(null); setLoading(true);
+    try { await fn(); } catch { setError("Failed to download."); } finally { setLoading(false); }
+  };
+  return (
+    <ReportCard title={title} description={description}>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <DownloadButton onClick={download} loading={loading}>Download CSV</DownloadButton>
+    </ReportCard>
+  );
+}
+
+function CompensationCard() {
+  return <SimpleDownloadCard title="Compensation / Salaries" description="Active pay type, rate, allowance and effective date per employee." fn={downloadCompensationReport} />;
+}
+
+function LoansCard() {
+  return <SimpleDownloadCard title="Loans & Balances" description="Every employee loan with amortization and outstanding balance." fn={downloadLoansReport} />;
+}
+
+// ── date-range card with department + employee filters ──────────────────────
+function RangeReportCard({
+  title, description, onDownload,
+}: {
+  title: string;
+  description: string;
+  onDownload: (p: { from: string; to: string; employee_id: number | ""; department_id: number | "" }) => Promise<void>;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const firstOfMonth = today.slice(0, 8) + "01";
+  const [from, setFrom] = useState(firstOfMonth);
+  const [to, setTo] = useState(today);
+  const [employeeId, setEmployeeId] = useState<number | "">("");
+  const [departmentId, setDepartmentId] = useState<number | "">("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: departments = [] } = useQuery({ queryKey: ["lookups", "departments"], queryFn: () => getLookup("departments"), staleTime: 5 * 60 * 1000 });
+
+  const download = async () => {
+    if (!from || !to) { setError("Both dates are required."); return; }
+    setError(null); setLoading(true);
+    try { await onDownload({ from, to, employee_id: employeeId, department_id: departmentId }); }
+    catch { setError("Failed to download. Check your date range."); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <ReportCard title={title} description={description}>
+      <div className="flex flex-wrap gap-2">
+        <label className="block"><span className="text-xs text-slate-500">From</span>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={fieldCls} /></label>
+        <label className="block"><span className="text-xs text-slate-500">To</span>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={fieldCls} /></label>
+        <label className="block"><span className="text-xs text-slate-500">Department</span>
+          <SearchSelect value={departmentId} onChange={(v) => setDepartmentId(v ? Number(v) : "")} className={fieldCls}
+            options={[{ value: "", label: "All departments" }, ...departments.map((d) => ({ value: String(d.id), label: d.name }))]} /></label>
+        <label className="block"><span className="text-xs text-slate-500">Employee</span>
+          <EmployeeSearchSelect value={employeeId} onChange={(id) => setEmployeeId(id === "" ? "" : Number(id))} placeholder="All employees" className={fieldCls} /></label>
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <DownloadButton onClick={download} loading={loading}>Download CSV</DownloadButton>
+    </ReportCard>
+  );
+}
+
+function AttendanceSummaryCard() {
+  return (
+    <RangeReportCard
+      title="Attendance Summary"
+      description="One row per employee for the period — present / absent / leave days and late, OT, undertime & night totals, like the timekeeping review."
+      onDownload={(p) => downloadAttendanceSummary({ date_from: p.from, date_to: p.to, employee_id: p.employee_id, department_id: p.department_id })}
+    />
+  );
+}
+
+function TimeLogsCard() {
+  return (
+    <RangeReportCard
+      title="Time Logs (raw punches)"
+      description="Every biometric / manual punch in the range, with device and location."
+      onDownload={(p) => downloadTimeLogsReport({ from: p.from, to: p.to, employee_id: p.employee_id, department_id: p.department_id })}
+    />
   );
 }
 

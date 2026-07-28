@@ -75,6 +75,96 @@ class ReportController extends Controller
         );
     }
 
+    /**
+     * GET /api/v1/reports/attendance-summary?date_from=&date_to=&employee_id=&department_id=
+     * One row per employee for the period — the timekeeping totals (scheduled /
+     * present / absent / leave days, late/UT/OT/night minutes, hours worked).
+     */
+    public function attendanceSummary(Request $request): Response
+    {
+        abort_unless($request->user()->can('attendance.view'), 403);
+
+        $request->validate([
+            'date_from'     => ['required', 'date'],
+            'date_to'       => ['required', 'date', 'after_or_equal:date_from'],
+            'employee_id'   => ['nullable', 'integer'],
+            'department_id' => ['nullable', 'integer'],
+        ]);
+
+        $agg = DailyTimeRecord::query()
+            ->whereBetween('work_date', [$request->date_from, $request->date_to])
+            ->when($request->employee_id, fn ($q) => $q->where('employee_id', $request->employee_id))
+            ->when($request->department_id, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
+            ->selectRaw('employee_id,
+                count(*) filter (where not is_rest_day) as scheduled_days,
+                count(*) filter (where actual_in is not null) as present_days,
+                count(*) filter (where is_absent) as absent_days,
+                count(*) filter (where is_on_leave) as leave_days,
+                coalesce(sum(hours_worked),0) as total_hours,
+                coalesce(sum(late_minutes),0) as late_minutes,
+                coalesce(sum(undertime_minutes),0) as ut_minutes,
+                coalesce(sum(overtime_minutes),0) as ot_minutes,
+                coalesce(sum(night_diff_minutes),0) as night_minutes')
+            ->groupBy('employee_id')
+            ->get()->keyBy('employee_id');
+
+        $employees = Employee::query()
+            ->whereIn('id', $agg->keys())
+            ->with('department:id,name')
+            ->orderBy('last_name')->orderBy('first_name')
+            ->get(['id', 'employee_no', 'first_name', 'last_name', 'department_id']);
+
+        $lines = [implode(',', [
+            'Employee No', 'Name', 'Department',
+            'Scheduled Days', 'Present', 'Absent', 'On Leave', 'Hours Worked',
+            'Late (min)', 'Undertime (min)', 'OT (min)', 'Night Diff (min)',
+        ])];
+        foreach ($employees as $e) {
+            $a = $agg->get($e->id);
+            $lines[] = implode(',', [
+                $e->employee_no,
+                $this->csv($e->last_name.', '.$e->first_name),
+                $this->csv($e->department?->name ?? ''),
+                (int) ($a->scheduled_days ?? 0),
+                (int) ($a->present_days ?? 0),
+                (int) ($a->absent_days ?? 0),
+                (int) ($a->leave_days ?? 0),
+                round((float) ($a->total_hours ?? 0), 2),
+                (int) ($a->late_minutes ?? 0),
+                (int) ($a->ut_minutes ?? 0),
+                (int) ($a->ot_minutes ?? 0),
+                (int) ($a->night_minutes ?? 0),
+            ]);
+        }
+
+        return $this->csvResponse(implode("\n", $lines), "attendance_summary_{$request->date_from}_to_{$request->date_to}.csv");
+    }
+
+    /** GET /api/v1/reports/compensation — active salaries for the company. */
+    public function compensation(Request $request): Response
+    {
+        abort_unless($request->user()->can('payroll.view'), 403);
+
+        $rows = EmployeeCompensation::query()
+            ->with('employee:id,employee_no,first_name,last_name,department_id', 'employee.department:id,name')
+            ->where('is_active', true)
+            ->get();
+
+        $lines = [implode(',', ['Employee No', 'Name', 'Department', 'Pay Type', 'Basic Monthly', 'Daily Rate', 'Hourly Rate', 'Allowance', 'Effective From'])];
+        foreach ($rows->sortBy(fn ($c) => $c->employee?->last_name) as $c) {
+            $lines[] = implode(',', [
+                $c->employee?->employee_no ?? '',
+                $this->csv(($c->employee?->last_name ?? '').', '.($c->employee?->first_name ?? '')),
+                $this->csv($c->employee?->department?->name ?? ''),
+                $c->pay_type,
+                $c->basic_monthly, $c->daily_rate, $c->hourly_rate, $c->allowance_monthly,
+                $c->effective_from?->toDateString() ?? '',
+            ]);
+        }
+
+        return $this->csvResponse(implode("\n", $lines), 'compensation_'.now()->format('Ymd').'.csv');
+    }
+
     /** GET /api/v1/reports/leave?date_from=&date_to=&status= */
     public function leave(Request $request): Response
     {
