@@ -78,11 +78,11 @@ const NAV: NavItem[] = [
   },
   {
     href: "/schedule-adjustments",
-    label: "Schedule Adjustments",
+    label: "My Schedule Adjustments",
     group: "My Requests",
+    // Self-service: any employee files their own shift-change request; approvers
+    // (dept heads / HR) approve it here or in the Approval Center.
     requiresEmployee: true,
-    // HR / department heads only — not regular employees.
-    permissions: ["attendance.manage", "attendance.approve.any"],
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />

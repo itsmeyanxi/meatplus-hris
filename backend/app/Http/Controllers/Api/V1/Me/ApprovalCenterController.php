@@ -6,6 +6,7 @@ use App\Domain\Attendance\Models\AttendanceCorrection;
 use App\Domain\Attendance\Models\CertificateOfAttendanceRequest;
 use App\Domain\Attendance\Models\OfficialBusinessRequest;
 use App\Domain\Attendance\Models\OvertimeRequest;
+use App\Domain\Attendance\Models\ScheduleAdjustmentRequest;
 use App\Domain\Attendance\Models\UndertimeRequest;
 use App\Domain\HRIS\Models\Employee;
 use App\Domain\Leave\Models\LeaveApplication;
@@ -54,6 +55,7 @@ class ApprovalCenterController extends Controller
             ['key' => 'undertime', 'label' => 'Undertime', 'model' => UndertimeRequest::class, 'global' => $globalAttendance, 'date' => 'date', 'url' => '/attendance/requests/undertime', 'summary' => fn ($r) => $r->reason ?? 'Undertime'],
             ['key' => 'coa', 'label' => 'Certificate of Attendance', 'model' => CertificateOfAttendanceRequest::class, 'global' => $globalAttendance, 'date' => 'work_date', 'url' => '/attendance/requests/certificate-of-attendance', 'summary' => fn ($r) => $r->reason ?? 'Certificate of attendance'],
             ['key' => 'correction', 'label' => 'Attendance Correction', 'model' => AttendanceCorrection::class, 'global' => $globalAttendance, 'date' => 'work_date', 'url' => '/attendance/requests/corrections', 'summary' => fn ($r) => $r->reason ?? 'Correction'],
+            ['key' => 'schedule_adjustment', 'label' => 'Schedule Adjustment', 'model' => ScheduleAdjustmentRequest::class, 'global' => $globalAttendance, 'date' => 'from_date', 'url' => '/schedule-adjustments', 'list_only' => true, 'summary' => fn ($r) => ($r->shift_start && $r->shift_end) ? "{$r->shift_start}–{$r->shift_end}" : ($r->reason ?? 'Schedule adjustment')],
         ];
 
         $items = collect();
@@ -74,7 +76,7 @@ class ApprovalCenterController extends Controller
                     'company' => $emp?->company?->code ?? $emp?->company?->trade_name,
                     'date' => optional($r->{$t['date']})->format('Y-m-d') ?? (string) $r->{$t['date']},
                     'summary' => ($t['summary'])($r),
-                    'url' => "{$t['url']}/{$r->id}",
+                    'url' => ($t['list_only'] ?? false) ? $t['url'] : "{$t['url']}/{$r->id}",
                     'filed_at' => $r->created_at,
                 ]);
             }
