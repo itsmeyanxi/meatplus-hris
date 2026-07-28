@@ -70,6 +70,8 @@ Route::prefix('v1')->group(function () {
         Route::get('my/pending-summary', PendingSummaryController::class);
         Route::get('my/team', \App\Http\Controllers\Api\V1\Me\TeamController::class);
         Route::get('my/approvals', \App\Http\Controllers\Api\V1\Me\ApprovalCenterController::class);
+        // Cross-company admin overview (super-admins only; gated inside the controller)
+        Route::get('admin/overview', \App\Http\Controllers\Api\V1\Admin\OverviewController::class);
         Route::get('my/payslips', [\App\Http\Controllers\Api\V1\Me\PayslipController::class, 'index']);
         Route::get('my/payslips/{payslip}', [\App\Http\Controllers\Api\V1\Me\PayslipController::class, 'show']);
         Route::get('my/time-clock', [\App\Http\Controllers\Api\V1\Me\TimeClockController::class, 'show']);
