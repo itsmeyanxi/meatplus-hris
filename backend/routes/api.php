@@ -238,6 +238,8 @@ Route::prefix('v1')->group(function () {
         Route::get('reports/dtr', [ReportController::class, 'dtr']);
         Route::get('reports/attendance-summary', [ReportController::class, 'attendanceSummary']);
         Route::get('reports/compensation', [ReportController::class, 'compensation']);
+        Route::get('reports/thirteenth-month', [ReportController::class, 'thirteenthMonth']);
+        Route::get('reports/remittance', [ReportController::class, 'remittance']);
         Route::get('reports/leave', [ReportController::class, 'leave']);
         Route::get('reports/overtime', [ReportController::class, 'overtime']);
         Route::get('reports/payroll/{payrollRun}', [ReportController::class, 'payroll']);

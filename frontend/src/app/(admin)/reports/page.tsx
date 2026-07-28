@@ -15,6 +15,8 @@ import {
   downloadTimeLogsReport,
   downloadCompensationReport,
   downloadLoansReport,
+  downloadThirteenthMonth,
+  downloadRemittance,
 } from "@/lib/reports";
 import { getMe } from "@/lib/auth";
 import { getLookup } from "@/lib/employees";
@@ -53,6 +55,12 @@ export default function ReportsPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <PayrollReportCard />
             <LoansCard />
+          </div>
+
+          <SectionTitle>Statutory &amp; Year-End</SectionTitle>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ThirteenthMonthCard />
+            <RemittanceCard />
           </div>
         </>
       )}
@@ -156,6 +164,55 @@ function TimeLogsCard() {
       description="Every biometric / manual punch in the range, with device and location."
       onDownload={(p) => downloadTimeLogsReport({ from: p.from, to: p.to, employee_id: p.employee_id, department_id: p.department_id })}
     />
+  );
+}
+
+function ThirteenthMonthCard() {
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const download = async () => {
+    setError(null); setLoading(true);
+    try { await downloadThirteenthMonth(year); } catch { setError("Failed to download."); } finally { setLoading(false); }
+  };
+  return (
+    <ReportCard title="13th-Month Pay" description="Per employee: total basic earned in the year ÷ 12 (per DOLE).">
+      <label className="block">
+        <span className="text-xs text-slate-500">Year</span>
+        <input type="number" min={2020} max={2100} value={year} onChange={(e) => setYear(Number(e.target.value))} className={fieldCls} />
+      </label>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <DownloadButton onClick={download} loading={loading}>Download CSV</DownloadButton>
+    </ReportCard>
+  );
+}
+
+function RemittanceCard() {
+  const now = new Date();
+  const [type, setType] = useState<"sss" | "philhealth" | "pagibig" | "tax">("sss");
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const download = async () => {
+    setError(null); setLoading(true);
+    try { await downloadRemittance(type, year, month); } catch { setError("Failed to download."); } finally { setLoading(false); }
+  };
+  return (
+    <ReportCard title="Statutory Remittance" description="Monthly SSS / PhilHealth / Pag-IBIG (employee + employer share) or BIR 1601-C withholding tax.">
+      <div className="flex flex-wrap gap-2">
+        <label className="block"><span className="text-xs text-slate-500">Report</span>
+          <SearchSelect value={type} onChange={(v) => setType(v as typeof type)} className={fieldCls}
+            options={[{ value: "sss", label: "SSS (R3)" }, { value: "philhealth", label: "PhilHealth (RF1)" }, { value: "pagibig", label: "Pag-IBIG (MCRF)" }, { value: "tax", label: "BIR 1601-C (Tax)" }]} /></label>
+        <label className="block"><span className="text-xs text-slate-500">Year</span>
+          <input type="number" min={2020} max={2100} value={year} onChange={(e) => setYear(Number(e.target.value))} className={fieldCls} /></label>
+        <label className="block"><span className="text-xs text-slate-500">Month</span>
+          <SearchSelect value={String(month)} onChange={(v) => setMonth(Number(v))} className={fieldCls}
+            options={["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m, i) => ({ value: String(i + 1), label: m }))} /></label>
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <DownloadButton onClick={download} loading={loading}>Download CSV</DownloadButton>
+    </ReportCard>
   );
 }
 

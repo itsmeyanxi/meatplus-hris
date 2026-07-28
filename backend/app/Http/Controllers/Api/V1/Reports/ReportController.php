@@ -7,13 +7,16 @@ use App\Domain\Attendance\Models\DailyTimeRecord;
 use App\Domain\Attendance\Models\OvertimeRequest;
 use App\Domain\Attendance\Models\TimeLog;
 use App\Domain\HRIS\Models\Employee;
+use App\Domain\HRIS\Models\EmployeeGovernmentId;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Leave\Models\LeaveApplication;
 use App\Domain\Payroll\Models\EmployeeCompensation;
 use App\Domain\Payroll\Models\Payslip;
+use App\Domain\Payroll\Services\StatutoryCalculator;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -163,6 +166,135 @@ class ReportController extends Controller
         }
 
         return $this->csvResponse(implode("\n", $lines), 'compensation_'.now()->format('Ymd').'.csv');
+    }
+
+    /**
+     * GET /api/v1/reports/thirteenth-month?year=
+     * 13th-month pay = total BASIC salary earned in the year ÷ 12 (per DOLE).
+     * Basic is summed from the year's payslips (computed/approved/posted runs).
+     */
+    public function thirteenthMonth(Request $request): Response
+    {
+        abort_unless($request->user()->can('payroll.view'), 403);
+        $year = (int) ($request->query('year') ?: now()->year);
+        $companyId = $request->user()->active_company_id;
+
+        $rows = DB::table('payslips as p')
+            ->join('payroll_runs as r', 'r.id', '=', 'p.payroll_run_id')
+            ->join('employees as e', 'e.id', '=', 'p.employee_id')
+            ->leftJoin('departments as d', 'd.id', '=', 'e.department_id')
+            ->where('p.company_id', $companyId)
+            ->whereRaw('extract(year from r.period_end) = ?', [$year])
+            ->whereIn('r.status', ['computed', 'approved', 'posted'])
+            ->groupBy('e.id', 'e.employee_no', 'e.first_name', 'e.last_name', 'd.name')
+            ->orderBy('e.last_name')
+            ->selectRaw('e.employee_no, e.first_name, e.last_name, d.name as dept,
+                coalesce(sum(p.basic_pay),0) as total_basic,
+                count(distinct p.payroll_run_id) as cutoffs')
+            ->get();
+
+        $lines = [implode(',', ['Employee No', 'Name', 'Department', 'Cutoffs Paid', "Total Basic {$year}", '13th Month Pay'])];
+        foreach ($rows as $r) {
+            $thirteenth = round(((float) $r->total_basic) / 12, 2);
+            $lines[] = implode(',', [
+                $r->employee_no,
+                $this->csv($r->last_name.', '.$r->first_name),
+                $this->csv($r->dept ?? ''),
+                (int) $r->cutoffs,
+                round((float) $r->total_basic, 2),
+                $thirteenth,
+            ]);
+        }
+
+        return $this->csvResponse(implode("\n", $lines), "13th_month_{$year}.csv");
+    }
+
+    /**
+     * GET /api/v1/reports/remittance?type=sss|philhealth|pagibig|tax&year=&month=
+     * Monthly statutory remittance: employee-share (from the month's payslips) and
+     * employer-share (computed), per employee, with the government ID. type=tax is
+     * the BIR 1601-C withholding summary (employee side only).
+     */
+    public function remittance(Request $request): Response
+    {
+        abort_unless($request->user()->can('payroll.view'), 403);
+        $type = in_array($request->query('type'), ['sss', 'philhealth', 'pagibig', 'tax'], true) ? $request->query('type') : 'sss';
+        $year = (int) ($request->query('year') ?: now()->year);
+        $month = (int) ($request->query('month') ?: now()->month);
+        $companyId = $request->user()->active_company_id;
+
+        $eeCol = $type === 'tax' ? 'withholding_tax' : $type;
+
+        // Employee-share totals from the month's payslips.
+        $agg = DB::table('payslips as p')
+            ->join('payroll_runs as r', 'r.id', '=', 'p.payroll_run_id')
+            ->where('p.company_id', $companyId)
+            ->whereRaw('extract(year from r.period_end) = ?', [$year])
+            ->whereRaw('extract(month from r.period_end) = ?', [$month])
+            ->whereIn('r.status', ['computed', 'approved', 'posted'])
+            ->groupBy('p.employee_id')
+            ->selectRaw("p.employee_id, coalesce(sum(p.$eeCol),0) as ee")
+            ->get()->keyBy('employee_id');
+
+        if ($agg->isEmpty()) {
+            return $this->csvResponse('No payroll for this month.', "remittance_{$type}_{$year}_{$month}.csv");
+        }
+
+        $ids = $agg->keys();
+        $employees = Employee::query()->whereIn('id', $ids)->orderBy('last_name')->get(['id', 'employee_no', 'first_name', 'last_name']);
+        $govs = EmployeeGovernmentId::query()->whereIn('employee_id', $ids)->get()->keyBy('employee_id');
+        $comps = EmployeeCompensation::query()->whereIn('employee_id', $ids)->where('is_active', true)->get()->keyBy('employee_id');
+        $calc = app(StatutoryCalculator::class);
+
+        $govField = ['sss' => 'sss_no', 'philhealth' => 'philhealth_no', 'pagibig' => 'pagibig_no', 'tax' => 'tin'][$type];
+        $govLabel = ['sss' => 'SSS No', 'philhealth' => 'PhilHealth No', 'pagibig' => 'Pag-IBIG No', 'tax' => 'TIN'][$type];
+
+        if ($type === 'tax') {
+            $lines = [implode(',', ['TIN', 'Employee No', 'Name', 'Tax Withheld'])];
+            foreach ($employees as $e) {
+                $lines[] = implode(',', [
+                    $govs->get($e->id)?->tin ?? '',
+                    $e->employee_no,
+                    $this->csv($e->last_name.', '.$e->first_name),
+                    round((float) ($agg->get($e->id)->ee ?? 0), 2),
+                ]);
+            }
+            $total = round($agg->sum('ee'), 2);
+            $lines[] = ',,TOTAL,'.$total;
+
+            return $this->csvResponse(implode("\n", $lines), "bir_1601c_{$year}_{$month}.csv");
+        }
+
+        $lines = [implode(',', [$govLabel, 'Employee No', 'Name', 'Monthly Basic', 'Employee Share', 'Employer Share', 'Total'])];
+        foreach ($employees as $e) {
+            $monthly = $this->monthlyBasic($comps->get($e->id));
+            $er = $calc->monthlyEmployerContributions($monthly)[$type] ?? 0;
+            $ee = round((float) ($agg->get($e->id)->ee ?? 0), 2);
+            $lines[] = implode(',', [
+                $govs->get($e->id)?->{$govField} ?? '',
+                $e->employee_no,
+                $this->csv($e->last_name.', '.$e->first_name),
+                round($monthly, 2),
+                $ee,
+                round((float) $er, 2),
+                round($ee + (float) $er, 2),
+            ]);
+        }
+
+        return $this->csvResponse(implode("\n", $lines), "remittance_{$type}_{$year}_{$month}.csv");
+    }
+
+    /** Monthly-equivalent basic salary from a compensation record. */
+    private function monthlyBasic(?EmployeeCompensation $c): float
+    {
+        if (! $c) {
+            return 0.0;
+        }
+        return match ($c->pay_type) {
+            'daily' => (float) $c->daily_rate * 22,
+            'hourly' => (float) $c->hourly_rate * 8 * 22,
+            default => (float) $c->basic_monthly,
+        };
     }
 
     /** GET /api/v1/reports/leave?date_from=&date_to=&status= */

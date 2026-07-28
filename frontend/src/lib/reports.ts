@@ -83,6 +83,15 @@ export function downloadLoansReport() {
   return downloadCsv("/api/v1/payroll/loans/export", {}, "loans.csv");
 }
 
+export function downloadThirteenthMonth(year: number) {
+  return downloadCsv("/api/v1/reports/thirteenth-month", { year }, `13th_month_${year}.csv`);
+}
+
+export function downloadRemittance(type: "sss" | "philhealth" | "pagibig" | "tax", year: number, month: number) {
+  const name = type === "tax" ? `bir_1601c_${year}_${month}` : `remittance_${type}_${year}_${month}`;
+  return downloadCsv("/api/v1/reports/remittance", { type, year, month }, `${name}.csv`);
+}
+
 /**
  * Full data export for the active company: one Excel file per category, zipped.
  * Can take a while to build, so we allow a generous timeout and keep the
