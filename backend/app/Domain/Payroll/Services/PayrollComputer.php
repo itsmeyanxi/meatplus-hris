@@ -34,11 +34,22 @@ class PayrollComputer
      */
     public function computeRun(PayrollRun $run): array
     {
+        // Point-in-time salary: for each employee use the compensation record
+        // effective for THIS cutoff — the one with the latest effective_from on or
+        // before the cutoff's end date — not merely whichever row is flagged active.
+        // So a raise effective mid-cutoff is paid at the new rate for that cutoff,
+        // and a future-dated raise doesn't apply until its effective date lands in
+        // the period. (effective_from null = always in effect.)
         $comps = EmployeeCompensation::query()
             ->where('company_id', $run->company_id)
-            ->where('is_active', true)
+            ->where(fn ($q) => $q->whereNull('effective_from')->orWhereDate('effective_from', '<=', $run->period_end->toDateString()))
             ->with('employee:id,first_name,last_name,is_active,is_confidential')
-            ->get();
+            ->orderBy('employee_id')
+            ->orderByDesc('effective_from')
+            ->orderByDesc('id')
+            ->get()
+            ->unique('employee_id')   // ordered latest-effective first, so keep that one per employee
+            ->values();
 
         // Optional payroll group: run only the confidential or only the
         // non-confidential employees (null = everyone).
