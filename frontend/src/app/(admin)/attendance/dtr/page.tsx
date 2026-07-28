@@ -6,6 +6,7 @@ import { getMe } from "@/lib/auth";
 import { getLookup } from "@/lib/employees";
 import { dtrApi, type DailyTimeRecord, type DayStatus } from "@/lib/attendance";
 import { PageHeader } from "@/components/ui";
+import { CombinedUpload } from "@/components/attendance/CombinedUpload";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { SearchSelect } from "@/components/SearchSelect";
 import { inputCls } from "@/lib/form-classes";
@@ -223,6 +224,8 @@ export default function DtrMatrixPage() {
         title="Attendance Matrix"
         description="Monthly overview — one row per employee, color-coded by attendance status."
       />
+
+      {canManage && <CombinedUpload />}
 
       {/* ── toolbar ── */}
       <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
