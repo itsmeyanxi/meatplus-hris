@@ -18,7 +18,9 @@ export function RoleGate({ roles, children }: { roles: string[]; children: React
   }
 
   const userRoles = data?.user.roles ?? [];
-  const allowed = roles.some((r) => userRoles.includes(r));
+  // Super-admins (admin, it_admin) can access every gated page.
+  const isSuperAdmin = userRoles.includes("admin") || userRoles.includes("it_admin");
+  const allowed = isSuperAdmin || roles.some((r) => userRoles.includes(r));
 
   if (!allowed) {
     return (
@@ -45,5 +47,5 @@ export function RoleGate({ roles, children }: { roles: string[]; children: React
   return <>{children}</>;
 }
 
-/** Roles that count as "HR" across the app. */
-export const HR_ROLES = ["hr_admin"];
+/** Roles that count as "HR" across the app (super-admins are always allowed too). */
+export const HR_ROLES = ["hr_admin", "hr_officer"];
