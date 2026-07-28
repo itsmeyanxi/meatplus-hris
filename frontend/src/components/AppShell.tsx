@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { api } from "@/lib/api";
 import { getMe, logout, switchCompany } from "@/lib/auth";
 import { branchTermFor, applyBranchTerm } from "@/lib/terminology";
 import { getRoles, ROLE_LABELS } from "@/lib/users";
@@ -26,6 +27,8 @@ export type NavItem = {
   permissions?: string[];
   // …and only if the user is linked to an employee record (if true).
   requiresEmployee?: boolean;
+  // Optional live count badge: "notifications" (unread) or "approvals" (pending to act on).
+  badge?: "notifications" | "approvals";
 };
 
 export type BackLink = { href: string; label: string };
@@ -135,6 +138,25 @@ export function AppShell({
   const userPermissions = previewEntry ? previewEntry.permissions : (data?.user.permissions ?? []);
   const hasEmployee = Boolean(data?.user.employee);
   // IT admin always sees everything (unless previewing as another role).
+  // Live sidebar badges — unread notifications (everyone) + pending approvals (approvers).
+  const { data: notifCount } = useQuery({
+    queryKey: ["nav-unread"],
+    queryFn: async () => (await api.get<{ unread: number }>("/api/v1/my/notifications")).data.unread ?? 0,
+    enabled: !!data?.user,
+    refetchInterval: 60_000,
+  });
+  const { data: approvalCount } = useQuery({
+    queryKey: ["nav-approvals"],
+    queryFn: async () => (await api.get<{ total: number }>("/api/v1/my/approvals")).data.total ?? 0,
+    enabled: !!data?.user,
+    refetchInterval: 60_000,
+  });
+  const badgeFor = (item: NavItem): number => {
+    if (item.badge === "notifications") return notifCount ?? 0;
+    if (item.badge === "approvals") return approvalCount ?? 0;
+    return 0;
+  };
+
   const isAllowed = (item: NavItem) => {
     if (isItAdmin && !previewEntry) return true;
     const roleOk = !item.roles || item.roles.some((r) => userRoles.includes(r));
@@ -299,8 +321,18 @@ export function AppShell({
                               }`
                         }
                       >
-                        <span className="shrink-0 scale-95">{item.icon}</span>
-                        {!isCollapsed && <span className="transition-opacity duration-200 truncate">{navLabel(item.label)}</span>}
+                        <span className="relative shrink-0 scale-95">
+                          {item.icon}
+                          {isCollapsed && badgeFor(item) > 0 && (
+                            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
+                          )}
+                        </span>
+                        {!isCollapsed && <span className="flex-1 truncate transition-opacity duration-200">{navLabel(item.label)}</span>}
+                        {!isCollapsed && badgeFor(item) > 0 && (
+                          <span className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white text-slate-900" : "bg-rose-500 text-white"}`}>
+                            {badgeFor(item) > 99 ? "99+" : badgeFor(item)}
+                          </span>
+                        )}
                       </Link>
                     );
                   })}
