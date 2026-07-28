@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { getMe } from "@/lib/auth";
 import { timeLogsApi, timeLogsExportUrl, type TimeLog, type TimeLogInput } from "@/lib/attendance";
+import { getLookup } from "@/lib/employees";
 import { PunchLocation } from "@/components/attendance/PunchLocation";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { SearchSelect } from "@/components/SearchSelect";
@@ -34,10 +35,24 @@ export default function TimeLogsPage() {
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
   const [deviceId, setDeviceId] = useState<string>("");
+  const [companyId, setCompanyId] = useState<number | "">("");
+  const [departmentId, setDepartmentId] = useState<number | "">("");
 
   const { data: devices = [] } = useQuery({ queryKey: ["time-log-devices"], queryFn: timeLogsApi.devices });
 
-  const filterKey = ["time-logs", { employeeId, from, to, deviceId }];
+  // Companies the user can access (for the Company filter). Single-company users
+  // just see their own; super-admins see all of theirs.
+  const companies = me?.user.companies ?? [];
+  const showCompany = canViewAny && companies.length > 1;
+
+  // Departments, scoped to the chosen company (or the active one).
+  const { data: departments = [] } = useQuery({
+    queryKey: ["tl-departments", companyId],
+    queryFn: () => getLookup("departments", companyId === "" ? {} : { company_id: Number(companyId) }),
+    enabled: canViewAny,
+  });
+
+  const filterKey = ["time-logs", { employeeId, from, to, deviceId, companyId, departmentId }];
   const { data: items = [] } = useQuery({
     queryKey: filterKey,
     queryFn: () =>
@@ -46,6 +61,8 @@ export default function TimeLogsPage() {
         from: from || undefined,
         to: to || undefined,
         device_id: deviceId || undefined,
+        company_id: companyId === "" ? undefined : Number(companyId),
+        department_id: departmentId === "" ? undefined : Number(departmentId),
       }),
   });
 
@@ -67,7 +84,7 @@ export default function TimeLogsPage() {
   // Download the CSV for the current filters (session cookie authenticates the request).
   const onExport = () => {
     const a = document.createElement("a");
-    a.href = timeLogsExportUrl({ employee_id: employeeId, from, to, device_id: deviceId });
+    a.href = timeLogsExportUrl({ employee_id: employeeId, from, to, device_id: deviceId, company_id: companyId, department_id: departmentId });
     a.download = "time-logs.csv";
     document.body.appendChild(a);
     a.click();
@@ -88,6 +105,28 @@ export default function TimeLogsPage() {
             <div>
               <label className={labelCls}>Employee</label>
               <EmployeeSearchSelect value={employeeId} onChange={(id) => setEmployeeId(id)} />
+            </div>
+          )}
+          {showCompany && (
+            <div>
+              <label className={labelCls}>Company</label>
+              <SearchSelect
+                className={inputCls}
+                value={companyId === "" ? "" : String(companyId)}
+                onChange={(v) => { setCompanyId(v === "" ? "" : Number(v)); setDepartmentId(""); }}
+                options={[{ value: "", label: "All companies" }, ...companies.map((c) => ({ value: String(c.id), label: c.code ?? c.legal_name }))]}
+              />
+            </div>
+          )}
+          {canViewAny && (
+            <div>
+              <label className={labelCls}>Department</label>
+              <SearchSelect
+                className={inputCls}
+                value={departmentId === "" ? "" : String(departmentId)}
+                onChange={(v) => setDepartmentId(v === "" ? "" : Number(v))}
+                options={[{ value: "", label: "All departments" }, ...departments.map((d) => ({ value: String(d.id), label: d.name ?? String(d.id) }))]}
+              />
             </div>
           )}
           <div>

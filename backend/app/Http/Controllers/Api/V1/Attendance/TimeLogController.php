@@ -44,6 +44,12 @@ class TimeLogController extends Controller
         if ($device = $request->query('device_id')) {
             $q->where('device_id', $device);
         }
+        if ($cid = $request->query('company_id')) {
+            $q->where('company_id', $cid);
+        }
+        if ($dept = $request->query('department_id')) {
+            $q->whereHas('employee', fn ($e) => $e->where('department_id', $dept));
+        }
 
         return TimeLogResource::collection($q->limit(500)->get());
     }
@@ -76,6 +82,12 @@ class TimeLogController extends Controller
         }
         if ($device = $request->query('device_id')) {
             $q->where('device_id', $device);
+        }
+        if ($cid = $request->query('company_id')) {
+            $q->where('company_id', $cid);
+        }
+        if ($dept = $request->query('department_id')) {
+            $q->whereHas('employee', fn ($e) => $e->where('department_id', $dept));
         }
 
         return response()->streamDownload(function () use ($q) {

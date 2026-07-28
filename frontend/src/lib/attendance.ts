@@ -70,13 +70,15 @@ export type TimeLogDevice = { device_id: string; name: string };
 
 /** Direct-download URL for the filtered time-log CSV export (uses the session cookie). */
 export function timeLogsExportUrl(
-  params: { employee_id?: number | ""; from?: string; to?: string; device_id?: string } = {},
+  params: { employee_id?: number | ""; from?: string; to?: string; device_id?: string; company_id?: number | ""; department_id?: number | "" } = {},
 ): string {
   const qs = new URLSearchParams();
   if (params.employee_id) qs.set("employee_id", String(params.employee_id));
   if (params.from) qs.set("from", params.from);
   if (params.to) qs.set("to", params.to);
   if (params.device_id) qs.set("device_id", params.device_id);
+  if (params.company_id) qs.set("company_id", String(params.company_id));
+  if (params.department_id) qs.set("department_id", String(params.department_id));
   const q = qs.toString();
   return `/api/v1/time-logs/export${q ? `?${q}` : ""}`;
 }
@@ -195,7 +197,7 @@ export const holidaysApi = {
 };
 
 export const timeLogsApi = {
-  list: async (params: { employee_id?: number; from?: string; to?: string; device_id?: string } = {}): Promise<TimeLog[]> => {
+  list: async (params: { employee_id?: number; from?: string; to?: string; device_id?: string; company_id?: number; department_id?: number } = {}): Promise<TimeLog[]> => {
     const { data } = await api.get<Listed<TimeLog>>("/api/v1/time-logs", { params });
     return data.data;
   },
