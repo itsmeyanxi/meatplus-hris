@@ -15,6 +15,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Payroll's timekeeping review for a cutoff. Payroll runs off attendance, so a
@@ -124,6 +125,66 @@ class PayrollTimekeepingController extends Controller
             ],
             'items' => $items,
         ]);
+    }
+
+    /**
+     * Export the whole cutoff's timekeeping review as CSV — one row per employee
+     * with attendance totals, floating-approval counts by type, and the head to
+     * chase. Company-scoped like index(), so it's a per-company timekeeping report.
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        abort_unless($request->user()->can('payroll.view') || $request->user()->can('attendance.view.any'), 403);
+        [$from, $to] = $this->period($request);
+
+        $dtr = DailyTimeRecord::query()
+            ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])
+            ->selectRaw('employee_id,
+                count(*) filter (where not is_rest_day) as scheduled_days,
+                count(*) filter (where actual_in is not null) as present_days,
+                count(*) filter (where is_absent) as absent_days,
+                count(*) filter (where is_on_leave) as leave_days,
+                coalesce(sum(late_minutes),0) as late_minutes,
+                coalesce(sum(overtime_minutes),0) as ot_minutes,
+                coalesce(sum(undertime_minutes),0) as undertime_minutes,
+                coalesce(sum(night_diff_minutes),0) as night_minutes')
+            ->groupBy('employee_id')->get()->keyBy('employee_id');
+
+        $floating = [];
+        foreach (self::REQUESTS as $r) {
+            foreach ($r['model']::query()->where('status', 'pending')->whereBetween($r['date'], [$from->toDateString(), $to->toDateString()])->selectRaw('employee_id, count(*) as c')->groupBy('employee_id')->get() as $row) {
+                $floating[$row->employee_id][$r['key']] = (int) $row->c;
+            }
+        }
+
+        $employeeIds = collect(array_keys($dtr->toArray()))->merge(array_keys($floating))->unique();
+        $employees = Employee::query()->whereIn('id', $employeeIds)
+            ->with(['department:id,name,head_employee_id', 'manager:id,first_name,last_name,email_company,email_personal,mobile', 'department.head:id,first_name,last_name,email_company,email_personal,mobile'])
+            ->orderBy('last_name')->orderBy('first_name')->get();
+
+        $filename = "timekeeping_{$from->toDateString()}_to_{$to->toDateString()}.csv";
+
+        return response()->streamDownload(function () use ($employees, $dtr, $floating) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Employee No', 'Name', 'Department', 'Scheduled Days', 'Present', 'Absent', 'On Leave', 'Late (min)', 'OT (min)', 'Undertime (min)', 'Night (min)', 'Floating Total', 'Overtime', 'Undertime', 'Official Business', 'COA', 'Correction', 'Head to Contact', 'Head Contact']);
+            foreach ($employees as $e) {
+                $d = $dtr->get($e->id);
+                $fl = $floating[$e->id] ?? [];
+                $head = $e->manager ?? $e->department?->head;
+                fputcsv($out, [
+                    $e->employee_no,
+                    $e->last_name.', '.$e->first_name,
+                    $e->department?->name ?? '',
+                    (int) ($d->scheduled_days ?? 0), (int) ($d->present_days ?? 0), (int) ($d->absent_days ?? 0), (int) ($d->leave_days ?? 0),
+                    (int) ($d->late_minutes ?? 0), (int) ($d->ot_minutes ?? 0), (int) ($d->undertime_minutes ?? 0), (int) ($d->night_minutes ?? 0),
+                    array_sum($fl),
+                    $fl['overtime'] ?? 0, $fl['undertime'] ?? 0, $fl['official_business'] ?? 0, $fl['coa'] ?? 0, $fl['correction'] ?? 0,
+                    $head ? trim(($head->first_name ?? '').' '.($head->last_name ?? '')) : '',
+                    $head ? ($head->email_company ?: $head->email_personal ?: $head->mobile ?: '') : '',
+                ]);
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     /**

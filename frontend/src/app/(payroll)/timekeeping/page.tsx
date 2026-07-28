@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { PageHeader, TableShell } from "@/components/ui";
 import { SearchSelect } from "@/components/SearchSelect";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
-import { timekeepingApi, FLOATING_LABELS, type TimekeepingRow } from "@/lib/payroll";
+import { timekeepingApi, timekeepingExportUrl, FLOATING_LABELS, type TimekeepingRow } from "@/lib/payroll";
 import { TimekeepingReviewDrawer } from "@/components/payroll/TimekeepingReviewDrawer";
 
 function hrs(min: number): string {
@@ -58,6 +58,18 @@ export default function PayrollTimekeepingPage() {
       <PageHeader
         title="Timekeeping Review"
         description="Check each employee's attendance for the cutoff. Requests still waiting for approval are “floating” — they can still change pay, so clear them before you run payroll. Nudge the employee's head straight from here."
+        actions={
+          <a
+            href={timekeepingExportUrl(from || undefined, to || undefined)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            title="Download this cutoff's timekeeping report (per employee) for the current company"
+          >
+            <svg className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export CSV
+          </a>
+        }
       />
 
       {/* Controls */}

@@ -244,6 +244,7 @@ Route::prefix('v1')->group(function () {
 
         // Payroll
         Route::get('payroll/timekeeping', [\App\Http\Controllers\Api\V1\Payroll\PayrollTimekeepingController::class, 'index']);
+        Route::get('payroll/timekeeping/export', [\App\Http\Controllers\Api\V1\Payroll\PayrollTimekeepingController::class, 'export']);
         Route::get('payroll/timekeeping/{employee}', [\App\Http\Controllers\Api\V1\Payroll\PayrollTimekeepingController::class, 'detail']);
         Route::post('payroll/timekeeping/remind', [\App\Http\Controllers\Api\V1\Payroll\PayrollTimekeepingController::class, 'remind']);
         Route::get('compensations', [\App\Http\Controllers\Api\V1\Payroll\CompensationController::class, 'index']);

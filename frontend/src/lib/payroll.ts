@@ -208,6 +208,15 @@ export type TimekeepingDetail = {
   head: TimekeepingHead | null;
 };
 
+/** Direct-download URL for the cutoff's timekeeping CSV (uses the session cookie). */
+export function timekeepingExportUrl(from?: string, to?: string): string {
+  const qs = new URLSearchParams();
+  if (from) qs.set("from", from);
+  if (to) qs.set("to", to);
+  const q = qs.toString();
+  return `/api/v1/payroll/timekeeping/export${q ? `?${q}` : ""}`;
+}
+
 export const timekeepingApi = {
   review: async (from?: string, to?: string): Promise<TimekeepingReview> => {
     const { data } = await api.get<TimekeepingReview>("/api/v1/payroll/timekeeping", { params: { from, to } });
