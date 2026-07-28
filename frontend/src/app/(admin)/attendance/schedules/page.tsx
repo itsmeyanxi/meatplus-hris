@@ -97,6 +97,7 @@ function SchedulesPageInner() {
   });
 
   const [editor, setEditor] = useState<EditorState | null>(null);
+  const [q, setQ] = useState("");
 
   const closeEditor = () => setEditor(null);
 
@@ -348,78 +349,89 @@ function SchedulesPageInner() {
         </AppCard>
       )}
 
-      {data?.map((s) => (
-        <AppCard key={s.id}>
-          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-            <div>
-              <h3 className="text-base font-semibold text-slate-900">
-                {s.name}
-                {!s.is_active && (
-                  <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                    Inactive
-                  </span>
-                )}
-              </h3>
-              <p className="font-mono text-xs uppercase tracking-wider text-slate-400">{s.code}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                {s.weekly_workdays}-day week
-                {s.breaks_paid ? " · paid breaks" : " · unpaid breaks"}
-                {s.is_flexible ? " · flexi" : ""}
-              </span>
-              <button
-                onClick={() => startEdit(s)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100"
-              >
-                Edit
-              </button>
-              <button
-                onClick={async () => {
-                  if (
-                    await confirm({
-                      title: "Archive work schedule",
-                      message: `Archive "${s.name}"? It will be hidden from new assignments.`,
-                      confirmLabel: "Archive",
-                      danger: true,
-                    })
-                  ) {
-                    remove.mutate(s.id);
-                  }
-                }}
-                className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-          {s.description && <p className="mb-4 text-sm text-slate-500">{s.description}</p>}
+      {/* Search — handy once there are many schedules */}
+      {!editor && (data?.length ?? 0) > 4 && (
+        <div className="relative max-w-sm">
+          <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+          </svg>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search schedules by name or code…"
+            className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-teal-500"
+          />
+        </div>
+      )}
 
-          <TableShell>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-slate-600">
-                  {["Day", "In", "Out", "Break", "Required", "Rest"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {s.days?.map((d: WorkScheduleDay) => (
-                  <tr key={d.day_of_week} className={"border-t border-slate-100 " + (d.is_rest_day ? "bg-slate-50" : "hover:bg-slate-50/70")}>
-                    <td className="px-4 py-3 font-medium text-slate-800">{DAY_NAMES[d.day_of_week]}</td>
-                    <td className="px-4 py-3 text-slate-600">{d.time_in?.slice(0, 5) ?? "—"}</td>
-                    <td className="px-4 py-3 text-slate-600">{d.time_out?.slice(0, 5) ?? "—"}</td>
-                    <td className="px-4 py-3 text-slate-600">{d.break_minutes} min</td>
-                    <td className="px-4 py-3 text-slate-600">{d.required_hours}h</td>
-                    <td className="px-4 py-3 text-slate-600">{d.is_rest_day ? "Yes" : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableShell>
-        </AppCard>
-      ))}
+      {(() => {
+        const term = q.trim().toLowerCase();
+        const list = (data ?? []).filter(
+          (s) => !term || s.name.toLowerCase().includes(term) || s.code.toLowerCase().includes(term),
+        );
+        if (data && data.length > 0 && list.length === 0) {
+          return <p className="py-6 text-center text-sm text-slate-400">No schedules match “{q}”.</p>;
+        }
+        return (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {list.map((s) => {
+              const weeklyHours = (s.days ?? []).reduce((a, d) => a + (d.is_rest_day ? 0 : Number(d.required_hours || 0)), 0);
+              return (
+                <AppCard key={s.id}>
+                  <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-semibold text-slate-900">
+                        {s.name}
+                        {!s.is_active && <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">Inactive</span>}
+                      </h3>
+                      <p className="font-mono text-[11px] uppercase tracking-wider text-slate-400">{s.code}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => startEdit(s)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100">Edit</button>
+                      <button
+                        onClick={async () => {
+                          if (await confirm({ title: "Archive work schedule", message: `Archive "${s.name}"? It will be hidden from new assignments.`, confirmLabel: "Archive", danger: true })) remove.mutate(s.id);
+                        }}
+                        className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 transition hover:bg-red-100"
+                      >Delete</button>
+                    </div>
+                  </div>
+
+                  {/* Weekly strip — the whole pattern at a glance */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {[0, 1, 2, 3, 4, 5, 6].map((dow) => {
+                      const d = s.days?.find((x) => x.day_of_week === dow);
+                      const rest = !d || d.is_rest_day;
+                      return (
+                        <div key={dow} className={`rounded-lg border p-1.5 text-center ${rest ? "border-slate-100 bg-slate-50" : "border-teal-100 bg-teal-50/60"}`}>
+                          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{DAY_NAMES[dow]}</div>
+                          {rest ? (
+                            <div className="mt-1 text-[10px] font-medium text-slate-400">Rest</div>
+                          ) : (
+                            <>
+                              <div className="mt-1 text-[11px] font-semibold tabular-nums text-slate-700">{d!.time_in?.slice(0, 5)}</div>
+                              <div className="text-[10px] tabular-nums text-slate-400">{d!.time_out?.slice(0, 5)}</div>
+                              <div className="mt-0.5 text-[10px] font-medium text-teal-600">{Number(d!.required_hours)}h</div>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                    <span className="font-medium text-slate-700">{s.weekly_workdays}-day week</span>
+                    <span>· {weeklyHours}h / week</span>
+                    <span>· {s.breaks_paid ? "paid breaks" : "unpaid breaks"}</span>
+                    {s.is_flexible && <span className="rounded-full bg-violet-50 px-2 py-0.5 font-medium text-violet-700">flexi</span>}
+                  </div>
+                  {s.description && <p className="mt-1.5 truncate text-xs text-slate-400">{s.description}</p>}
+                </AppCard>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }
