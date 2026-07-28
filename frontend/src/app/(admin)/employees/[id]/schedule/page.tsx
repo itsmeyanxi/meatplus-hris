@@ -28,6 +28,41 @@ function t12(t: string | null): string {
   return `${hh}:${String(m).padStart(2, "0")} ${ap}`;
 }
 
+/** A readable one-line summary of a schedule: times · workdays · rest days · hours. */
+function schedSummary(s: WorkSchedule): string {
+  const days = s.days ?? [];
+  const work = days.filter((d) => !d.is_rest_day);
+  const rest = days.filter((d) => d.is_rest_day).map((d) => DOW[d.day_of_week]);
+  if (work.length === 0) return "No working days";
+  const w = work[0];
+  const times = w.time_in && w.time_out ? `${t12(w.time_in)} – ${t12(w.time_out)}` : "—";
+  const restStr = rest.length ? `${rest.join(", ")} rest` : "no rest day";
+  const hrs = Number(w.required_hours || 0);
+  return `${times} · ${s.weekly_workdays}-day week · ${restStr}${hrs ? ` · ${hrs}h/day` : ""}`;
+}
+
+/** A tiny 7-cell week strip (S M T W T F S) — teal = works, grey = rest. */
+function MiniWeek({ schedule }: { schedule: WorkSchedule }) {
+  const byDow = new Map((schedule.days ?? []).map((d) => [d.day_of_week, d]));
+  return (
+    <div className="flex shrink-0 gap-0.5">
+      {[0, 1, 2, 3, 4, 5, 6].map((dow) => {
+        const d = byDow.get(dow);
+        const rest = !d || d.is_rest_day;
+        return (
+          <div
+            key={dow}
+            title={`${DOW[dow]}: ${rest ? "Rest day" : `${t12(d!.time_in)}–${t12(d!.time_out)}`}`}
+            className={`h-5 w-5 rounded text-center text-[9px] font-bold leading-5 ${rest ? "bg-slate-100 text-slate-400" : "bg-teal-100 text-teal-700"}`}
+          >
+            {DOW[dow][0]}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function EmployeeSchedulePage() {
   const params = useParams<{ id: string }>();
   const employeeId = Number(params.id);
@@ -61,6 +96,7 @@ export default function EmployeeSchedulePage() {
   const [wsId, setWsId] = useState("");
   const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [adding, setAdding] = useState(false);
+  const [schedSearch, setSchedSearch] = useState("");
 
   const selected: WorkSchedule | undefined = useMemo(
     () => schedules.find((s) => String(s.id) === wsId),
@@ -133,26 +169,67 @@ export default function EmployeeSchedulePage() {
           )}
         </div>
 
-        {/* Assign form */}
+        {/* Assign form — searchable list with a readable summary + mini week per option */}
         {adding && canManage && (
-          <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-slate-100 pt-4">
-            <div className="min-w-[280px] flex-1">
-              <label className="mb-1 block text-xs font-medium text-slate-500">Work schedule</label>
-              <SearchSelect
-                value={wsId}
-                onChange={setWsId}
-                placeholder="Pick a schedule…"
-                options={schedules.filter((s) => s.is_active).map((s) => ({ value: String(s.id), label: s.name, hint: `${s.weekly_workdays}d` }))}
-              />
-            </div>
+          <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">Effective from</label>
-              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              <label className="mb-1 block text-xs font-medium text-slate-500">1 · Pick a work schedule</label>
+              <div className="relative">
+                <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                </svg>
+                <input
+                  value={schedSearch}
+                  onChange={(e) => setSchedSearch(e.target.value)}
+                  placeholder="Search by name, time, or rest day…"
+                  className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-teal-500"
+                />
+              </div>
+              <div className="mt-2 max-h-72 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200">
+                {(() => {
+                  const term = schedSearch.trim().toLowerCase();
+                  const list = schedules
+                    .filter((s) => s.is_active)
+                    .filter((s) => !term || s.name.toLowerCase().includes(term) || s.code.toLowerCase().includes(term) || schedSummary(s).toLowerCase().includes(term));
+                  if (list.length === 0) return <p className="px-3 py-6 text-center text-sm text-slate-400">No schedules match.</p>;
+                  return list.map((s) => {
+                    const active = wsId === String(s.id);
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setWsId(String(s.id))}
+                        className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition ${active ? "bg-teal-50 ring-1 ring-inset ring-teal-300" : "hover:bg-slate-50"}`}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-slate-800">{s.name}</span>
+                            {active && <span className="rounded-full bg-teal-600 px-2 py-0.5 text-[10px] font-bold text-white">Selected</span>}
+                          </div>
+                          <div className="mt-0.5 text-xs text-slate-500">{schedSummary(s)}</div>
+                        </div>
+                        <MiniWeek schedule={s} />
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
             </div>
-            <button onClick={() => assign.mutate()} disabled={!wsId || assign.isPending}
-              className="rounded-lg bg-teal-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50">
-              {assign.isPending ? "Saving…" : "Assign"}
-            </button>
+
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500">2 · Effective from</label>
+                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              </div>
+              <button
+                onClick={() => assign.mutate()}
+                disabled={!wsId || assign.isPending}
+                className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+              >
+                {assign.isPending ? "Saving…" : "Assign schedule"}
+              </button>
+              <p className="text-xs text-slate-400">The new schedule applies from this date; the previous one is kept in history.</p>
+            </div>
           </div>
         )}
       </div>
