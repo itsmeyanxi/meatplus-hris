@@ -35,17 +35,30 @@ class LookupController extends Controller
     private function scopeToCompany(Builder $query, Request $request): Builder
     {
         $requested = (int) $request->query('company_id');
-        if (! $requested) {
-            return $query;
+        if ($requested) {
+            abort_unless(
+                in_array($requested, $this->allowedCompanyIds($request), true),
+                403,
+                'You do not belong to that company.',
+            );
+
+            return $query->withoutGlobalScope(CompanyScope::class)->where('company_id', $requested);
         }
 
-        abort_unless(
-            in_array($requested, $this->allowedCompanyIds($request), true),
-            403,
-            'You do not belong to that company.',
-        );
+        // No explicit company: a lookup should always reflect the ONE company the
+        // user is currently in. For most users the global CompanyScope already does
+        // that, but the `admin` super-role bypasses CompanyScope (see CompanyScope),
+        // which would otherwise leak every company's branches/departments/etc into
+        // these lists. Pin to the active company explicitly so super-admins are
+        // scoped here too; they can still switch companies to see another.
+        $user = $request->user();
+        if ($user->active_company_id) {
+            return $query
+                ->withoutGlobalScope(CompanyScope::class)
+                ->where($query->getModel()->getTable().'.company_id', $user->active_company_id);
+        }
 
-        return $query->withoutGlobalScope(CompanyScope::class)->where('company_id', $requested);
+        return $query;
     }
 
     public function companies(Request $request): JsonResponse
@@ -73,8 +86,9 @@ class LookupController extends Controller
         return response()->json([
             'data' => $this->scopeToCompany(Branch::query(), $request)
                 ->where('is_active', true)
+                ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
                 ->orderBy('name')
-                ->get(['id', 'code', 'name', 'is_head_office', 'latitude', 'longitude']),
+                ->get(['id', 'code', 'name', 'is_head_office', 'is_agency', 'latitude', 'longitude']),
         ]);
     }
 

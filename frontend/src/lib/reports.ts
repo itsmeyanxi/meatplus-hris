@@ -79,12 +79,57 @@ export function downloadCompensationReport() {
   return downloadCsv("/api/v1/reports/compensation", {}, "compensation.csv");
 }
 
+/**
+ * Per-agency attendance workbook (Summary · Daily Shifts · Punch Records) for one
+ * branch — or a single worker in it when `employeeId` is given.
+ */
+export async function downloadAgencyAttendance(params: {
+  branchId: number;
+  dateFrom: string;
+  dateTo: string;
+  agencyName?: string;
+  employeeId?: number;
+  employeeName?: string;
+}) {
+  const { data } = await api.get<Blob>("/api/v1/reports/agency-attendance", {
+    params: {
+      branch_id: params.branchId,
+      date_from: params.dateFrom,
+      date_to: params.dateTo,
+      employee_id: params.employeeId || undefined,
+    },
+    responseType: "blob",
+    timeout: 120000,
+  });
+  const label = params.employeeId ? params.employeeName ?? "worker" : params.agencyName ?? "agency";
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const href = URL.createObjectURL(data);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = `agency_${slug}_attendance_${params.dateFrom}_to_${params.dateTo}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(href);
+}
+
 export function downloadLoansReport() {
   return downloadCsv("/api/v1/payroll/loans/export", {}, "loans.csv");
 }
 
 export function downloadThirteenthMonth(year: number) {
   return downloadCsv("/api/v1/reports/thirteenth-month", { year }, `13th_month_${year}.csv`);
+}
+
+/** Year-to-Date payroll workbook (in-system runs + prior carry-over), as XLSX. */
+export async function downloadYtd(year: number) {
+  const res = await api.get<Blob>("/api/v1/reports/ytd", { params: { year }, responseType: "blob", timeout: 120000 });
+  const cd = (res.headers["content-disposition"] as string | undefined) ?? "";
+  const filename = cd.match(/filename="?([^"]+)"?/)?.[1] ?? `ytd_${year}.xlsx`;
+  const href = URL.createObjectURL(res.data);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(href);
 }
 
 export function downloadRemittance(type: "sss" | "philhealth" | "pagibig" | "tax", year: number, month: number) {

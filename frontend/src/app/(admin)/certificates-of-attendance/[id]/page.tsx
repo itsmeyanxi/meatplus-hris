@@ -25,6 +25,8 @@ export default function CertificateOfAttendanceDetailPage() {
       slug="certificate-of-attendance-requests"
       title="Certificate of attendance request"
       backHref="/certificates-of-attendance"
+      enableNotifySupervisor
+      enableRevert
       rows={(r) => [
         { label: "Date",        value: r.work_date },
         { label: "Type",        value: PUNCH_LABELS[r.missed_punch] ?? r.missed_punch },

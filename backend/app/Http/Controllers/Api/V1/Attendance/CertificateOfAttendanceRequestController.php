@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Attendance;
 
 use App\Domain\Attendance\Models\CertificateOfAttendanceRequest;
 use App\Http\Controllers\Concerns\HandlesApprovalWorkflow;
+use App\Http\Controllers\Concerns\NotifiesSupervisor;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendance\CertificateOfAttendanceRequestRequest;
 use App\Http\Requests\Attendance\AttendanceDecisionRequest;
@@ -15,6 +16,54 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 class CertificateOfAttendanceRequestController extends Controller
 {
     use HandlesApprovalWorkflow;
+    use NotifiesSupervisor;
+
+    /**
+     * POST /certificate-of-attendance-requests/{id}/revert
+     * Undo a decision (approved/rejected) back to pending and recompute the DTR.
+     */
+    public function revert(Request $request, CertificateOfAttendanceRequest $certificateOfAttendanceRequest): CertificateOfAttendanceRequestResource
+    {
+        $this->assertCanRevert($request, $certificateOfAttendanceRequest);
+
+        $certificateOfAttendanceRequest->update([
+            'status' => 'pending',
+            'approved_by_user_id' => null,
+            'decided_at' => null,
+            'decision_remarks' => null,
+        ]);
+
+        $this->recomputeRequestDays($certificateOfAttendanceRequest);
+
+        return new CertificateOfAttendanceRequestResource($certificateOfAttendanceRequest->load(['employee', 'approver:id,name']));
+    }
+
+    /**
+     * POST /certificate-of-attendance-requests/{id}/notify-supervisor
+     * Nudge the subject's direct supervisor to approve this COA.
+     */
+    public function notifySupervisor(Request $request, CertificateOfAttendanceRequest $certificateOfAttendanceRequest): JsonResponse
+    {
+        $user = $request->user();
+        $isOwner = $user->employee && $certificateOfAttendanceRequest->employee_id === $user->employee->id;
+        abort_unless(
+            $isOwner || $user->can('attendance.approve.any') || $user->can('attendance.approve.self_dept') || $user->can('attendance.manage') || $user->can('attendance.view.any'),
+            403,
+            'You cannot notify the supervisor for this request.'
+        );
+
+        if ($certificateOfAttendanceRequest->status !== 'pending') {
+            return response()->json(['message' => "This request is already {$certificateOfAttendanceRequest->status}."], 422);
+        }
+
+        return $this->pingSupervisor(
+            $certificateOfAttendanceRequest->employee_id,
+            'Certificate of Attendance',
+            $certificateOfAttendanceRequest->work_date?->toDateString(),
+            "/certificates-of-attendance/{$certificateOfAttendanceRequest->id}",
+            $certificateOfAttendanceRequest->id,
+        );
+    }
 
     public function index(Request $request): AnonymousResourceCollection
     {

@@ -22,6 +22,8 @@ type ReqApi<T> = {
   approve: (id: number, remarks?: string) => Promise<T>;
   reject: (id: number, remarks?: string) => Promise<T>;
   cancel: (id: number) => Promise<T>;
+  notifySupervisor?: (id: number) => Promise<{ message: string }>;
+  revert?: (id: number) => Promise<T>;
 };
 
 type Row = { label: string; value: ReactNode };
@@ -33,6 +35,8 @@ export function RequestDetailView<T extends BaseReq>({
   title,
   backHref,
   rows,
+  enableNotifySupervisor = false,
+  enableRevert = false,
 }: {
   api: ReqApi<T>;
   id: number;
@@ -40,6 +44,8 @@ export function RequestDetailView<T extends BaseReq>({
   title: string;
   backHref: string;
   rows: (item: T) => Row[];
+  enableNotifySupervisor?: boolean;
+  enableRevert?: boolean;
 }) {
   const qc = useQueryClient();
   const detailKey = [slug, id];
@@ -62,6 +68,9 @@ export function RequestDetailView<T extends BaseReq>({
     onSuccess: invalidate,
     meta: { successMessage: "Request approved." },
   });
+  const notifySup = useMutation({
+    mutationFn: () => api.notifySupervisor!(id),
+  });
   const reject = useMutation({
     mutationFn: () => api.reject(id, rejectRemarks || undefined),
     onSuccess: () => { invalidate(); setRejecting(false); },
@@ -71,6 +80,11 @@ export function RequestDetailView<T extends BaseReq>({
     mutationFn: () => api.cancel(id),
     onSuccess: invalidate,
     meta: { successMessage: "Request cancelled." },
+  });
+  const revert = useMutation({
+    mutationFn: () => api.revert!(id),
+    onSuccess: invalidate,
+    meta: { successMessage: "Reverted to pending." },
   });
   const busy = approve.isPending || reject.isPending || cancel.isPending;
 
@@ -129,13 +143,27 @@ export function RequestDetailView<T extends BaseReq>({
             {item.status === "pending" ? (
               <p className="text-sm text-slate-500">Awaiting a decision.</p>
             ) : (
-              <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
-                <Field label="Decided by">{item.approved_by?.name ?? "—"}</Field>
-                <Field label="Decided at">
-                  {item.decided_at ? new Date(item.decided_at).toLocaleString() : "—"}
-                </Field>
-                <Field label="Remarks">{item.decision_remarks ?? "—"}</Field>
-              </dl>
+              <>
+                <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
+                  <Field label="Decided by">{item.approved_by?.name ?? "—"}</Field>
+                  <Field label="Decided at">
+                    {item.decided_at ? new Date(item.decided_at).toLocaleString() : "—"}
+                  </Field>
+                  <Field label="Remarks">{item.decision_remarks ?? "—"}</Field>
+                </dl>
+                {enableRevert && api.revert && (
+                  <div className="mt-4 flex items-center gap-3 border-t border-slate-100 pt-4">
+                    <button
+                      onClick={() => { if (window.confirm("Revert this request back to pending? This undoes the decision and its effect on attendance.")) revert.mutate(); }}
+                      disabled={revert.isPending}
+                      className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+                    >
+                      {revert.isPending ? "Reverting…" : "Revert to pending"}
+                    </button>
+                    <span className="text-xs text-slate-500">Undo the decision so it can be decided again.</span>
+                  </div>
+                )}
+              </>
             )}
 
             {item.status === "pending" && (
@@ -171,7 +199,24 @@ export function RequestDetailView<T extends BaseReq>({
                       >
                         {cancel.isPending ? "Cancelling…" : "Cancel request"}
                       </button>
+                      {enableNotifySupervisor && api.notifySupervisor && (
+                        <button
+                          onClick={() => notifySup.mutate()}
+                          disabled={notifySup.isPending}
+                          className="ml-auto rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100 disabled:opacity-60"
+                        >
+                          {notifySup.isPending ? "Notifying…" : "Notify supervisor"}
+                        </button>
+                      )}
                     </div>
+                    {enableNotifySupervisor && notifySup.isSuccess && (
+                      <p className="text-sm text-emerald-700">{notifySup.data.message}</p>
+                    )}
+                    {enableNotifySupervisor && notifySup.isError && (
+                      <p className="text-sm text-red-600">
+                        {(notifySup.error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Failed to notify supervisor."}
+                      </p>
+                    )}
                   </>
                 ) : (
                   <>

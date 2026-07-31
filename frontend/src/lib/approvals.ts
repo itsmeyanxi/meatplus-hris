@@ -130,6 +130,14 @@ function makeApi<TList, TInput>(slug: string) {
       const { data } = await api.post<{ data: TList }>(`/api/v1/${slug}/${id}/cancel`, {});
       return data.data;
     },
+    notifySupervisor: async (id: number): Promise<{ message: string }> => {
+      const { data } = await api.post<{ message: string }>(`/api/v1/${slug}/${id}/notify-supervisor`, {});
+      return data;
+    },
+    revert: async (id: number): Promise<TList> => {
+      const { data } = await api.post<{ data: TList }>(`/api/v1/${slug}/${id}/revert`, {});
+      return data.data;
+    },
   };
 }
 

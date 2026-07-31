@@ -8,6 +8,7 @@ use App\Domain\Attendance\Models\OvertimeRequest;
 use App\Domain\Attendance\Models\TimeLog;
 use App\Domain\HRIS\Models\Employee;
 use App\Domain\HRIS\Models\EmployeeGovernmentId;
+use App\Domain\Identity\Models\Branch;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Leave\Models\LeaveApplication;
 use App\Domain\Payroll\Models\EmployeeCompensation;
@@ -18,6 +19,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use OpenSpout\Common\Entity\Row;
+use OpenSpout\Common\Entity\Style\Color;
+use OpenSpout\Common\Entity\Style\Style;
+use OpenSpout\Writer\XLSX\Options as XlsxOptions;
 use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -42,6 +46,11 @@ class ReportController extends Controller
             ->when($request->employee_id, fn ($q) => $q->where('employee_id', $request->employee_id))
             ->when($request->department_id, fn ($q) => $q->whereHas(
                 'employee', fn ($e) => $e->where('department_id', $request->department_id)
+            ))
+            // Keep agency workers out of the company's internal DTR — they have their
+            // own per-agency report. An explicit employee_id still returns anyone.
+            ->when(! $request->employee_id, fn ($q) => $q->whereHas(
+                'employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true))
             ))
             ->orderBy('work_date')
             ->orderBy('employee_id')
@@ -98,6 +107,8 @@ class ReportController extends Controller
             ->whereBetween('work_date', [$request->date_from, $request->date_to])
             ->when($request->employee_id, fn ($q) => $q->where('employee_id', $request->employee_id))
             ->when($request->department_id, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
+            // Organic staff only — agency workers are reported via the Agencies module.
+            ->when(! $request->employee_id, fn ($q) => $q->whereHas('employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true))))
             ->selectRaw('employee_id,
                 count(*) filter (where not is_rest_day) as scheduled_days,
                 count(*) filter (where actual_in is not null) as present_days,
@@ -143,6 +154,330 @@ class ReportController extends Controller
         return $this->csvResponse(implode("\n", $lines), "attendance_summary_{$request->date_from}_to_{$request->date_to}.csv");
     }
 
+    /**
+     * GET /api/v1/reports/agency-attendance?branch_id=&date_from=&date_to=
+     *
+     * A clean, self-contained attendance workbook for ONE agency (branch), kept
+     * completely separate from the company's other employees. Three sheets:
+     * Summary, Daily Shifts (shift start/end + hours per person per day) and raw
+     * Punch Records. Only the chosen agency's workers are ever included.
+     */
+    public function agencyAttendance(Request $request): BinaryFileResponse
+    {
+        $user = $request->user();
+        abort_unless($user->can('attendance.view'), 403);
+
+        $data = $request->validate([
+            'branch_id' => ['required', 'integer'],
+            'date_from' => ['required', 'date'],
+            'date_to'   => ['required', 'date', 'after_or_equal:date_from'],
+            // Optional: scope the whole report to a single worker in this agency.
+            'employee_id' => ['nullable', 'integer'],
+        ]);
+
+        // The branch must belong to the company the user is currently in.
+        $branch = Branch::query()->find($data['branch_id']);
+        abort_unless($branch && (int) $branch->company_id === (int) $user->active_company_id, 404, 'Agency not found in this company.');
+
+        $from = $data['date_from'];
+        $to = $data['date_to'];
+
+        $employees = Employee::query()
+            ->where('company_id', $branch->company_id)
+            ->where('branch_id', $branch->id)
+            ->when(! empty($data['employee_id']), fn ($q) => $q->where('id', $data['employee_id']))
+            ->orderBy('last_name')->orderBy('first_name')
+            ->get(['id', 'employee_no', 'first_name', 'last_name', 'biometric_user_id']);
+        abort_if(! empty($data['employee_id']) && $employees->isEmpty(), 404, 'That worker is not in this agency.');
+        $single = ! empty($data['employee_id']) ? $employees->first() : null;
+        $empById = $employees->keyBy('id');
+        $ids = $employees->pluck('id');
+
+        $dtrs = DailyTimeRecord::query()
+            ->whereIn('employee_id', $ids)
+            ->whereBetween('work_date', [$from, $to])
+            ->orderBy('work_date')
+            ->get();
+
+        $logs = TimeLog::query()
+            ->whereIn('employee_id', $ids)
+            ->whereBetween('logged_at', [$from.' 00:00:00', $to.' 23:59:59'])
+            ->orderBy('logged_at')
+            ->get(['employee_id', 'logged_at', 'direction', 'source', 'device_id']);
+
+        $name = fn ($e) => $e ? trim($e->last_name.', '.$e->first_name) : '';
+        $hm = fn ($t) => $t ? \Illuminate\Support\Carbon::parse($t)->format('h:i A') : '';
+        $status = function ($r) {
+            if ($r->is_on_leave) {
+                return 'On Leave';
+            }
+            if ($r->holiday_type) {
+                return ucwords(str_replace('_', ' ', $r->holiday_type));
+            }
+            if ($r->is_rest_day && ! $r->actual_in) {
+                return 'Rest Day';
+            }
+            if ($r->is_absent) {
+                return 'Absent';
+            }
+
+            return $r->actual_in ? 'Present' : '—';
+        };
+
+        // Reusable cell styles.
+        $titleStyle = (new Style())->withFontBold(true)->withFontSize(15)->withFontColor('1E293B');
+        $labelStyle = (new Style())->withFontBold(true)->withFontColor('334155');
+        $headStyle = (new Style())->withFontBold(true)->withFontColor(Color::WHITE)->withBackgroundColor('1E293B');
+
+        $options = new XlsxOptions();
+        $options->setColumnWidth(24, 1);   // Employee No / labels
+        $options->setColumnWidth(28, 2);   // Name / values
+        $options->setColumnWidth(12, 3, 4, 5, 6, 7);
+        $options->setColumnWidth(10, 8, 9, 10);
+        $options->setColumnWidth(14, 11);
+
+        $path = tempnam(sys_get_temp_dir(), 'agrep_').'.xlsx';
+        $writer = new XlsxWriter($options);
+        $writer->openToFile($path);
+
+        // Sheet 1 — Summary
+        $writer->getCurrentSheet()->setName('Summary');
+        $present = $dtrs->whereNotNull('actual_in')->count();
+        $writer->addRow(Row::fromValuesWithStyle([($branch->name ?? 'Agency').' — Attendance Report'], $titleStyle));
+        $writer->addRow(Row::fromValues([]));
+        $sumRow = function (string $label, $value) use ($writer, $labelStyle) {
+            $writer->addRow(Row::fromValuesWithStyles([$label, $value], [$labelStyle, new Style()]));
+        };
+        $sumRow('Agency', $branch->name.($branch->code ? " ({$branch->code})" : ''));
+        $sumRow('Period', "{$from}  to  {$to}");
+        $sumRow('Employees', $employees->count());
+        $sumRow('Employees with attendance', $dtrs->whereNotNull('actual_in')->pluck('employee_id')->unique()->count());
+        $writer->addRow(Row::fromValues([]));
+        $sumRow('Present day-records', $present);
+        $sumRow('Absent day-records', $dtrs->where('is_absent', true)->count());
+        $sumRow('On-leave day-records', $dtrs->where('is_on_leave', true)->count());
+        $sumRow('Total hours worked', round((float) $dtrs->sum('hours_worked'), 2));
+        $sumRow('Total late (min)', (int) $dtrs->sum('late_minutes'));
+        $sumRow('Total overtime (min)', (int) $dtrs->sum('overtime_minutes'));
+        $sumRow('Total punches', $logs->count());
+
+        // Sheet 2 — Daily Shifts
+        $writer->addNewSheetAndMakeItCurrent();
+        $writer->getCurrentSheet()->setName('Daily Shifts');
+        $writer->addRow(Row::fromValuesWithStyle(['Employee No', 'Name', 'Date', 'Day', 'Scheduled In', 'Shift Start', 'Shift End', 'Hours', 'Late (min)', 'OT (min)', 'Status'], $headStyle));
+        foreach ($dtrs as $r) {
+            $e = $empById->get($r->employee_id);
+            $wd = \Illuminate\Support\Carbon::parse($r->work_date);
+            $writer->addRow(Row::fromValues([
+                (string) ($e->employee_no ?? ''),
+                $name($e),
+                $wd->format('Y-m-d'),
+                $wd->format('D'),
+                $hm($r->scheduled_in),
+                $hm($r->actual_in),
+                $hm($r->actual_out),
+                $r->hours_worked !== null ? round((float) $r->hours_worked, 2) : '',
+                (int) $r->late_minutes,
+                (int) $r->overtime_minutes,
+                $status($r),
+            ]));
+        }
+
+        // Sheet 3 — Punch Records
+        $writer->addNewSheetAndMakeItCurrent();
+        $writer->getCurrentSheet()->setName('Punch Records');
+        $writer->addRow(Row::fromValuesWithStyle(['Employee No', 'Name', 'Date', 'Time', 'Direction', 'Device', 'Source'], $headStyle));
+        foreach ($logs as $l) {
+            $e = $empById->get($l->employee_id);
+            $ts = \Illuminate\Support\Carbon::parse($l->logged_at);
+            $writer->addRow(Row::fromValues([
+                (string) ($e->employee_no ?? ''),
+                $name($e),
+                $ts->format('Y-m-d'),
+                $ts->format('h:i A'),
+                strtoupper((string) $l->direction),
+                (string) $l->device_id,
+                (string) $l->source,
+            ]));
+        }
+
+        $writer->close();
+
+        $slug = \Illuminate\Support\Str::slug($single ? ($single->first_name.' '.$single->last_name) : ($branch->name ?: 'agency'));
+
+        return response()
+            ->download($path, "agency_{$slug}_attendance_{$from}_to_{$to}.xlsx", [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])
+            ->deleteFileAfterSend(true);
+    }
+
+    /**
+     * GET /api/v1/reports/agency-attendance-data?branch_id=&date_from=&date_to=&employee_id=
+     * Same content as the agency workbook, but as JSON so it can be shown on screen.
+     */
+    public function agencyAttendanceData(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user->can('attendance.view'), 403);
+
+        $data = $request->validate([
+            'branch_id' => ['required', 'integer'],
+            'date_from' => ['required', 'date'],
+            'date_to'   => ['required', 'date', 'after_or_equal:date_from'],
+            'employee_id' => ['nullable', 'integer'],
+        ]);
+
+        $branch = Branch::query()->find($data['branch_id']);
+        abort_unless($branch && (int) $branch->company_id === (int) $user->active_company_id, 404, 'Agency not found in this company.');
+
+        $from = $data['date_from'];
+        $to = $data['date_to'];
+
+        $employees = Employee::query()
+            ->where('company_id', $branch->company_id)->where('branch_id', $branch->id)
+            ->when(! empty($data['employee_id']), fn ($q) => $q->where('id', $data['employee_id']))
+            ->orderBy('last_name')->orderBy('first_name')
+            ->get(['id', 'employee_no', 'first_name', 'last_name']);
+        abort_if(! empty($data['employee_id']) && $employees->isEmpty(), 404, 'That worker is not in this agency.');
+        $empById = $employees->keyBy('id');
+        $ids = $employees->pluck('id');
+
+        $dtrs = DailyTimeRecord::query()
+            ->whereIn('employee_id', $ids)->whereBetween('work_date', [$from, $to])
+            ->orderBy('work_date')->orderBy('employee_id')->get();
+
+        $hm = fn ($t) => $t ? \Illuminate\Support\Carbon::parse($t)->format('h:i A') : null;
+        $status = function ($r) {
+            if ($r->is_on_leave) return 'On Leave';
+            if ($r->holiday_type) return ucwords(str_replace('_', ' ', $r->holiday_type));
+            if ($r->is_rest_day && ! $r->actual_in) return 'Rest Day';
+            if ($r->is_absent) return 'Absent';
+
+            return $r->actual_in ? 'Present' : '—';
+        };
+
+        $rows = $dtrs->map(function ($r) use ($empById, $hm, $status) {
+            $e = $empById->get($r->employee_id);
+            $wd = \Illuminate\Support\Carbon::parse($r->work_date);
+
+            return [
+                'employee_no' => $e->employee_no ?? '',
+                'name' => $e ? trim($e->first_name.' '.$e->last_name) : '',
+                'date' => $wd->format('Y-m-d'),
+                'day' => $wd->format('D'),
+                'shift_start' => $hm($r->actual_in),
+                'shift_end' => $hm($r->actual_out),
+                'hours' => $r->hours_worked !== null ? round((float) $r->hours_worked, 2) : null,
+                'late' => (int) $r->late_minutes,
+                'ot' => (int) $r->overtime_minutes,
+                'status' => $status($r),
+            ];
+        })->values();
+
+        return response()->json([
+            'agency' => ['id' => $branch->id, 'name' => $branch->name],
+            'from' => $from,
+            'to' => $to,
+            'summary' => [
+                'employees' => $employees->count(),
+                'present_days' => $dtrs->whereNotNull('actual_in')->count(),
+                'absent_days' => $dtrs->where('is_absent', true)->count(),
+                'leave_days' => $dtrs->where('is_on_leave', true)->count(),
+                'total_hours' => round((float) $dtrs->sum('hours_worked'), 2),
+            ],
+            'rows' => $rows,
+        ]);
+    }
+
+    /**
+     * GET /api/v1/reports/ytd?year= — a Year-to-Date payroll workbook for the
+     * active company: per-employee totals combining in-system payroll runs with
+     * the prior-period carry-over (prev_* on the payroll profile), so a company
+     * adopted mid-year still shows a correct full-year YTD. Mirrors the concepts of
+     * the source YTD export (earnings, gov contributions, tax, net).
+     */
+    public function ytd(Request $request): BinaryFileResponse
+    {
+        abort_unless($request->user()->can('payroll.view'), 403);
+        $companyId = $request->user()->active_company_id;
+        abort_unless($companyId, 400, 'Switch to a company first.');
+        $year = (int) ($request->query('year') ?: now()->year);
+        $company = Company::find($companyId);
+
+        // In-system payslip totals for the year, per employee.
+        $agg = DB::table('payslips as p')
+            ->join('payroll_runs as r', 'r.id', '=', 'p.payroll_run_id')
+            ->where('p.company_id', $companyId)
+            ->whereRaw('extract(year from r.period_end) = ?', [$year])
+            ->whereIn('r.status', ['computed', 'approved', 'posted'])
+            ->groupBy('p.employee_id')
+            ->selectRaw('p.employee_id,
+                coalesce(sum(p.basic_pay),0) basic, coalesce(sum(p.overtime_pay),0) ot,
+                coalesce(sum(p.allowance),0) allow, coalesce(sum(p.de_minimis),0) demin,
+                coalesce(sum(p.gross_pay),0) gross, coalesce(sum(p.sss),0) sss,
+                coalesce(sum(p.philhealth),0) phil, coalesce(sum(p.pagibig),0) hdmf,
+                coalesce(sum(p.withholding_tax),0) tax, coalesce(sum(p.loans_deduction),0) loans,
+                coalesce(sum(p.net_pay),0) net')
+            ->get()->keyBy('employee_id');
+
+        $employees = Employee::query()
+            ->where('company_id', $companyId)
+            ->with(['position:id,title', 'department:id,name', 'compensation', 'payrollProfile'])
+            ->orderBy('last_name')->orderBy('first_name')
+            ->get();
+
+        $titleStyle = (new Style())->withFontBold(true)->withFontSize(13)->withFontColor('1E293B');
+        $head = (new Style())->withFontBold(true)->withFontColor(Color::WHITE)->withBackgroundColor('1E293B');
+
+        $opt = new XlsxOptions();
+        $opt->setColumnWidth(14, 1);
+        $opt->setColumnWidth(26, 2);
+        $opt->setColumnWidth(18, 3, 4);
+        $opt->setColumnWidth(13, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18);
+
+        $cols = ['Employee ID', 'Name', 'Position', 'Department', 'Status', 'Basic Rate', 'Pay Type',
+            'YTD Basic', 'YTD OT', 'YTD Allowance', 'YTD De Minimis', 'YTD Gross',
+            'YTD SSS', 'YTD PhilHealth', 'YTD HDMF', 'YTD Tax', 'YTD Loans', 'YTD Net',
+            'Prior Taxable (carry-over)', 'Prior Tax (carry-over)', 'Prior 13th (carry-over)', 'Total YTD Taxable', 'Total YTD Tax'];
+
+        $path = tempnam(sys_get_temp_dir(), 'ytd_').'.xlsx';
+        $writer = new XlsxWriter($opt);
+        $writer->openToFile($path);
+        $writer->getCurrentSheet()->setName('YTD Summary');
+        $writer->addRow(Row::fromValuesWithStyle([($company?->legal_name ?: 'Company').' — YTD Payroll '.$year], $titleStyle));
+        $writer->addRow(Row::fromValues([]));
+        $writer->addRow(Row::fromValuesWithStyle($cols, $head));
+
+        foreach ($employees as $e) {
+            $a = $agg->get($e->id);
+            $comp = $e->compensation;
+            $prof = $e->payrollProfile;
+            $payType = $comp?->pay_type ?? 'monthly';
+            $rate = $payType === 'daily' ? (float) ($comp?->daily_rate ?? 0) : (float) ($comp?->basic_monthly ?? 0);
+            $priorTaxable = (float) ($prof?->prev_taxable_gross ?? 0);
+            $priorTax = (float) ($prof?->prev_tax_withheld ?? 0);
+            $prior13 = (float) ($prof?->prev_13th_month ?? 0);
+            $ytdGross = (float) ($a->gross ?? 0);
+            $ytdTax = (float) ($a->tax ?? 0);
+
+            $writer->addRow(Row::fromValues([
+                $e->employee_no, trim($e->first_name.' '.$e->last_name), $e->position?->title ?? '', $e->department?->name ?? '',
+                $e->is_active ? 'Active' : 'Inactive', round($rate, 2), $payType,
+                round((float) ($a->basic ?? 0), 2), round((float) ($a->ot ?? 0), 2), round((float) ($a->allow ?? 0), 2), round((float) ($a->demin ?? 0), 2), round($ytdGross, 2),
+                round((float) ($a->sss ?? 0), 2), round((float) ($a->phil ?? 0), 2), round((float) ($a->hdmf ?? 0), 2), round($ytdTax, 2), round((float) ($a->loans ?? 0), 2), round((float) ($a->net ?? 0), 2),
+                round($priorTaxable, 2), round($priorTax, 2), round($prior13, 2), round($ytdGross + $priorTaxable, 2), round($ytdTax + $priorTax, 2),
+            ]));
+        }
+
+        $writer->close();
+        $slug = \Illuminate\Support\Str::slug($company?->code ?: 'company');
+
+        return response()->download($path, "{$slug}_ytd_{$year}.xlsx", [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
     /** GET /api/v1/reports/compensation — active salaries for the company. */
     public function compensation(Request $request): Response
     {
@@ -151,6 +486,8 @@ class ReportController extends Controller
         $rows = EmployeeCompensation::query()
             ->with('employee:id,employee_no,first_name,last_name,department_id', 'employee.department:id,name')
             ->where('is_active', true)
+            // Internal payroll only — exclude agency workers (reported per agency).
+            ->whereHas('employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)))
             ->get();
 
         $lines = [implode(',', ['Employee No', 'Name', 'Department', 'Pay Type', 'Basic Monthly', 'Daily Rate', 'Hourly Rate', 'Allowance', 'Effective From'])];

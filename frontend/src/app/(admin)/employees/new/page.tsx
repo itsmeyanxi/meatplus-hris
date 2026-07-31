@@ -188,7 +188,7 @@ export default function NewEmployeePage() {
                     value={field.value as string | number | undefined}
                     onChange={field.onChange}
                     placeholder={`Select ${branch.singular}…`}
-                    options={(branches ?? []).map((b) => ({ value: String(b.id), label: b.name }))}
+                    options={(branches ?? []).filter((b) => !b.is_agency).map((b) => ({ value: String(b.id), label: b.name }))}
                   />
                 )}
               />

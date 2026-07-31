@@ -38,8 +38,17 @@ return Application::configure(basePath: dirname(__DIR__))
             return response()->json(['message' => 'Unauthenticated.'], 401);
         });
         $exceptions->render(function (\Symfony\Component\Routing\Exception\RouteNotFoundException $e, Request $request) {
-            if ($request->is('api/*')) {
+            // Unauthenticated requests to guarded endpoints try to redirect to a
+            // 'login' route that this API-only app doesn't define. Answer 401 (for
+            // api/* or the login-redirect case) instead of a 500 error page.
+            if ($request->is('api/*') || str_contains($e->getMessage(), 'login')) {
                 return response()->json(['message' => 'Unauthenticated.'], 401);
+            }
+        });
+        // …and don't log that login-redirect case — it's pure noise, not a fault.
+        $exceptions->report(function (\Symfony\Component\Routing\Exception\RouteNotFoundException $e) {
+            if (str_contains($e->getMessage(), 'login')) {
+                return false;
             }
         });
     })->create();

@@ -126,6 +126,19 @@ class EmployeeController extends Controller
 
         if ($branchId = $request->query('branch_id')) {
             $query->where('branch_id', $branchId);
+        } else {
+            // Organic vs agency separation. The Employees module lists ORGANIC staff
+            // only by default; agency workers (branches flagged is_agency, e.g. PASEI's
+            // EAA/Golden 5/Stellar/ATC) live in the Agencies module. A `scope` of
+            // "agency" returns only agency workers, "all" returns both. An explicit
+            // branch filter above overrides this. Employees with no branch count as
+            // organic (always in the default/organic set).
+            $scope = $request->query('scope', 'organic');
+            if ($scope === 'agency') {
+                $query->whereHas('branch', fn ($b) => $b->where('is_agency', true));
+            } elseif ($scope !== 'all') {
+                $query->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true));
+            }
         }
 
         // Payroll group filter: confidential vs non-confidential.
@@ -163,7 +176,7 @@ class EmployeeController extends Controller
         abort_unless($request->user()->can('employee.view'), 403);
 
         $employee->load([
-            'branch', 'department', 'position', 'employmentType', 'manager', 'compensation',
+            'branch', 'department', 'position', 'employmentType', 'manager', 'compensation', 'user',
         ]);
 
         return new EmployeeResource($employee);

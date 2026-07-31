@@ -189,7 +189,7 @@ export default function EditEmployeePage() {
               value={form.branch_id}
               onChange={(v) => setForm((p) => ({ ...p, branch_id: v ? Number(v) : 0 }))}
               placeholder={`— Select ${branch.singular} —`}
-              options={branches.map((b) => ({ value: String(b.id), label: b.name }))}
+              options={branches.filter((b) => !b.is_agency || b.id === form.branch_id).map((b) => ({ value: String(b.id), label: b.name }))}
             />
           </Field>
           <Field label="Department">

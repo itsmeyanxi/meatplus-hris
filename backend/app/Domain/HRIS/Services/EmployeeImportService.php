@@ -63,11 +63,19 @@ class EmployeeImportService
     private array $positionCache = [];
     private array $empTypeCache = [];
 
+    /** When true, branches resolved during this import are flagged is_agency. */
+    private bool $asAgency = false;
+
+    /** When set, every imported row is assigned to this branch (Branch column ignored). */
+    private ?int $forceBranchId = null;
+
     /**
      * @return array{created:int, updated:int, skipped:int, total:int, errors:array<int,array{row:int,message:string}>, warnings:array<int,array{row:int,message:string}>}
      */
-    public function import(string $path, string $ext, int $companyId): array
+    public function import(string $path, string $ext, int $companyId, bool $asAgency = false, ?int $forceBranchId = null): array
     {
+        $this->asAgency = $asAgency;
+        $this->forceBranchId = $forceBranchId;
         $rows = $this->readRows($path, $ext);
         if (count($rows) < 2) {
             return ['created' => 0, 'updated' => 0, 'skipped' => 0, 'total' => 0, 'warnings' => [],
@@ -136,7 +144,10 @@ class EmployeeImportService
                 if (($d = $get('department')) !== '') {
                     $present['department_id'] = $this->resolveDepartment($companyId, $d);
                 }
-                if (($b = $get('location')) !== '') {
+                if ($this->forceBranchId) {
+                    // Per-agency bulk upload: every row goes to this branch.
+                    $present['branch_id'] = $this->forceBranchId;
+                } elseif (($b = $get('location')) !== '') {
                     $present['branch_id'] = $this->resolveBranch($companyId, $b);
                 }
                 if (($bio = $get('biometric_user_id')) !== '') {
@@ -360,8 +371,15 @@ class EmployeeImportService
                 'company_id' => $companyId,
                 'code' => $this->uniqueCode(Branch::class, $companyId, $name, 20),
                 'name' => $name,
+                'is_agency' => $this->asAgency,
                 'is_active' => true,
             ]);
+
+        // Importing as agency: make sure the (possibly pre-existing) branch is
+        // flagged so these workers land in the Agencies module, not the organic list.
+        if ($this->asAgency && ! $branch->is_agency) {
+            $branch->forceFill(['is_agency' => true])->save();
+        }
 
         return $this->branchCache[$key] = $branch->id;
     }

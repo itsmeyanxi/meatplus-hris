@@ -985,7 +985,7 @@ export default function EmployeeRegistrationPage() {
                     {section.key === "locations"   && (
                       <LocationsSection
                         form={form}
-                        branches={branches}
+                        branches={(branches ?? []).filter((b) => !(b as { is_agency?: boolean }).is_agency)}
                         locations={locations}
                         onAdd={addLocation}
                         onRemove={removeLocation}

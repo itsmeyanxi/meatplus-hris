@@ -46,7 +46,7 @@ trait HandlesApprovalWorkflow
             return $query;
         }
 
-        $employee = $user->employee;
+        $employee = $user->employeeRecord();
         if (! $employee) {
             abort(403, 'You are not linked to an employee record.');
         }
@@ -84,7 +84,7 @@ trait HandlesApprovalWorkflow
             return;
         }
 
-        $employee = $user->employee;
+        $employee = $user->employeeRecord();
 
         if ($employee && $model->employee_id === $employee->id) {
             return;
@@ -139,7 +139,8 @@ trait HandlesApprovalWorkflow
         $user = $request->user();
 
         // Approving own request is never allowed.
-        if ($user->employee && $model->employee_id === $user->employee->id) {
+        $ownEmp = $user->employeeRecord();
+        if ($ownEmp && $model->employee_id === $ownEmp->id) {
             abort(403, 'You cannot approve your own request.');
         }
 
@@ -154,6 +155,32 @@ trait HandlesApprovalWorkflow
         }
 
         abort(403, 'You do not have permission to act on this request.');
+    }
+
+    /**
+     * Throw 403/422 if the current user cannot REVERT this decided request back to
+     * pending. Same authority as approving: global approvers / HR, or the subject's
+     * supervisor (scoped). A still-pending request has nothing to revert.
+     */
+    protected function assertCanRevert(Request $request, Model $model): void
+    {
+        if ($model->status === 'pending') {
+            throw ValidationException::withMessages([
+                'status' => 'This request is already pending — nothing to revert.',
+            ]);
+        }
+
+        $user = $request->user();
+
+        if ($user->can('attendance.approve.any') || $user->can('attendance.manage')) {
+            return;
+        }
+
+        if ($user->can('attendance.approve.self_dept') && $this->isWithinApproverScope($user, $model)) {
+            return;
+        }
+
+        abort(403, 'You do not have permission to revert this request.');
     }
 
     /**
@@ -284,12 +311,12 @@ trait HandlesApprovalWorkflow
      */
     private function isWithinApproverScope(User $user, Model $model): bool
     {
-        $approverEmployeeId = $user->employee?->id;
+        $approverEmployeeId = $user->employeeRecord()?->id;
         if (! $approverEmployeeId) {
             return false;
         }
 
-        $subject = Employee::query()
+        $subject = Employee::withoutGlobalScopes()
             ->where('id', $model->employee_id)
             ->with('department:id,head_employee_id')
             ->first(['id', 'manager_employee_id', 'department_id']);

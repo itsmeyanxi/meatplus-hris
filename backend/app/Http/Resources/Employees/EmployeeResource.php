@@ -108,6 +108,17 @@ class EmployeeResource extends JsonResource
             'date_separated' => $this->date_separated?->toDateString(),
             'separation_reason' => $this->separation_reason,
 
+            // The login account linked to this employee, reflecting the email the
+            // person actually uses to sign in (which may differ from the HR email
+            // fields above if they were invited to / registered with another address).
+            'account' => $this->whenLoaded('user', fn () => $this->user ? [
+                'id' => $this->user->id,
+                'email' => $this->user->email,
+                'username' => $this->user->username,
+                'is_active' => (bool) $this->user->is_active,
+                'last_login_at' => $this->user->last_login_at,
+            ] : null),
+
             'is_active' => $this->is_active,
             'photo_path' => $this->photo_path,
 

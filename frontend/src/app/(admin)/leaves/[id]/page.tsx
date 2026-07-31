@@ -53,6 +53,10 @@ export default function LeaveDetailPage() {
     onSuccess: () => { invalidate(); router.back(); },
   });
 
+  const notifySup = useMutation({
+    mutationFn: () => leaveAppsApi.notifySupervisor(id),
+  });
+
   if (isLoading) {
     return <div className="p-8 text-center text-slate-500">Loading leave application…</div>;
   }
@@ -134,6 +138,30 @@ export default function LeaveDetailPage() {
       </AppCard>
 
       {/* Approval actions — only shown to approvers when leave is pending */}
+      {isPending && (
+        <AppCard title="Route to supervisor">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => notifySup.mutate()}
+              disabled={notifySup.isPending}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-100 disabled:opacity-60"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              {notifySup.isPending ? "Notifying…" : "Notify supervisor"}
+            </button>
+            {notifySup.isSuccess && <span className="text-sm text-emerald-700">{notifySup.data.message}</span>}
+            {notifySup.isError && (
+              <span className="text-sm text-red-600">
+                {(notifySup.error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Failed to notify."}
+              </span>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-slate-500">Sends the employee&rsquo;s dedicated supervisor a notification to review this leave — so the right person approves it.</p>
+        </AppCard>
+      )}
+
       {showApprovalActions && (
         <AppCard title="Decision">
           {!showRejectForm ? (

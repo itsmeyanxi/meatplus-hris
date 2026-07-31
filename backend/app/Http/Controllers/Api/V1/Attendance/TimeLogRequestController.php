@@ -15,7 +15,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use OpenSpout\Common\Entity\Row;
+use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Admin-uploaded time logs that wait for approval. Uploading needs
@@ -146,19 +148,71 @@ class TimeLogRequestController extends Controller
         });
     }
 
-    /** Download a CSV template (day-level: Employee ID | Date | Time In | Time Out). */
-    public function template(Request $request): StreamedResponse
+    /**
+     * Download a ready-to-fill Excel template for uploading attendance:
+     * a "How to fill" guide sheet plus a "Time Logs" sheet (day-level:
+     * Employee ID | Date | Time In | Time Out). Uploaded rows become PENDING
+     * time-log requests for review, not final attendance.
+     */
+    public function template(Request $request): BinaryFileResponse
     {
         abort_unless($request->user()->can('attendance.manage'), 403);
 
         $headers = ['Employee ID', 'Date', 'Time In', 'Time Out'];
-        $example = ['2160073', '2026-07-14', '08:01', '17:05'];
+        // One row per employee per day. Time In/Out are 24-hour HH:MM.
+        $examples = [
+            ['2160073', '2026-07-14', '08:01', '17:05'],
+            ['2160073', '2026-07-15', '07:58', '17:02'],
+            ['5', '2026-07-14', '08:00', '17:00'],
+            ['6', '2026-07-14', '13:00', '22:00'],   // afternoon/night shift
+            ['9', '2026-07-14', '08:03', ''],         // only timed in (no out captured)
+        ];
 
-        return response()->streamDownload(function () use ($headers, $example) {
-            $out = fopen('php://output', 'w');
-            fputcsv($out, $headers);
-            fputcsv($out, $example);
-            fclose($out);
-        }, 'time_log_upload_template.csv', ['Content-Type' => 'text/csv']);
+        $guide = [
+            ['ALL COMPANY HRIS — Attendance (Time In / Time Out) Upload Template'],
+            [''],
+            ['HOW TO USE'],
+            ['1. Fill in the "Time Logs" tab (second tab below). ONE ROW PER EMPLOYEE, PER DAY.'],
+            ['2. In the app go to Attendance > Time Logs (or Timekeeping) > Upload, pick the company, and upload this file.'],
+            ['3. Uploaded rows are created as PENDING requests for review — they are NOT final attendance until approved.'],
+            ['4. You may upload .xlsx or .csv. Column order does not matter — only the header names do.'],
+            [''],
+            ['COLUMNS'],
+            ['   • Employee ID  — REQUIRED. The worker\'s Employee ID, OR their Biometric ID (device PIN). Either matches.'],
+            ['   • Date         — REQUIRED. The workday. Use YYYY-MM-DD (e.g. 2026-07-14).'],
+            ['   • Time In       — the clock-in time in 24-hour HH:MM (e.g. 08:01). "8:01 AM" also works.'],
+            ['   • Time Out      — the clock-out time in 24-hour HH:MM (e.g. 17:05 = 5:05 PM).'],
+            [''],
+            ['RULES & TIPS'],
+            ['   • Each row needs a Time In OR a Time Out (at least one). Leave the other blank if it wasn\'t captured.'],
+            ['   • A night shift is fine: put the OUT time as-is (e.g. In 20:00, Out 05:00 belongs on the START date).'],
+            ['   • Use 24-hour time to avoid AM/PM mistakes: 1:00 PM = 13:00, 5:00 PM = 17:00, midnight = 00:00.'],
+            ['   • The Employee/Biometric ID must already exist in the chosen company, or the row is skipped with an error.'],
+            ['   • After uploading, review the batch and Approve so the times post to the employees\' DTR.'],
+        ];
+
+        $path = tempnam(sys_get_temp_dir(), 'tltpl_').'.xlsx';
+        $writer = new XlsxWriter();
+        $writer->openToFile($path);
+
+        $writer->getCurrentSheet()->setName('How to fill');
+        foreach ($guide as $line) {
+            $writer->addRow(Row::fromValues($line));
+        }
+
+        $writer->addNewSheetAndMakeItCurrent();
+        $writer->getCurrentSheet()->setName('Time Logs');
+        $writer->addRow(Row::fromValues($headers));
+        foreach ($examples as $ex) {
+            $writer->addRow(Row::fromValues($ex));
+        }
+
+        $writer->close();
+
+        return response()
+            ->download($path, 'attendance_time_log_upload_template.xlsx', [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])
+            ->deleteFileAfterSend(true);
     }
 }

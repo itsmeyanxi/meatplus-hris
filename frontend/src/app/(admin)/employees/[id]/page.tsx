@@ -78,6 +78,20 @@ export default function EmployeeOverviewPage() {
         <Section title="Contact">
           <Field label="Company email" value={data.email_company} mono />
           <Field label="Personal email" value={data.email_personal} mono />
+          {data.account && (
+            <div className="min-w-0 rounded-lg bg-sky-50 px-2.5 py-1.5">
+              <dt className="flex items-center gap-1.5 text-xs text-sky-700/80">
+                Login email
+                <span className="inline-flex items-center rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">
+                  account made
+                </span>
+              </dt>
+              <dd className="mt-0.5 break-all font-mono text-sm text-sky-900">{data.account.email}</dd>
+              {data.account.email !== data.email_company && data.account.email !== data.email_personal && (
+                <dd className="mt-1 text-[11px] text-amber-600">Differs from the emails on file above — this is the address they actually sign in with.</dd>
+              )}
+            </div>
+          )}
           <Field label="Mobile" value={data.mobile} />
           <Field label="Home phone" value={data.phone_home} />
           <div className="pt-2 border-t border-slate-100">

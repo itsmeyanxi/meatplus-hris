@@ -16,6 +16,7 @@ import {
   downloadCompensationReport,
   downloadLoansReport,
   downloadThirteenthMonth,
+  downloadYtd,
   downloadRemittance,
 } from "@/lib/reports";
 import { getMe } from "@/lib/auth";
@@ -60,6 +61,7 @@ export default function ReportsPage() {
           <SectionTitle>Statutory &amp; Year-End</SectionTitle>
           <div className="grid gap-4 sm:grid-cols-2">
             <ThirteenthMonthCard />
+            <YtdCard />
             <RemittanceCard />
           </div>
         </>
@@ -183,6 +185,26 @@ function ThirteenthMonthCard() {
       </label>
       {error && <p className="text-xs text-red-600">{error}</p>}
       <DownloadButton onClick={download} loading={loading}>Download CSV</DownloadButton>
+    </ReportCard>
+  );
+}
+
+function YtdCard() {
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const download = async () => {
+    setError(null); setLoading(true);
+    try { await downloadYtd(year); } catch { setError("Failed to download."); } finally { setLoading(false); }
+  };
+  return (
+    <ReportCard title="Year-to-Date (YTD) Payroll" description="Per employee: YTD earnings, gov contributions, tax and net — combining in-system runs with prior-period carry-over. Excel.">
+      <label className="block">
+        <span className="text-xs text-slate-500">Year</span>
+        <input type="number" min={2020} max={2100} value={year} onChange={(e) => setYear(Number(e.target.value))} className={fieldCls} />
+      </label>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <DownloadButton onClick={download} loading={loading}>Download Excel</DownloadButton>
     </ReportCard>
   );
 }

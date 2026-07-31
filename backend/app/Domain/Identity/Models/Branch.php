@@ -17,17 +17,23 @@ class Branch extends Model
         'company_id', 'code', 'name',
         'address_line1', 'address_line2', 'city', 'province', 'postal_code', 'country',
         'latitude', 'longitude', 'geofence_radius_m',
-        'is_head_office', 'is_active',
+        'is_head_office', 'is_agency', 'is_active',
     ];
 
     protected function casts(): array
     {
         return [
             'is_head_office' => 'boolean',
+            'is_agency' => 'boolean',
             'is_active' => 'boolean',
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'geofence_radius_m' => 'integer',
         ];
+    }
+
+    public function employees(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Domain\HRIS\Models\Employee::class);
     }
 }

@@ -150,4 +150,8 @@ export const leaveAppsApi = {
     const { data } = await api.post<{ data: LeaveApplication }>(`/api/v1/leave-applications/${id}/cancel`, {});
     return data.data;
   },
+  notifySupervisor: async (id: number): Promise<{ message: string }> => {
+    const { data } = await api.post<{ message: string }>(`/api/v1/leave-applications/${id}/notify-supervisor`, {});
+    return data;
+  },
 };

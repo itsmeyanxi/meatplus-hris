@@ -7,6 +7,7 @@ use App\Domain\HRIS\Models\Employee;
 use App\Domain\Leave\Models\LeaveApplication;
 use App\Domain\Leave\Models\LeaveType;
 use App\Domain\Leave\Services\LeaveBalanceService;
+use App\Http\Controllers\Concerns\NotifiesSupervisor;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Leave\LeaveDecisionRequest;
 use App\Http\Requests\Leave\StoreLeaveApplicationRequest;
@@ -24,8 +25,38 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class LeaveApplicationController extends Controller
 {
+    use NotifiesSupervisor;
+
     public function __construct(private readonly LeaveBalanceService $balanceService)
     {
+    }
+
+    /**
+     * POST /leave-applications/{id}/notify-supervisor
+     * Nudge the applicant's direct supervisor to approve, instead of an
+     * admin/HR deciding it. Open to the applicant or anyone who can approve.
+     */
+    public function notifySupervisor(Request $request, LeaveApplication $leaveApplication): JsonResponse
+    {
+        $user = $request->user();
+        $isOwner = $user->employee && $leaveApplication->employee_id === $user->employee->id;
+        abort_unless(
+            $isOwner || $user->can('leave.approve.any') || $user->can('leave.approve.self_dept') || $user->can('leave.manage') || $user->can('leave.view.any'),
+            403,
+            'You cannot notify the supervisor for this request.'
+        );
+
+        if ($leaveApplication->status !== 'pending') {
+            return response()->json(['message' => "This request is already {$leaveApplication->status}."], 422);
+        }
+
+        return $this->pingSupervisor(
+            $leaveApplication->employee_id,
+            'Leave',
+            $leaveApplication->date_from?->toDateString(),
+            "/leaves/{$leaveApplication->id}",
+            $leaveApplication->id,
+        );
     }
 
     /** Bulk-import leave applications from a CSV/XLSX (deduped by employee+type+dates). */
@@ -338,7 +369,8 @@ class LeaveApplicationController extends Controller
         }
 
         $user = $request->user();
-        if ($user->employee && $leave->employee_id === $user->employee->id) {
+        $ownEmp = $user->employeeRecord();
+        if ($ownEmp && $leave->employee_id === $ownEmp->id) {
             abort(403, 'You cannot approve your own leave.');
         }
 
@@ -347,12 +379,15 @@ class LeaveApplicationController extends Controller
         }
 
         if ($user->can('leave.approve.self_dept')) {
-            $approverEmp = $user->employee?->id;
+            $approverEmp = $ownEmp?->id;
             // An approver with no employee record can't be anyone's manager/dept head.
             if (! $approverEmp) {
                 abort(403, 'You do not have permission to act on this request.');
             }
-            $subj = $leave->employee()->first(['id', 'manager_employee_id', 'department_id']);
+            // Resolve the subject without the company scope so a cross-company
+            // supervisor (their employee record sits in another company) still matches.
+            $subj = \App\Domain\HRIS\Models\Employee::withoutGlobalScopes()
+                ->where('id', $leave->employee_id)->first(['id', 'manager_employee_id', 'department_id']);
             if ($subj && $subj->manager_employee_id === $approverEmp) {
                 return;
             }

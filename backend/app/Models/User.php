@@ -128,6 +128,27 @@ class User extends Authenticatable
         return $this->hasOne(Employee::class);
     }
 
+    /** Memoised, company-agnostic employee record for this request. */
+    private ?Employee $employeeRecordCache = null;
+
+    private bool $employeeRecordLoaded = false;
+
+    /**
+     * The user's OWN employee record, resolved WITHOUT the company scope. A user
+     * has a single employee identity in their home company; it must not vanish
+     * when they switch to another company they belong to — otherwise a
+     * cross-company supervisor/approver stops matching their own reports.
+     */
+    public function employeeRecord(): ?Employee
+    {
+        if (! $this->employeeRecordLoaded) {
+            $this->employeeRecordCache = Employee::withoutGlobalScopes()->where('user_id', $this->id)->first();
+            $this->employeeRecordLoaded = true;
+        }
+
+        return $this->employeeRecordCache;
+    }
+
     public function sendPasswordResetNotification($token): void
     {
         $url = config('app.frontend_url') . '/reset-password?token=' . $token . '&email=' . urlencode($this->email ?? '');

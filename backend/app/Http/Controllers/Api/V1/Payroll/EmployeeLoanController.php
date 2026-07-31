@@ -3,10 +3,18 @@
 namespace App\Http\Controllers\Api\V1\Payroll;
 
 use App\Domain\HRIS\Services\LoanImportService;
+use App\Domain\Identity\Models\Company;
 use App\Domain\Payroll\Models\EmployeeLoan;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use OpenSpout\Common\Entity\Row;
+use OpenSpout\Common\Entity\Style\Color;
+use OpenSpout\Common\Entity\Style\Style;
+use OpenSpout\Writer\XLSX\Options as XlsxOptions;
+use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -101,34 +109,151 @@ class EmployeeLoanController extends Controller
         }, 'loan_import_template.csv', ['Content-Type' => 'text/csv']);
     }
 
-    /** Export every loan + balance for the active company as CSV. */
-    public function export(Request $request): StreamedResponse
+    /** Loan-type code → the human label the importer recognises (so an export re-imports 1:1). */
+    private const TYPE_LABEL = [
+        'sss_salary' => 'SSS Salary Loan',
+        'sss_calamity' => 'SSS Calamity Loan',
+        'pagibig_mpl' => 'Pag-IBIG MPL',
+        'pagibig_calamity' => 'Pag-IBIG Calamity',
+        'company' => 'Company Loan',
+        'cash_advance' => 'Cash Advance',
+        'other' => 'Other',
+    ];
+
+    /** Loan-type code → the ledger sheet name (mirrors the source cash-advance file). */
+    private const SHEET_NAME = [
+        'cash_advance' => 'CASH ADVANCE',
+        'sss_salary' => 'SSS LOANS',
+        'sss_calamity' => 'SSS CALAMITY',
+        'pagibig_mpl' => 'HDMF LOAN',
+        'pagibig_calamity' => 'HDMF CALAMITY',
+        'company' => 'COMPANY LOAN',
+        'other' => 'OTHER',
+    ];
+
+    /**
+     * Export the company's loans as a clean, formatted ledger workbook — one sheet
+     * per loan type, each loan shown with its amortization schedule (installment,
+     * schedule date, amount, deducted-so-far, running balance), mirroring the source
+     * cash-advance file. Installments already covered by payments made are marked
+     * deducted; the rest are the projected remaining schedule.
+     */
+    public function export(Request $request): BinaryFileResponse
     {
         abort_unless($request->user()->can('payroll.view'), 403);
+        $companyId = $request->user()->active_company_id;
+        $company = Company::find($companyId);
+        $companyName = $company?->legal_name ?: ($company?->code ?: 'Company');
 
         $loans = EmployeeLoan::query()
             ->with('employee:id,employee_no,first_name,last_name')
-            ->orderBy('employee_id')
-            ->get();
+            ->orderBy('type')->orderBy('employee_id')->orderBy('start_date')
+            ->get()
+            ->groupBy('type');
 
-        return response()->streamDownload(function () use ($loans) {
-            $o = fopen('php://output', 'w');
-            fputcsv($o, ['Employee No', 'Name', 'Loan Type', 'Reference No', 'Principal', 'Amortization', 'Outstanding Balance', 'Status', 'Start Date']);
-            foreach ($loans as $l) {
-                fputcsv($o, [
-                    $l->employee?->employee_no ?? '',
-                    trim(($l->employee?->last_name ?? '').', '.($l->employee?->first_name ?? '')),
-                    $l->type,
-                    $l->reference_no,
-                    number_format((float) $l->principal, 2, '.', ''),
-                    number_format((float) $l->amortization, 2, '.', ''),
-                    number_format((float) $l->outstanding_balance, 2, '.', ''),
-                    $l->outstanding_balance <= 0 ? 'Paid' : ($l->is_active ? 'Active' : 'Paused'),
-                    $l->start_date?->toDateString() ?? '',
-                ]);
+        // Styles.
+        $title = (new Style())->withFontBold(true)->withFontSize(13)->withFontColor('1E293B');
+        $head = (new Style())->withFontBold(true)->withFontColor(Color::WHITE)->withBackgroundColor('1E293B');
+        $loanHead = (new Style())->withFontBold(true)->withBackgroundColor('E2E8F0');
+
+        // Semi-monthly (5th / 20th) schedule dates from a start date.
+        $genDates = function (?Carbon $start, int $n): array {
+            if (! $start || $n <= 0) {
+                return array_fill(0, max(0, $n), null);
             }
-            fclose($o);
-        }, 'loans_export_'.now()->format('Ymd').'.csv', ['Content-Type' => 'text/csv']);
+            $cur = $start->copy()->day(5);
+            if ($cur->lt($start)) $cur = $start->copy()->day(20);
+            if ($cur->lt($start)) $cur = $start->copy()->addMonth()->day(5);
+            $out = [];
+            for ($i = 0; $i < $n; $i++) {
+                $out[] = $cur->copy();
+                $cur = $cur->day === 5 ? $cur->copy()->day(20) : $cur->copy()->addMonthNoOverflow()->day(5);
+            }
+
+            return $out;
+        };
+
+        $cols = ['Entry Date', 'Employee No.', 'Name', 'Reference', 'Loan', 'No', 'Payment Sched', 'Amount', 'Date Deducted', 'Payment', 'Balance', 'Remarks'];
+
+        $opt = new XlsxOptions();
+        $opt->setColumnWidth(12, 1, 7, 9);      // dates
+        $opt->setColumnWidth(14, 2);            // employee no
+        $opt->setColumnWidth(26, 3);            // name
+        $opt->setColumnWidth(20, 4);            // reference
+        $opt->setColumnWidth(12, 5, 8, 10, 11); // money
+        $opt->setColumnWidth(20, 12);           // remarks
+
+        $path = tempnam(sys_get_temp_dir(), 'loanledger_').'.xlsx';
+        $writer = new XlsxWriter($opt);
+        $writer->openToFile($path);
+        $first = true;
+
+        foreach (self::SHEET_NAME as $type => $sheetName) {
+            $group = $loans->get($type);
+            if (! $group || $group->isEmpty()) {
+                continue;
+            }
+            if ($first) {
+                $writer->getCurrentSheet()->setName($sheetName);
+                $first = false;
+            } else {
+                $writer->addNewSheetAndMakeItCurrent();
+                $writer->getCurrentSheet()->setName($sheetName);
+            }
+
+            $writer->addRow(Row::fromValuesWithStyle([$companyName], $title));
+            $writer->addRow(Row::fromValuesWithStyle([self::TYPE_LABEL[$type] ?? $type], $title));
+            $writer->addRow(Row::fromValues([]));
+            $writer->addRow(Row::fromValuesWithStyle($cols, $head));
+
+            foreach ($group as $l) {
+                $name = trim(($l->employee?->last_name ?? '').', '.($l->employee?->first_name ?? ''));
+                $empNo = (string) ($l->employee?->employee_no ?? '');
+                $ref = (string) ($l->reference_no ?? '');
+                $principal = round((float) $l->principal, 2);
+                $amort = round((float) $l->amortization, 2);
+                $outstanding = round((float) $l->outstanding_balance, 2);
+                $n = $amort > 0 ? (int) ceil($principal / $amort) : 0;
+                $paid = max(0, $principal - $outstanding);
+                $paidCount = $amort > 0 ? min($n, (int) round($paid / $amort)) : 0;
+                $dates = $genDates($l->start_date ? $l->start_date->copy() : null, $n);
+                $remark = $outstanding <= 0 ? 'Fully Paid - Closed' : ($l->is_active ? 'Deduction on Going' : 'Paused');
+
+                // Loan header row (principal + starting balance).
+                $writer->addRow(Row::fromValuesWithStyle([
+                    $l->start_date?->toDateString() ?? '', $empNo, $name, $ref, $principal, '', '', '', '', '', $principal, $remark,
+                ], $loanHead));
+
+                // Installment schedule.
+                $bal = $principal;
+                for ($i = 1; $i <= $n; $i++) {
+                    $amt = $i < $n ? $amort : round($principal - ($n - 1) * $amort, 2);
+                    $bal = round($bal - $amt, 2);
+                    $isPaid = $i <= $paidCount;
+                    $d = $dates[$i - 1] ?? null;
+                    $ds = $d ? $d->toDateString() : '';
+                    $writer->addRow(Row::fromValues([
+                        '', $empNo, $name, $ref, '', $i, $ds, -$amt, $isPaid ? $ds : '', $isPaid ? -$amt : '', $bal, $remark,
+                    ]));
+                }
+            }
+        }
+
+        if ($first) {
+            // No loans at all — still produce a valid, non-empty workbook.
+            $writer->getCurrentSheet()->setName('Loans');
+            $writer->addRow(Row::fromValuesWithStyle([$companyName.' — no loans on record'], $title));
+        }
+
+        $writer->close();
+
+        $slug = \Illuminate\Support\Str::slug($company?->code ?: 'company');
+
+        return response()
+            ->download($path, "{$slug}_loans_ledger_".now()->format('Ymd').'.xlsx', [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])
+            ->deleteFileAfterSend(true);
     }
 
     private function validateLoan(Request $request, bool $creating = true): array

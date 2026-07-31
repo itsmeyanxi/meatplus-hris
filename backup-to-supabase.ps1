@@ -16,6 +16,11 @@
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 
+# Append a timestamped line to the run log so the scheduled task leaves a trail.
+$logFile = Join-Path $root 'backups\supabase-backup.log'
+function Log($msg) { "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $msg" | Add-Content -Path $logFile -Encoding utf8 }
+try { Log 'run started' } catch {}
+
 # --- read the Supabase connection URL from backend\.env.production ---
 $envFile = Join-Path $root 'backend\.env.production'
 if (-not (Test-Path $envFile)) { throw "Cannot find $envFile" }
@@ -41,7 +46,9 @@ $code = $LASTEXITCODE
 
 if ($code -eq 0) {
     Write-Host 'Off-site backup to Supabase complete.'
+    Log "OK  restored $($dump.Name) (exit 0)"
 } else {
     # Warnings (e.g. "does not exist, skipping" on first run) are expected.
     Write-Warning "pg_restore finished with exit $code - review output above; warnings on DROP are normal on a first/empty target."
+    Log "DONE-WITH-WARNINGS  restored $($dump.Name) (exit $code)"
 }

@@ -174,6 +174,18 @@ const NAV: NavItem[] = [
       </svg>
     ),
   },
+  {
+    // Label reads "Agencies" for PASEI via the branch-term swap in AppShell.
+    href: "/agencies",
+    label: "Branches",
+    group: "Company",
+    permissions: ["employee.view"],
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M4 21V7l8-4 8 4v14M9 21v-6h6v6M9 9h.01M15 9h.01M12 12h.01" />
+      </svg>
+    ),
+  },
 
   // ── Administration Tools ─────────────────────────────────────────────────────
   {

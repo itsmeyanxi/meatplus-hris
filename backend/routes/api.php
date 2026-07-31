@@ -229,6 +229,7 @@ Route::prefix('v1')->group(function () {
         Route::post('leave-applications', [LeaveApplicationController::class, 'store']);
         Route::get('leave-applications/{leaveApplication}', [LeaveApplicationController::class, 'show']);
         Route::post('leave-applications/{leaveApplication}/approve', [LeaveApplicationController::class, 'approve']);
+        Route::post('leave-applications/{leaveApplication}/notify-supervisor', [LeaveApplicationController::class, 'notifySupervisor']);
         Route::post('leave-applications/{leaveApplication}/reject', [LeaveApplicationController::class, 'reject']);
         Route::post('leave-applications/{leaveApplication}/cancel', [LeaveApplicationController::class, 'cancel']);
         Route::get('leave-applications/{leaveApplication}/attachment', [LeaveApplicationController::class, 'attachment']);
@@ -237,7 +238,13 @@ Route::prefix('v1')->group(function () {
         Route::get('reports/full-export', [ReportController::class, 'fullExport']);
         Route::get('reports/dtr', [ReportController::class, 'dtr']);
         Route::get('reports/attendance-summary', [ReportController::class, 'attendanceSummary']);
+        Route::get('reports/agency-attendance', [ReportController::class, 'agencyAttendance']);
+        Route::get('reports/agency-attendance-data', [ReportController::class, 'agencyAttendanceData']);
+        Route::get('agencies', [\App\Http\Controllers\Api\V1\Agencies\AgencyController::class, 'index']);
+        Route::get('agencies/{branch}/today', [\App\Http\Controllers\Api\V1\Agencies\AgencyController::class, 'today']);
+        Route::post('agencies/{branch}/employees', [\App\Http\Controllers\Api\V1\Agencies\AgencyController::class, 'storeEmployee']);
         Route::get('reports/compensation', [ReportController::class, 'compensation']);
+        Route::get('reports/ytd', [ReportController::class, 'ytd']);
         Route::get('reports/thirteenth-month', [ReportController::class, 'thirteenthMonth']);
         Route::get('reports/remittance', [ReportController::class, 'remittance']);
         Route::get('reports/leave', [ReportController::class, 'leave']);
@@ -330,6 +337,14 @@ Route::prefix('v1')->group(function () {
             Route::post("$slug/{".$param.'}/approve', [$ctrl, 'approve']);
             Route::post("$slug/{".$param.'}/reject', [$ctrl, 'reject']);
             Route::post("$slug/{".$param.'}/cancel', [$ctrl, 'cancel']);
+            // COA (and any type that implements it) can nudge the direct supervisor.
+            if (method_exists($ctrl, 'notifySupervisor')) {
+                Route::post("$slug/{".$param.'}/notify-supervisor', [$ctrl, 'notifySupervisor']);
+            }
+            // Revert a decided request back to pending.
+            if (method_exists($ctrl, 'revert')) {
+                Route::post("$slug/{".$param.'}/revert', [$ctrl, 'revert']);
+            }
         }
     });
 });

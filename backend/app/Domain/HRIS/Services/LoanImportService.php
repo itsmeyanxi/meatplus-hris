@@ -124,6 +124,12 @@ class LoanImportService
     {
         $n = strtolower(trim($label));
         if ($n === '') return null;
+        // "Calamity" must win over the broader salary/MPL aliases (e.g. "Pag-IBIG
+        // Calamity" contains "pag-ibig", which would otherwise match pagibig_mpl).
+        if (str_contains($n, 'calamity')) {
+            if (str_contains($n, 'sss')) return 'sss_calamity';
+            if (str_contains($n, 'pag') || str_contains($n, 'hdmf')) return 'pagibig_calamity';
+        }
         foreach (self::TYPE_MAP as $code => $aliases) {
             foreach ($aliases as $a) {
                 if ($n === $a || str_contains($n, $a)) return $code;
