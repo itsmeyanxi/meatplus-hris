@@ -16,8 +16,9 @@ class CompanyScope implements Scope
 
         $user = auth()->user();
 
-        // The `admin` super-role sees EVERY company's data at once — no active-company
-        // limitation. This is the one deliberate hole in tenant isolation.
+        // The `super_admin` super-role sees EVERY company's data at once — no
+        // active-company limitation. This is the one deliberate hole in tenant
+        // isolation (super_admin > admin > it_admin).
         if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
             return;
         }

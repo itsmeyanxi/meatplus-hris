@@ -86,9 +86,11 @@ class User extends Authenticatable
 
     /**
      * True if the user is an IT Admin in ANY company. This is intentionally global
-     * and team-independent: it_admin is the top-level super-admin and bypasses both
-     * permission checks (Gate::before) and the company scope everywhere, regardless
-     * of which company is currently active.
+     * and team-independent: it_admin bypasses permission checks (Gate::before) so
+     * they can perform any action — but ONLY within their active company. Unlike
+     * super_admin, it_admin does NOT bypass the company scope; they still view one
+     * company at a time (see CompanyScope). super_admin is the top tier
+     * (super_admin > admin > it_admin).
      */
     public function isItAdmin(): bool
     {
