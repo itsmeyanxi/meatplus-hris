@@ -10,13 +10,13 @@ import {
   type CertificateOfAttendanceRequest,
 } from "@/lib/approvals";
 
-// ââ helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ── helpers ───────────────────────────────────────────────────────────────
 
 function fmt(iso: string) {
   return new Date(iso + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 }
 function to12h(t: string | null): string {
-  if (!t) return "â";
+  if (!t) return "—";
   const [h, m] = t.split(":").map(Number);
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
@@ -33,7 +33,7 @@ function blankForm(): CertificateOfAttendanceInput {
   return { work_date: "", claimed_time_in: "", claimed_time_out: "", reason: "" };
 }
 
-// ââ page ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ── page ──────────────────────────────────────────────────────────────────
 
 export default function CertificatesOfAttendancePage() {
   const qc = useQueryClient();
@@ -47,7 +47,7 @@ export default function CertificatesOfAttendancePage() {
   const employeeId = user?.employee?.id ?? null;
 
   const showQueue = isHR || isApprover;
-  const queueLabel = isHR ? "Pending approval â all employees" : "Pending approval â your department";
+  const queueLabel = isHR ? "Pending approval — all employees" : "Pending approval — your department";
 
   const { data: pendingRequests = [], isLoading: pendingLoading } = useQuery({
     queryKey: ["coa-requests", "pending", isHR ? "all" : "dept"],
@@ -86,7 +86,7 @@ export default function CertificatesOfAttendancePage() {
         <section className="space-y-3">
           <h3 className="text-sm font-semibold text-slate-700">{queueLabel}</h3>
           {pendingLoading ? (
-            <p className="text-sm text-slate-400">Loadingâ¦</p>
+            <p className="text-sm text-slate-400">Loading…</p>
           ) : pendingRequests.length === 0 ? (
             <div className="rounded-xl border border-slate-200 bg-white px-5 py-8 text-center text-sm text-slate-400">
               No pending certificate-of-attendance requests.
@@ -119,7 +119,7 @@ export default function CertificatesOfAttendancePage() {
   );
 }
 
-// ââ Stats bar âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ── Stats bar ─────────────────────────────────────────────────────────────
 
 function StatsBar({ employeeId, isHR, isApprover }: { employeeId: number | null; isHR: boolean; isApprover: boolean }) {
   const { data: all = [] } = useQuery({
@@ -152,7 +152,7 @@ function StatsBar({ employeeId, isHR, isApprover }: { employeeId: number | null;
   );
 }
 
-// ââ File COA form âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ── File COA form ─────────────────────────────────────────────────────────
 
 function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; canManage: boolean; meData: Me | undefined }) {
   const qc = useQueryClient();
@@ -210,9 +210,9 @@ function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; ca
                   />
                 </div>
               )}
-              <InfoRow label="Name" value={employee?.full_name ?? "â"} />
-              <InfoRow label="Position" value={employee?.position ?? "â"} />
-              <InfoRow label="Account / Department" value={employee?.department ?? "â"} />
+              <InfoRow label="Name" value={employee?.full_name ?? "—"} />
+              <InfoRow label="Position" value={employee?.position ?? "—"} />
+              <InfoRow label="Account / Department" value={employee?.department ?? "—"} />
               <InfoRow label="Date Filed" value={today} />
             </div>
 
@@ -252,7 +252,7 @@ function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; ca
           <div className="flex justify-end border-t border-slate-100 px-6 py-4">
             <button type="submit" disabled={create.isPending}
               className="rounded-lg bg-slate-900 px-8 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60">
-              {create.isPending ? "Submittingâ¦" : "Submit"}
+              {create.isPending ? "Submitting…" : "Submit"}
             </button>
           </div>
         </form>
@@ -270,7 +270,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-// ââ Approver row ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ── Approver row ──────────────────────────────────────────────────────────
 
 function ApproverRow({ request: r, onDone }: { request: CertificateOfAttendanceRequest; onDone: () => void }) {
   const [remarks, setRemarks] = useState("");
@@ -302,7 +302,7 @@ function ApproverRow({ request: r, onDone }: { request: CertificateOfAttendanceR
             <div className="flex items-center gap-2">
               <input
                 className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-400"
-                placeholder={acting === "reject" ? "Rejection reason (required)â¦" : "Remarks (optional)â¦"}
+                placeholder={acting === "reject" ? "Rejection reason (required)…" : "Remarks (optional)…"}
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
               />
@@ -311,7 +311,7 @@ function ApproverRow({ request: r, onDone }: { request: CertificateOfAttendanceR
                 onClick={() => acting === "approve" ? approve.mutate() : reject.mutate()}
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50 ${acting === "approve" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}
               >
-                {approve.isPending || reject.isPending ? "Savingâ¦" : acting === "approve" ? "Confirm approve" : "Confirm reject"}
+                {approve.isPending || reject.isPending ? "Saving…" : acting === "approve" ? "Confirm approve" : "Confirm reject"}
               </button>
               <button onClick={() => { setActing(null); setRemarks(""); }} className="text-xs text-slate-400 hover:text-slate-700">Cancel</button>
             </div>
@@ -322,7 +322,7 @@ function ApproverRow({ request: r, onDone }: { request: CertificateOfAttendanceR
   );
 }
 
-// ââ My history ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ── My history ────────────────────────────────────────────────────────────
 
 function MyHistory({ requests, isLoading }: { requests: CertificateOfAttendanceRequest[]; isLoading: boolean }) {
   const qc = useQueryClient();
@@ -331,7 +331,7 @@ function MyHistory({ requests, isLoading }: { requests: CertificateOfAttendanceR
     onSuccess: () => qc.invalidateQueries({ queryKey: ["coa-requests"] }),
   });
 
-  if (isLoading) return <p className="text-sm text-slate-400">Loadingâ¦</p>;
+  if (isLoading) return <p className="text-sm text-slate-400">Loading…</p>;
   if (requests.length === 0) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white px-5 py-10 text-center text-sm text-slate-400">
