@@ -751,15 +751,22 @@ function AttendanceLogPanel({ feed }: { feed: AttDay[] }) {
 function AttendanceSummaryCards({
   summary, monthLabel,
 }: { summary: PersonalProps["summary"]; monthLabel: string }) {
-  const otHrs = summary ? fmtHrs(summary.overtime_minutes) : null;
+  // Keep it simple: the four everyone cares about, plus OB / OT only when the
+  // employee actually has some — so a typical month shows a clean 4-card row.
+  const cards: { label: string; value: number | string | null; href: string; color: "emerald" | "amber" | "red" | "violet" | "sky" | "indigo" }[] = [
+    { label: `Present · ${monthLabel}`, value: summary?.present ?? null, href: "/my-attendance", color: "emerald" },
+    { label: "Late",   value: summary?.late   ?? null, href: "/my-attendance", color: "amber" },
+    { label: "Absent", value: summary?.absent ?? null, href: "/my-attendance", color: "red" },
+    { label: "Leave",  value: summary?.leave  ?? null, href: "/my-attendance", color: "violet" },
+  ];
+  if ((summary?.ob ?? 0) > 0) cards.push({ label: "OB", value: summary!.ob, href: "/official-businesses", color: "sky" });
+  if ((summary?.overtime_minutes ?? 0) > 0) cards.push({ label: "OT (hrs)", value: fmtHrs(summary!.overtime_minutes), href: "/overtimes", color: "indigo" });
+
   return (
-    <section className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-      <EmpStatCard label={`Present · ${monthLabel}`} value={summary?.present ?? null} href="/my-attendance" color="emerald" />
-      <EmpStatCard label="Late"   value={summary?.late   ?? null} href="/my-attendance" color="amber" />
-      <EmpStatCard label="Absent" value={summary?.absent ?? null} href="/my-attendance" color="red" />
-      <EmpStatCard label="Leave"  value={summary?.leave  ?? null} href="/my-attendance" color="violet" />
-      <EmpStatCard label="OB"     value={summary?.ob     ?? null} href="/official-businesses" color="sky" />
-      <EmpStatCard label="OT (hrs)" value={otHrs} href="/overtimes" color="indigo" />
+    <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {cards.map((c) => (
+        <EmpStatCard key={c.label} label={c.label} value={c.value} href={c.href} color={c.color} />
+      ))}
     </section>
   );
 }
