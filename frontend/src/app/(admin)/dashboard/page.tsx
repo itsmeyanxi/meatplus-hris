@@ -293,10 +293,10 @@ function AdminView({
     <>
       {/* Stats strip */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Total headcount"  value={adminStats?.headcount     ?? null} href="/employees?active=1" color="slate"   />
-        <StatCard label="No portal access" value={adminStats?.no_access      ?? null} href="/employees"         color="amber"   />
-        <StatCard label="Pending leaves"   value={adminStats?.pending_leaves ?? null} href="/leaves"            color="sky"     />
-        <StatCard label="Present today"    value={adminStats?.today_present  ?? null} href="/attendance/dtr"    color="emerald" />
+        <StatCard label="Total headcount"  value={adminStats?.headcount     ?? null} href="/employees?active=1" color="slate"   icon={<PeopleIcon />} />
+        <StatCard label="No portal access" value={adminStats?.no_access      ?? null} href="/employees"         color="amber"   icon={<ShieldIcon />} />
+        <StatCard label="Pending leaves"   value={adminStats?.pending_leaves ?? null} href="/leaves"            color="sky"     icon={<LeafIcon />} />
+        <StatCard label="Present today"    value={adminStats?.today_present  ?? null} href="/attendance/dtr"    color="emerald" icon={<ClockIcon />} />
       </section>
 
       {/* Approval queues */}
@@ -364,10 +364,10 @@ function HRView({ adminStats, perms, personal }: SharedProps & { personal: Perso
   return (
     <>
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Total headcount"  value={adminStats?.headcount     ?? null} href="/employees?active=1" color="slate"   />
-        <StatCard label="No portal access" value={adminStats?.no_access      ?? null} href="/employees"         color="amber"   />
-        <StatCard label="Pending leaves"   value={adminStats?.pending_leaves ?? null} href="/leaves"            color="sky"     />
-        <StatCard label="Present today"    value={adminStats?.today_present  ?? null} href="/attendance/dtr"    color="emerald" />
+        <StatCard label="Total headcount"  value={adminStats?.headcount     ?? null} href="/employees?active=1" color="slate"   icon={<PeopleIcon />} />
+        <StatCard label="No portal access" value={adminStats?.no_access      ?? null} href="/employees"         color="amber"   icon={<ShieldIcon />} />
+        <StatCard label="Pending leaves"   value={adminStats?.pending_leaves ?? null} href="/leaves"            color="sky"     icon={<LeafIcon />} />
+        <StatCard label="Present today"    value={adminStats?.today_present  ?? null} href="/attendance/dtr"    color="emerald" icon={<ClockIcon />} />
       </section>
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
@@ -432,10 +432,10 @@ function PayrollView({
   return (
     <>
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Total headcount" value={adminStats?.headcount    ?? null} href="/employees?active=1" color="slate"   />
-        <StatCard label="Present today"   value={adminStats?.today_present ?? null} href="/attendance/dtr"    color="emerald" />
-        <StatCard label="Pending leaves"  value={adminStats?.pending_leaves ?? null} href="/leaves"           color="sky"     />
-        <StatCard label="No portal access" value={adminStats?.no_access   ?? null} href="/employees"          color="amber"   />
+        <StatCard label="Total headcount" value={adminStats?.headcount    ?? null} href="/employees?active=1" color="slate"   icon={<PeopleIcon />} />
+        <StatCard label="Present today"   value={adminStats?.today_present ?? null} href="/attendance/dtr"    color="emerald" icon={<ClockIcon />} />
+        <StatCard label="Pending leaves"  value={adminStats?.pending_leaves ?? null} href="/leaves"           color="sky"     icon={<LeafIcon />} />
+        <StatCard label="No portal access" value={adminStats?.no_access   ?? null} href="/employees"          color="amber"   icon={<ShieldIcon />} />
       </section>
 
       <Panel>
@@ -518,10 +518,10 @@ function ManagerView({ adminStats, perms, personal }: SharedProps & { personal: 
 
       {/* Team stats */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Total headcount" value={adminStats?.headcount     ?? null} href="/employees?active=1" color="slate"   />
-        <StatCard label="Present today"   value={adminStats?.today_present  ?? null} href="/attendance/dtr"    color="emerald" />
-        <StatCard label="Pending leaves"  value={adminStats?.pending_leaves ?? null} href="/leaves"            color="sky"     />
-        <StatCard label="No portal access" value={adminStats?.no_access    ?? null} href="/employees"          color="amber"   />
+        <StatCard label="Total headcount" value={adminStats?.headcount     ?? null} href="/employees?active=1" color="slate"   icon={<PeopleIcon />} />
+        <StatCard label="Present today"   value={adminStats?.today_present  ?? null} href="/attendance/dtr"    color="emerald" icon={<ClockIcon />} />
+        <StatCard label="Pending leaves"  value={adminStats?.pending_leaves ?? null} href="/leaves"            color="sky"     icon={<LeafIcon />} />
+        <StatCard label="No portal access" value={adminStats?.no_access    ?? null} href="/employees"          color="amber"   icon={<ShieldIcon />} />
       </section>
 
       {/* Personal + manage */}
@@ -625,10 +625,10 @@ function DeptAdminView({ adminStats, perms, personal }: SharedProps & { personal
   return (
     <>
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Total headcount"  value={adminStats?.headcount     ?? null} href="/employees?active=1" color="slate"   />
-        <StatCard label="No portal access" value={adminStats?.no_access      ?? null} href="/employees"         color="amber"   />
-        <StatCard label="Present today"    value={adminStats?.today_present  ?? null} href="/attendance/dtr"    color="emerald" />
-        <StatCard label="Pending leaves"   value={adminStats?.pending_leaves ?? null} href="/leaves"            color="sky"     />
+        <StatCard label="Total headcount"  value={adminStats?.headcount     ?? null} href="/employees?active=1" color="slate"   icon={<PeopleIcon />} />
+        <StatCard label="No portal access" value={adminStats?.no_access      ?? null} href="/employees"         color="amber"   icon={<ShieldIcon />} />
+        <StatCard label="Present today"    value={adminStats?.today_present  ?? null} href="/attendance/dtr"    color="emerald" icon={<ClockIcon />} />
+        <StatCard label="Pending leaves"   value={adminStats?.pending_leaves ?? null} href="/leaves"            color="sky"     icon={<LeafIcon />} />
       </section>
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
@@ -915,13 +915,16 @@ const COLOR_MAP = {
   emerald: { card: "bg-emerald-50 border-emerald-200", num: "text-emerald-800", label: "text-emerald-600" },
 } as const;
 
-function StatCard({ label, value, href, color }: {
-  label: string; value: number | null; href: string; color: keyof typeof COLOR_MAP;
+function StatCard({ label, value, href, color, icon }: {
+  label: string; value: number | null; href: string; color: keyof typeof COLOR_MAP; icon?: React.ReactNode;
 }) {
   const c = COLOR_MAP[color];
   return (
     <Link href={href} className={`flex flex-col rounded-xl border p-4 transition hover:shadow-sm ${c.card}`}>
-      <span className={`text-xs font-medium uppercase tracking-wide ${c.label}`}>{label}</span>
+      <div className="flex items-start justify-between gap-2">
+        <span className={`text-xs font-medium uppercase tracking-wide ${c.label}`}>{label}</span>
+        {icon && <span className={`h-5 w-5 shrink-0 ${c.num} opacity-70`}>{icon}</span>}
+      </div>
       <span className={`mt-1.5 text-3xl font-bold tabular-nums ${c.num}`}>
         {value === null
           ? <span className="inline-block h-8 w-12 animate-pulse rounded bg-current opacity-20" />
