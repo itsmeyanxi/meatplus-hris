@@ -70,8 +70,18 @@ export function ImportDataButton({
             <p className="mt-1 text-sm text-slate-500">{description}</p>
             <p className="mt-2 text-xs text-slate-500">
               Columns: <span className="font-medium text-slate-700">{columns}</span>
-              {templateUrl && <> · <a href={templateUrl} className="font-medium text-teal-700 hover:underline">Download template</a></>}
             </p>
+            {templateUrl && (
+              <a
+                href={templateUrl}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5l5 5v9a2 2 0 01-2 2z" />
+                </svg>
+                Download template
+              </a>
+            )}
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <input
