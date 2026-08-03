@@ -66,7 +66,9 @@ export function AppShell({
   // --- "View as role" preview (IT Admin only) ---
   const realRoles = data?.user.roles ?? [];
   const isItAdmin = realRoles.includes("it_admin");
-  const isSuperAdmin = isItAdmin || realRoles.includes("admin");
+  // super_admin is the top tier — the only role that bypasses the company scope,
+  // so the cross-company "all companies" god-view is gated on it alone.
+  const isSuperAdmin = realRoles.includes("super_admin");
 
   const [previewRole, setPreviewRole] = useState<string | null>(() =>
     typeof window !== "undefined" ? localStorage.getItem("previewRole") : null,
@@ -107,8 +109,8 @@ export function AppShell({
 
   // Original company is the home company locked in on first switch — can never return there.
   const originalCompanyId = data?.user.original_company_id ?? null;
-  // An IT account is either currently it_admin or has previously switched away (has original_company_id).
-  const isItAccount = isItAdmin || originalCompanyId !== null;
+  // An IT account is either currently it_admin/super_admin or has previously switched away (has original_company_id).
+  const isItAccount = isItAdmin || isSuperAdmin || originalCompanyId !== null;
 
   const { data: companiesData } = useQuery({
     queryKey: ["companies-list"],
@@ -158,7 +160,7 @@ export function AppShell({
   };
 
   const isAllowed = (item: NavItem) => {
-    if (isItAdmin && !previewEntry) return true;
+    if ((isItAdmin || isSuperAdmin) && !previewEntry) return true;
     const roleOk = !item.roles || item.roles.some((r) => userRoles.includes(r));
     const permOk =
       !item.permissions ||
@@ -510,6 +512,14 @@ function ProfileMenu({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 16l2 2 4-4" />
                 </svg>
                 My Attendance
+              </Link>
+            )}
+            {hasEmployee && (
+              <Link href="/my-time-logs" className={rowCls} onClick={() => setOpen(false)}>
+                <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                My Time Logs
               </Link>
             )}
             <Link href="/account" className={rowCls} onClick={() => setOpen(false)}>

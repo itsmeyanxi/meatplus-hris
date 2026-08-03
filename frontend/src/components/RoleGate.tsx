@@ -18,8 +18,10 @@ export function RoleGate({ roles, children }: { roles: string[]; children: React
   }
 
   const userRoles = data?.user.roles ?? [];
-  // Super-admins (admin, it_admin) can access every gated page.
-  const isSuperAdmin = userRoles.includes("admin") || userRoles.includes("it_admin");
+  // Admin tiers (super_admin, admin, it_admin) can access every gated page.
+  // The backend still enforces the real per-company scoping.
+  const isSuperAdmin =
+    userRoles.includes("super_admin") || userRoles.includes("admin") || userRoles.includes("it_admin");
   const allowed = isSuperAdmin || roles.some((r) => userRoles.includes(r));
 
   if (!allowed) {

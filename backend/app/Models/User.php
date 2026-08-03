@@ -101,10 +101,11 @@ class User extends Authenticatable
     }
 
     /**
-     * The `admin` super-role: the single most powerful role. It bypasses BOTH the
+     * The `super_admin` super-role: the single most powerful role, sitting at the top
+     * of the admin hierarchy (super_admin > admin > it_admin). It bypasses BOTH the
      * ability checks (Gate::before) AND the company scope (CompanyScope), so it sees
      * every company's data at once with no active-company limitation — unlike
-     * it_admin, which can do anything but still views one company at a time.
+     * `admin` (company-level, one company) and it_admin (IT within one company).
      */
     public function isSuperAdmin(): bool
     {
@@ -112,7 +113,7 @@ class User extends Authenticatable
             ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
             ->where('model_has_roles.model_id', $this->id)
             ->where('model_has_roles.model_type', $this->getMorphClass())
-            ->where('roles.name', 'admin')
+            ->where('roles.name', 'super_admin')
             ->exists();
     }
 

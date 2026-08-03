@@ -43,11 +43,22 @@ class PermissionsSeeder extends Seeder
             Permission::findOrCreate($name, 'web');
         }
 
+        // Company-level admin: full HR / payroll / attendance / leave operations
+        // within their OWN company, but WITHOUT the group-wide powers — no company
+        // management, no role assignment, and no destructive employee deletes. Unlike
+        // super_admin they do NOT bypass the company scope (one company at a time).
+        $companyAdmin = array_values(array_diff($permissions, [
+            'company.manage', 'role.manage', 'employee.delete',
+        ]));
+
         $rolePermissions = [
-            // admin = the single most powerful role. Holds every permission AND
-            // bypasses the company scope (see User::isSuperAdmin / CompanyScope), so
-            // it sees every company's data at once with no limitation.
-            'admin' => $permissions,
+            // super_admin = the single most powerful role, top of the admin hierarchy.
+            // Holds every permission AND bypasses the company scope (see
+            // User::isSuperAdmin / CompanyScope), so it sees every company's data at
+            // once with no limitation.
+            'super_admin' => $permissions,
+            // admin = company-level administrator (see $companyAdmin above).
+            'admin' => $companyAdmin,
             'hr_admin' => [
                 'employee.view', 'employee.create', 'employee.update', 'employee.view.sensitive',
                 'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',
@@ -69,7 +80,9 @@ class PermissionsSeeder extends Seeder
                 'user.invite',
                 'access_request.view', 'access_request.approve.hr',
             ],
-            // IT is the top-level administrator: full access to every function of the system.
+            // it_admin = IT administrator within ONE company: full access to every
+            // function of the system, but scoped to their active company (does NOT
+            // bypass the company scope like super_admin does).
             'it_admin' => $permissions,
             // Regular IT employee: day-to-day tech support — manage biometric
             // devices, help users with their accounts (invite / reset / provision),
@@ -162,7 +175,8 @@ class PermissionsSeeder extends Seeder
         }
 
         // Retire legacy roles, migrating any holders into the surviving role.
-        $this->retireRole('super_admin', 'it_admin', $company?->id);
+        // NOTE: super_admin is now the live top-tier role (super_admin > admin >
+        // it_admin) and is intentionally NOT retired here.
         $this->retireRole('hr_manager', 'hr_admin', $company?->id);
     }
 
