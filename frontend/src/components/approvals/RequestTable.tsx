@@ -132,7 +132,7 @@ export function RequestTable<T extends BaseRow>({
                   onClick={() => handleStatusChange(s)}
                   className={
                     status === s
-                      ? "rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium capitalize text-white"
+                      ? "rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium capitalize text-white"
                       : "rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium capitalize hover:bg-slate-100"
                   }
                 >

@@ -54,9 +54,9 @@ function StatusChip({ status }: { status: RunStatus }) {
 
 function MiniStat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-xl border px-4 py-3 ${highlight ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white"}`}>
-      <div className={`text-[11px] font-medium uppercase tracking-wide ${highlight ? "text-slate-300" : "text-slate-500"}`}>{label}</div>
-      <div className="mt-0.5 text-lg font-bold tabular-nums">{value}</div>
+    <div className={`rounded-xl border px-4 py-3 ${highlight ? "border-brand-200 bg-brand-50" : "border-slate-200 bg-white"}`}>
+      <div className={`text-[11px] font-medium uppercase tracking-wide ${highlight ? "text-brand-600" : "text-slate-500"}`}>{label}</div>
+      <div className={`mt-0.5 text-lg font-bold tabular-nums ${highlight ? "text-brand-800" : "text-slate-900"}`}>{value}</div>
     </div>
   );
 }

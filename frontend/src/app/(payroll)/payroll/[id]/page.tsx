@@ -216,7 +216,7 @@ function StatusStepper({ status }: { status: RunStatus }) {
           <li key={st} className="flex items-center">
             <span
               className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
-                done ? "bg-emerald-500 text-white" : current ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-400"
+                done ? "bg-emerald-500 text-white" : current ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-400"
               }`}
             >
               {done ? "✓" : i + 1}
@@ -234,9 +234,9 @@ function StatusStepper({ status }: { status: RunStatus }) {
 
 function Summary({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-xl border p-4 ${highlight ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white"}`}>
-      <div className={`text-xs font-medium uppercase tracking-wide ${highlight ? "text-slate-300" : "text-slate-500"}`}>{label}</div>
-      <div className="mt-1 text-lg font-bold tabular-nums">{value}</div>
+    <div className={`rounded-xl border p-4 ${highlight ? "border-brand-200 bg-brand-50" : "border-slate-200 bg-white"}`}>
+      <div className={`text-xs font-medium uppercase tracking-wide ${highlight ? "text-brand-600" : "text-slate-500"}`}>{label}</div>
+      <div className={`mt-1 text-lg font-bold tabular-nums ${highlight ? "text-brand-800" : "text-slate-900"}`}>{value}</div>
     </div>
   );
 }

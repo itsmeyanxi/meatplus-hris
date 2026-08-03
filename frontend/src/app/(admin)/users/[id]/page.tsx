@@ -145,7 +145,7 @@ export default function UserDetailPage() {
             {(Object.entries(ROLE_LABELS) as [Role, string][]).map(([key, label]) => {
               const checked = (form.roles ?? user.roles).includes(key);
               return (
-                <label key={key} className={`flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition ${checked ? "bg-slate-900 text-white" : "bg-white text-slate-700 hover:bg-slate-100"} border border-slate-200`}>
+                <label key={key} className={`flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition ${checked ? "bg-brand-600 text-white border-brand-600" : "bg-white text-slate-700 hover:bg-slate-100 border-slate-200"} border`}>
                   <input
                     type="checkbox"
                     className="sr-only"

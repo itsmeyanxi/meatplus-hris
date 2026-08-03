@@ -276,7 +276,7 @@ export default function EmployeesPage() {
             onClick={() => setShowFilters((v) => !v)}
             className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium shadow-sm transition ${
               showFilters || advancedCount > 0
-                ? "border-slate-900 bg-slate-900 text-white"
+                ? "border-brand-600 bg-brand-600 text-white"
                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
             }`}
           >

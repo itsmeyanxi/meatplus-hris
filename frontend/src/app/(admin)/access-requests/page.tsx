@@ -253,7 +253,7 @@ export default function AccessRequestsPage() {
               onClick={() => { setStatusFilter(tab.value); setPage(1); }}
               className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
                 statusFilter === tab.value
-                  ? "bg-slate-900 text-white shadow-sm"
+                  ? "bg-brand-600 text-white shadow-sm"
                   : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
               }`}
             >

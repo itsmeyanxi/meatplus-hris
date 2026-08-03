@@ -182,7 +182,7 @@ export default function RequestAccessPage() {
             onClick={() => setActiveSection(s.letter)}
             className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
               activeSection === s.letter
-                ? "bg-slate-900 text-white shadow-sm"
+                ? "bg-brand-600 text-white shadow-sm"
                 : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
             }`}
           >

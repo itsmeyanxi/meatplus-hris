@@ -66,7 +66,7 @@ function ViewAsCard({ roles }: { roles: { name: string; permissions: string[] }[
           className={[
             "flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition",
             !isActive
-              ? "border-slate-900 bg-slate-900 text-white"
+              ? "border-brand-600 bg-brand-600 text-white"
               : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
           ].join(" ")}
         >

@@ -131,7 +131,7 @@ export function MyAttendanceRequests({
             }}
             className={
               type === t.key
-                ? "rounded-full bg-slate-900 px-3.5 py-1.5 text-xs font-medium text-white shadow-sm"
+                ? "rounded-full bg-brand-600 px-3.5 py-1.5 text-xs font-medium text-white shadow-sm"
                 : "rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
             }
           >

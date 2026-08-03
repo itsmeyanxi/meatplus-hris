@@ -315,7 +315,7 @@ export function AppShell({
                         title={isCollapsed ? navLabel(item.label) : undefined}
                         className={
                           active
-                            ? `flex items-center rounded-xl border border-slate-900 bg-slate-900 py-2 text-sm font-medium text-white shadow-sm transition-all ${
+                            ? `flex items-center rounded-xl border border-brand-600 bg-brand-600 py-2 text-sm font-medium text-white shadow-sm transition-all ${
                                 isCollapsed ? "justify-center px-0" : "px-2.5 gap-2.5"
                               }`
                             : `flex items-center rounded-xl py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 ${
@@ -331,7 +331,7 @@ export function AppShell({
                         </span>
                         {!isCollapsed && <span className="flex-1 truncate transition-opacity duration-200">{navLabel(item.label)}</span>}
                         {!isCollapsed && badgeFor(item) > 0 && (
-                          <span className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white text-slate-900" : "bg-rose-500 text-white"}`}>
+                          <span className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white text-brand-700" : "bg-rose-500 text-white"}`}>
                             {badgeFor(item) > 99 ? "99+" : badgeFor(item)}
                           </span>
                         )}
@@ -391,7 +391,7 @@ export function AppShell({
                     href={item.href}
                     className={
                       active
-                        ? "whitespace-nowrap rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm"
+                        ? "whitespace-nowrap rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm"
                         : "whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
                     }
                   >
