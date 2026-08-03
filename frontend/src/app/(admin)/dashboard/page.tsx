@@ -309,6 +309,21 @@ function AdminView({
         </div>
       </section>
 
+      {/* Quick access — one row of jump-links to every area (easy navigation) */}
+      <section>
+        <SectionHeading>Quick Access</SectionHeading>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <QuickTile href="/employees"       label="Employees"       icon={<PeopleIcon />} />
+          <QuickTile href="/attendance"      label="Attendance"      icon={<ClockIcon />} />
+          <QuickTile href="/attendance/dtr"  label="DTR Matrix"      icon={<CalendarIcon />} />
+          <QuickTile href="/leaves"          label="Leaves"          icon={<LeafIcon />} />
+          <QuickTile href="/payroll"         label="Payroll"         icon={<PayrollIcon />} />
+          <QuickTile href="/access-requests" label="Access Requests" icon={<ShieldIcon />} />
+          <QuickTile href="/users"           label="Users"           icon={<PeopleIcon />} />
+          <QuickTile href="/reports"         label="Reports"         icon={<ChartIcon />} />
+        </div>
+      </section>
+
       {/* Personal attendance (shown when admin account is linked to an employee record) */}
       {personal.hasEmployee && (
         <div className="grid items-start gap-4 lg:grid-cols-2">
@@ -317,55 +332,26 @@ function AdminView({
         </div>
       )}
 
-      {/* Payroll + Quick actions */}
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <Panel>
-          <CardHeader icon={<FolderIcon />} title="Quick Actions" />
-          <div className="grid grid-cols-2 gap-2">
-            <QuickLink href="/employees"       label="Employees" />
-            <QuickLink href="/attendance"      label="Attendance" />
-            <QuickLink href="/attendance/dtr"  label="DTR Matrix" />
-            <QuickLink href="/leaves"          label="Leaves" />
-            <QuickLink href="/payroll"         label="Payroll" />
-            <QuickLink href="/access-requests" label="Access Requests" />
-            <QuickLink href="/users"           label="Users" />
-            <QuickLink href="/reports"         label="Reports" />
-          </div>
-        </Panel>
-
-        <Panel>
-          <CardHeader icon={<PayrollIcon />} title="Recent Payroll Runs" action={
-            <Link href="/payroll" className="text-xs font-medium text-slate-500 transition hover:text-slate-800">View all →</Link>
-          } />
-          {payrollRuns.length === 0
-            ? <EmptyNote>No payroll runs yet. <Link href="/payroll" className="text-sky-600 hover:underline">Create one</Link></EmptyNote>
-            : <div className="divide-y divide-slate-100">
-                {payrollRuns.map((run) => (
-                  <Link key={run.id} href={`/payroll/${run.id}`}
-                    className="-mx-1 flex items-center justify-between rounded-lg px-1 py-2.5 transition hover:bg-slate-50">
-                    <div>
-                      <p className="text-sm font-medium text-slate-800">{run.name}</p>
-                      <p className="text-xs text-slate-500">{run.period_start} – {run.period_end}</p>
-                    </div>
-                    <RunStatusBadge status={run.status} />
-                  </Link>
-                ))}
-              </div>
-          }
-        </Panel>
-      </div>
-
-      {/* Manage links */}
+      {/* Recent payroll runs */}
       <Panel>
-        <CardHeader icon={<ChartIcon />} title="Manage" />
-        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-          <ManageLink href="/employees"       label="Employee directory"  sub="View and manage all employees" />
-          <ManageLink href="/attendance/dtr"  label="DTR matrix"          sub="Monthly attendance grid" />
-          <ManageLink href="/leaves"          label="Leave approvals"     sub="Pending leave requests" />
-          <ManageLink href="/payroll"         label="Payroll runs"        sub="Create and approve payroll" />
-          <ManageLink href="/access-requests" label="Access requests"     sub="System access approval queue" />
-          <ManageLink href="/users"           label="User management"     sub="Accounts and roles" />
-        </div>
+        <CardHeader icon={<PayrollIcon />} title="Recent Payroll Runs" action={
+          <Link href="/payroll" className="text-xs font-medium text-slate-500 transition hover:text-slate-800">View all →</Link>
+        } />
+        {payrollRuns.length === 0
+          ? <EmptyNote>No payroll runs yet. <Link href="/payroll" className="text-sky-600 hover:underline">Create one</Link></EmptyNote>
+          : <div className="divide-y divide-slate-100 sm:grid sm:grid-cols-2 sm:gap-x-6 sm:divide-y-0">
+              {payrollRuns.map((run) => (
+                <Link key={run.id} href={`/payroll/${run.id}`}
+                  className="-mx-1 flex items-center justify-between rounded-lg px-1 py-2.5 transition hover:bg-slate-50">
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{run.name}</p>
+                    <p className="text-xs text-slate-500">{run.period_start} – {run.period_end}</p>
+                  </div>
+                  <RunStatusBadge status={run.status} />
+                </Link>
+              ))}
+            </div>
+        }
       </Panel>
     </>
   );
@@ -780,6 +766,25 @@ function AttendanceSummaryCards({
 
 function PersonalPanel({ personal }: { personal: PersonalProps }) {
   const { balances, pendingCount } = personal;
+  const [showZeros, setShowZeros] = useState(false);
+
+  // Dedupe by leave-type name (super_admins see every company's identical types),
+  // keeping the highest balance, and surface the ones that actually have credits
+  // first — the long tail of 0-balance types is collapsed behind a toggle.
+  const credits = useMemo(() => {
+    const byName = new Map<string, number>();
+    for (const b of balances ?? []) {
+      byName.set(b.leave_type.name, Math.max(byName.get(b.leave_type.name) ?? 0, b.current_balance));
+    }
+    return [...byName.entries()]
+      .map(([name, balance]) => ({ name, balance }))
+      .sort((a, b) => b.balance - a.balance);
+  }, [balances]);
+
+  const withCredit = credits.filter((c) => c.balance > 0);
+  const zeroCount = credits.length - withCredit.length;
+  const shown = showZeros ? credits : withCredit;
+
   return (
     <Panel>
       <CardHeader
@@ -808,19 +813,32 @@ function PersonalPanel({ personal }: { personal: PersonalProps }) {
         </div>
         <div className="border-t border-slate-100 pt-3">
           <SectionLabel>Leave Credits</SectionLabel>
-          {!balances || balances.length === 0
+          {credits.length === 0
             ? <p className="text-sm text-slate-500">No leave credits on record.</p>
-            : <ul className="divide-y divide-slate-50">
-                {balances.map((b) => (
-                  <li key={b.id} className="flex items-center justify-between py-1.5 text-sm">
-                    <span className="text-slate-600">{b.leave_type.name}</span>
-                    <span className="min-w-[2.5rem] rounded-md bg-slate-50 px-2 py-0.5 text-center font-semibold tabular-nums text-slate-800">
-                      {b.current_balance}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+            : shown.length === 0
+              ? <p className="text-sm text-slate-500">No available leave credits.</p>
+              : <ul className="divide-y divide-slate-50">
+                  {shown.map((c) => (
+                    <li key={c.name} className="flex items-center justify-between py-1.5 text-sm">
+                      <span className="text-slate-600">{c.name}</span>
+                      <span className={`min-w-[2.5rem] rounded-md px-2 py-0.5 text-center font-semibold tabular-nums ${
+                        c.balance > 0 ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-400"
+                      }`}>
+                        {c.balance}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
           }
+          {zeroCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowZeros((v) => !v)}
+              className="mt-2 text-xs font-medium text-slate-500 transition hover:text-slate-800"
+            >
+              {showZeros ? "Hide" : `Show ${zeroCount} with no balance`}
+            </button>
+          )}
         </div>
       </div>
     </Panel>
@@ -975,6 +993,19 @@ function QuickLink({ href, label }: { href: string; label: string }) {
   return (
     <Link href={href}
       className="flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100">
+      {label}
+    </Link>
+  );
+}
+
+/** Icon + label jump-tile for the admin Quick Access bar. */
+function QuickTile({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
+  return (
+    <Link href={href}
+      className="group flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white transition group-hover:bg-slate-700">
+        <span className="h-4 w-4">{icon}</span>
+      </span>
       {label}
     </Link>
   );
