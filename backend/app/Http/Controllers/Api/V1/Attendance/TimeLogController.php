@@ -113,7 +113,7 @@ class TimeLogController extends Controller
      * Export the (filtered) punch log as CSV. Honours the same filters and the
      * company scope as index(); streamed in chunks so a large range stays memory-safe.
      */
-    public function export(Request $request, AttendanceEventResolver $eventResolver): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function export(Request $request, AttendanceEventResolver $eventResolver): \Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         $user = $request->user();
         abort_unless($user->can('attendance.view'), 403);
@@ -157,34 +157,23 @@ class TimeLogController extends Controller
             ? collect()
             : $eventResolver->resolve($from, $to, $employeeId, $dept ? (int) $dept : null);
 
-        return response()->streamDownload(function () use ($q, $events) {
-            $out = fopen('php://output', 'w');
-            fputcsv($out, [
-                'Logged At', 'Type', 'Employee No', 'Employee Name', 'Company',
-                'Direction', 'Source', 'Device', 'Location', 'Reason', 'Approved By', 'Approved At',
-            ]);
+        $headers = [
+            'Logged At', 'Type', 'Employee No', 'Employee Name', 'Company',
+            'Direction', 'Source', 'Device', 'Location', 'Reason', 'Approved By', 'Approved At',
+        ];
 
-            // lazy() chunks by primary key and keeps eager-loads, so 60k+ rows
-            // stream without exhausting memory.
+        // Generator so 60k+ punch rows stream into the workbook without exhausting memory.
+        $rows = (function () use ($q, $events) {
             foreach ($q->lazy(1000) as $l) {
                 $branch = ($l->relationLoaded('device') && $l->device && $l->device->branch)
                     ? $l->device->branch
                     : $l->employee?->branch;
-                fputcsv($out, [
-                    $l->logged_at?->format('Y-m-d h:i:s A'),
-                    'Punch',
-                    $l->employee?->employee_no,
-                    $l->employee?->full_name,
-                    $l->employee?->company?->code,
-                    $l->direction,
-                    $l->source,
-                    $l->device?->name ?? $l->device_id,
-                    $branch?->name,
-                    '', '', '',
-                ]);
+                yield [
+                    $l->logged_at?->format('Y-m-d h:i:s A'), 'Punch',
+                    $l->employee?->employee_no, $l->employee?->full_name, $l->employee?->company?->code,
+                    $l->direction, $l->source, $l->device?->name ?? $l->device_id, $branch?->name, '', '', '',
+                ];
             }
-
-            // Append OB / COA / OT events with their reason + approver + approval time.
             foreach ($events as $ev) {
                 $when = trim(($ev['date'] ?? '').' '.($ev['start_time'] ?? ''));
                 if (($ev['date_to'] ?? null) && $ev['date_to'] !== $ev['date']) {
@@ -197,24 +186,16 @@ class TimeLogController extends Controller
                     'ot' => $ev['hours'] !== null ? $ev['hours'].' hrs' : 'Overtime',
                     default => 'Off-site',
                 };
-                fputcsv($out, [
-                    $when,
-                    $ev['label'],
-                    $ev['employee_no'],
-                    $ev['employee_name'],
-                    $ev['company_code'],
-                    $direction,
-                    $ev['label'],
-                    '',
-                    $ev['detail'],
-                    $ev['reason'],
-                    $ev['approved_by'],
-                    $ev['approved_at'],
-                ]);
+                yield [
+                    $when, $ev['label'], $ev['employee_no'], $ev['employee_name'], $ev['company_code'],
+                    $direction, $ev['label'], '', $ev['detail'], $ev['reason'], $ev['approved_by'], $ev['approved_at'],
+                ];
             }
+        })();
 
-            fclose($out);
-        }, 'time-logs.csv', ['Content-Type' => 'text/csv']);
+        return \App\Support\XlsxReport::download('time-logs_'.now()->format('Ymd').'.xlsx', $headers, $rows, [
+            'title' => 'Time Logs',
+        ]);
     }
 
     /** Distinct device identifiers seen in the punch log (for the Device filter). */

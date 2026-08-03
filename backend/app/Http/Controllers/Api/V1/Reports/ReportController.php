@@ -15,6 +15,7 @@ use App\Domain\Payroll\Models\EmployeeCompensation;
 use App\Domain\Payroll\Models\Payslip;
 use App\Domain\Payroll\Services\StatutoryCalculator;
 use App\Http\Controllers\Controller;
+use App\Support\XlsxReport;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
@@ -28,7 +29,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class ReportController extends Controller
 {
     /** GET /api/v1/reports/dtr?date_from=&date_to=&employee_id=&department_id= */
-    public function dtr(Request $request): Response
+    public function dtr(Request $request): BinaryFileResponse
     {
         abort_unless($request->user()->can('attendance.view'), 403);
 
@@ -56,35 +57,34 @@ class ReportController extends Controller
             ->orderBy('employee_id')
             ->get();
 
-        $lines = [];
-        $lines[] = implode(',', [
+        $headers = [
             'Date', 'Employee No', 'Name', 'Department',
             'Time In', 'Time Out', 'Hours Worked',
             'Late (min)', 'Undertime (min)', 'OT (min)', 'Night Diff (min)',
             'Status',
-        ]);
-
+        ];
+        $data = [];
         foreach ($rows as $r) {
-            $lines[] = implode(',', [
+            $data[] = [
                 $r->work_date->toDateString(),
                 $r->employee?->employee_no ?? '',
-                $this->csv(($r->employee?->last_name ?? '') . ', ' . ($r->employee?->first_name ?? '')),
-                $this->csv($r->employee?->department?->name ?? ''),
+                ($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? ''),
+                $r->employee?->department?->name ?? '',
                 $r->actual_in?->format('H:i') ?? '',
                 $r->actual_out?->format('H:i') ?? '',
-                $r->hours_worked ?? '',
-                $r->late_minutes ?? 0,
-                $r->undertime_minutes ?? 0,
-                $r->overtime_minutes ?? 0,
-                $r->night_diff_minutes ?? 0,
+                $r->hours_worked !== null ? (float) $r->hours_worked : '',
+                (int) ($r->late_minutes ?? 0),
+                (int) ($r->undertime_minutes ?? 0),
+                (int) ($r->overtime_minutes ?? 0),
+                (int) ($r->night_diff_minutes ?? 0),
                 $r->dayStatus(),
-            ]);
+            ];
         }
 
-        return $this->csvResponse(
-            implode("\n", $lines),
-            "dtr_{$request->date_from}_to_{$request->date_to}.csv"
-        );
+        return XlsxReport::download("dtr_{$request->date_from}_to_{$request->date_to}.xlsx", $headers, $data, [
+            'title' => 'Daily Time Records',
+            'subtitle' => "Period {$request->date_from} to {$request->date_to} · generated ".now()->format('M d, Y g:i A'),
+        ]);
     }
 
     /**
@@ -92,7 +92,7 @@ class ReportController extends Controller
      * One row per employee for the period — the timekeeping totals (scheduled /
      * present / absent / leave days, late/UT/OT/night minutes, hours worked).
      */
-    public function attendanceSummary(Request $request): Response
+    public function attendanceSummary(Request $request): BinaryFileResponse
     {
         abort_unless($request->user()->can('attendance.view'), 403);
 
@@ -128,17 +128,18 @@ class ReportController extends Controller
             ->orderBy('last_name')->orderBy('first_name')
             ->get(['id', 'employee_no', 'first_name', 'last_name', 'department_id']);
 
-        $lines = [implode(',', [
+        $headers = [
             'Employee No', 'Name', 'Department',
             'Scheduled Days', 'Present', 'Absent', 'On Leave', 'Hours Worked',
             'Late (min)', 'Undertime (min)', 'OT (min)', 'Night Diff (min)',
-        ])];
+        ];
+        $data = [];
         foreach ($employees as $e) {
             $a = $agg->get($e->id);
-            $lines[] = implode(',', [
+            $data[] = [
                 $e->employee_no,
-                $this->csv($e->last_name.', '.$e->first_name),
-                $this->csv($e->department?->name ?? ''),
+                $e->last_name.', '.$e->first_name,
+                $e->department?->name ?? '',
                 (int) ($a->scheduled_days ?? 0),
                 (int) ($a->present_days ?? 0),
                 (int) ($a->absent_days ?? 0),
@@ -148,10 +149,13 @@ class ReportController extends Controller
                 (int) ($a->ut_minutes ?? 0),
                 (int) ($a->ot_minutes ?? 0),
                 (int) ($a->night_minutes ?? 0),
-            ]);
+            ];
         }
 
-        return $this->csvResponse(implode("\n", $lines), "attendance_summary_{$request->date_from}_to_{$request->date_to}.csv");
+        return XlsxReport::download("attendance_summary_{$request->date_from}_to_{$request->date_to}.xlsx", $headers, $data, [
+            'title' => 'Attendance Summary',
+            'subtitle' => "Period {$request->date_from} to {$request->date_to} · generated ".now()->format('M d, Y g:i A'),
+        ]);
     }
 
     /**
@@ -479,7 +483,7 @@ class ReportController extends Controller
     }
 
     /** GET /api/v1/reports/compensation — active salaries for the company. */
-    public function compensation(Request $request): Response
+    public function compensation(Request $request): BinaryFileResponse
     {
         abort_unless($request->user()->can('payroll.view'), 403);
 
@@ -490,19 +494,22 @@ class ReportController extends Controller
             ->whereHas('employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)))
             ->get();
 
-        $lines = [implode(',', ['Employee No', 'Name', 'Department', 'Pay Type', 'Basic Monthly', 'Daily Rate', 'Hourly Rate', 'Allowance', 'Effective From'])];
+        $headers = ['Employee No', 'Name', 'Department', 'Pay Type', 'Basic Monthly', 'Daily Rate', 'Hourly Rate', 'Allowance', 'Effective From'];
+        $data = [];
         foreach ($rows->sortBy(fn ($c) => $c->employee?->last_name) as $c) {
-            $lines[] = implode(',', [
+            $data[] = [
                 $c->employee?->employee_no ?? '',
-                $this->csv(($c->employee?->last_name ?? '').', '.($c->employee?->first_name ?? '')),
-                $this->csv($c->employee?->department?->name ?? ''),
+                ($c->employee?->last_name ?? '').', '.($c->employee?->first_name ?? ''),
+                $c->employee?->department?->name ?? '',
                 $c->pay_type,
-                $c->basic_monthly, $c->daily_rate, $c->hourly_rate, $c->allowance_monthly,
+                (float) $c->basic_monthly, (float) $c->daily_rate, (float) $c->hourly_rate, (float) $c->allowance_monthly,
                 $c->effective_from?->toDateString() ?? '',
-            ]);
+            ];
         }
 
-        return $this->csvResponse(implode("\n", $lines), 'compensation_'.now()->format('Ymd').'.csv');
+        return XlsxReport::download('compensation_'.now()->format('Ymd').'.xlsx', $headers, $data, [
+            'title' => 'Compensation Report',
+        ]);
     }
 
     /**
@@ -510,7 +517,7 @@ class ReportController extends Controller
      * 13th-month pay = total BASIC salary earned in the year ÷ 12 (per DOLE).
      * Basic is summed from the year's payslips (computed/approved/posted runs).
      */
-    public function thirteenthMonth(Request $request): Response
+    public function thirteenthMonth(Request $request): BinaryFileResponse
     {
         abort_unless($request->user()->can('payroll.view'), 403);
         $year = (int) ($request->query('year') ?: now()->year);
@@ -530,20 +537,22 @@ class ReportController extends Controller
                 count(distinct p.payroll_run_id) as cutoffs')
             ->get();
 
-        $lines = [implode(',', ['Employee No', 'Name', 'Department', 'Cutoffs Paid', "Total Basic {$year}", '13th Month Pay'])];
+        $headers = ['Employee No', 'Name', 'Department', 'Cutoffs Paid', "Total Basic {$year}", '13th Month Pay'];
+        $data = [];
         foreach ($rows as $r) {
-            $thirteenth = round(((float) $r->total_basic) / 12, 2);
-            $lines[] = implode(',', [
+            $data[] = [
                 $r->employee_no,
-                $this->csv($r->last_name.', '.$r->first_name),
-                $this->csv($r->dept ?? ''),
+                $r->last_name.', '.$r->first_name,
+                $r->dept ?? '',
                 (int) $r->cutoffs,
                 round((float) $r->total_basic, 2),
-                $thirteenth,
-            ]);
+                round(((float) $r->total_basic) / 12, 2),
+            ];
         }
 
-        return $this->csvResponse(implode("\n", $lines), "13th_month_{$year}.csv");
+        return XlsxReport::download("13th_month_{$year}.xlsx", $headers, $data, [
+            'title' => "13th Month Pay — {$year}",
+        ]);
     }
 
     /**
@@ -552,7 +561,7 @@ class ReportController extends Controller
      * employer-share (computed), per employee, with the government ID. type=tax is
      * the BIR 1601-C withholding summary (employee side only).
      */
-    public function remittance(Request $request): Response
+    public function remittance(Request $request): BinaryFileResponse
     {
         abort_unless($request->user()->can('payroll.view'), 403);
         $type = in_array($request->query('type'), ['sss', 'philhealth', 'pagibig', 'tax'], true) ? $request->query('type') : 'sss';
@@ -574,7 +583,7 @@ class ReportController extends Controller
             ->get()->keyBy('employee_id');
 
         if ($agg->isEmpty()) {
-            return $this->csvResponse('No payroll for this month.', "remittance_{$type}_{$year}_{$month}.csv");
+            return XlsxReport::download("remittance_{$type}_{$year}_{$month}.xlsx", ['Notice'], [['No payroll for this month.']]);
         }
 
         $ids = $agg->keys();
@@ -586,39 +595,46 @@ class ReportController extends Controller
         $govField = ['sss' => 'sss_no', 'philhealth' => 'philhealth_no', 'pagibig' => 'pagibig_no', 'tax' => 'tin'][$type];
         $govLabel = ['sss' => 'SSS No', 'philhealth' => 'PhilHealth No', 'pagibig' => 'Pag-IBIG No', 'tax' => 'TIN'][$type];
 
+        $period = date('F Y', mktime(0, 0, 0, $month, 1, $year));
+
         if ($type === 'tax') {
-            $lines = [implode(',', ['TIN', 'Employee No', 'Name', 'Tax Withheld'])];
+            $headers = ['TIN', 'Employee No', 'Name', 'Tax Withheld'];
+            $data = [];
             foreach ($employees as $e) {
-                $lines[] = implode(',', [
+                $data[] = [
                     $govs->get($e->id)?->tin ?? '',
                     $e->employee_no,
-                    $this->csv($e->last_name.', '.$e->first_name),
+                    $e->last_name.', '.$e->first_name,
                     round((float) ($agg->get($e->id)->ee ?? 0), 2),
-                ]);
+                ];
             }
-            $total = round($agg->sum('ee'), 2);
-            $lines[] = ',,TOTAL,'.$total;
+            $data[] = ['', '', 'TOTAL', round($agg->sum('ee'), 2)];
 
-            return $this->csvResponse(implode("\n", $lines), "bir_1601c_{$year}_{$month}.csv");
+            return XlsxReport::download("bir_1601c_{$year}_{$month}.xlsx", $headers, $data, [
+                'title' => "BIR 1601-C — Withholding Tax · {$period}",
+            ]);
         }
 
-        $lines = [implode(',', [$govLabel, 'Employee No', 'Name', 'Monthly Basic', 'Employee Share', 'Employer Share', 'Total'])];
+        $headers = [$govLabel, 'Employee No', 'Name', 'Monthly Basic', 'Employee Share', 'Employer Share', 'Total'];
+        $data = [];
         foreach ($employees as $e) {
             $monthly = $this->monthlyBasic($comps->get($e->id));
             $er = $calc->monthlyEmployerContributions($monthly)[$type] ?? 0;
             $ee = round((float) ($agg->get($e->id)->ee ?? 0), 2);
-            $lines[] = implode(',', [
+            $data[] = [
                 $govs->get($e->id)?->{$govField} ?? '',
                 $e->employee_no,
-                $this->csv($e->last_name.', '.$e->first_name),
+                $e->last_name.', '.$e->first_name,
                 round($monthly, 2),
                 $ee,
                 round((float) $er, 2),
                 round($ee + (float) $er, 2),
-            ]);
+            ];
         }
 
-        return $this->csvResponse(implode("\n", $lines), "remittance_{$type}_{$year}_{$month}.csv");
+        return XlsxReport::download("remittance_{$type}_{$year}_{$month}.xlsx", $headers, $data, [
+            'title' => strtoupper($type)." Remittance · {$period}",
+        ]);
     }
 
     /** Monthly-equivalent basic salary from a compensation record. */
@@ -635,7 +651,7 @@ class ReportController extends Controller
     }
 
     /** GET /api/v1/reports/leave?date_from=&date_to=&status= */
-    public function leave(Request $request): Response
+    public function leave(Request $request): BinaryFileResponse
     {
         abort_unless($request->user()->can('attendance.view'), 403);
 
@@ -654,31 +670,32 @@ class ReportController extends Controller
             ->orderBy('date_from', 'desc')
             ->get();
 
-        $lines = [];
-        $lines[] = implode(',', [
+        $headers = [
             'Employee No', 'Name', 'Leave Type',
             'Start Date', 'End Date', 'Days', 'Status', 'Remarks',
-        ]);
-
+        ];
+        $data = [];
         foreach ($rows as $r) {
-            $lines[] = implode(',', [
+            $data[] = [
                 $r->employee?->employee_no ?? '',
-                $this->csv(($r->employee?->last_name ?? '') . ', ' . ($r->employee?->first_name ?? '')),
-                $this->csv($r->leaveType?->name ?? ''),
+                ($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? ''),
+                $r->leaveType?->name ?? '',
                 $r->date_from?->toDateString() ?? '',
                 $r->date_to?->toDateString() ?? '',
-                $r->days_count ?? '',
+                $r->days_count !== null ? (float) $r->days_count : '',
                 $r->status,
-                $this->csv($r->decision_remarks ?? ''),
-            ]);
+                $r->decision_remarks ?? '',
+            ];
         }
 
         $suffix = $request->date_from ? "_{$request->date_from}_to_{$request->date_to}" : '';
 
-        return $this->csvResponse(implode("\n", $lines), "leave_report{$suffix}.csv");
+        return XlsxReport::download("leave_report{$suffix}.xlsx", $headers, $data, [
+            'title' => 'Leave Report',
+        ]);
     }
 
-    public function overtime(Request $request): Response
+    public function overtime(Request $request): BinaryFileResponse
     {
         abort_unless($request->user()->can('attendance.view'), 403);
 
@@ -696,33 +713,34 @@ class ReportController extends Controller
             ->orderBy('date', 'desc')
             ->get();
 
-        $lines = [];
-        $lines[] = implode(',', [
+        $headers = [
             'Employee No', 'Name', 'Date', 'Start', 'End',
             'Hours', 'Classification', 'Status', 'Reason',
-        ]);
-
+        ];
+        $data = [];
         foreach ($rows as $r) {
-            $lines[] = implode(',', [
+            $data[] = [
                 $r->employee?->employee_no ?? '',
-                $this->csv(($r->employee?->last_name ?? '') . ', ' . ($r->employee?->first_name ?? '')),
+                ($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? ''),
                 $r->date?->toDateString() ?? '',
                 $r->start_time,
                 $r->end_time,
-                $r->requested_hours ?? '',
-                $this->csv($r->classification ?? ''),
+                $r->requested_hours !== null ? (float) $r->requested_hours : '',
+                $r->classification ?? '',
                 $r->status,
-                $this->csv($r->reason ?? ''),
-            ]);
+                $r->reason ?? '',
+            ];
         }
 
         $suffix = $request->date_from ? "_{$request->date_from}_to_{$request->date_to}" : '';
 
-        return $this->csvResponse(implode("\n", $lines), "overtime_report{$suffix}.csv");
+        return XlsxReport::download("overtime_report{$suffix}.xlsx", $headers, $data, [
+            'title' => 'Overtime Report',
+        ]);
     }
 
     /** GET /api/v1/reports/payroll/{payrollRunId} */
-    public function payroll(Request $request, int $payrollRunId): Response
+    public function payroll(Request $request, int $payrollRunId): BinaryFileResponse
     {
         abort_unless($request->user()->can('payroll.view'), 403);
 
@@ -737,47 +755,49 @@ class ReportController extends Controller
 
         $run = $rows->first()->run;
 
-        $lines = [];
-        $lines[] = implode(',', [
+        $headers = [
             'Employee No', 'Name',
             'Days Worked', 'Days Absent', 'Late (min)', 'OT (min)',
             'Basic Pay', 'OT Pay', 'Night Diff', 'Holiday Pay', 'Rest Day Pay', 'Allowance', 'De Minimis', 'Gross Pay',
             'SSS', 'PhilHealth', 'Pag-IBIG', 'W/Tax',
             'Absence Deduction', 'Tardiness Deduction', 'Loans', 'Total Deductions',
             'Net Pay',
-        ]);
-
+        ];
+        $data = [];
         foreach ($rows as $r) {
-            $lines[] = implode(',', [
+            $data[] = [
                 $r->employee?->employee_no ?? '',
-                $this->csv(($r->employee?->last_name ?? '') . ', ' . ($r->employee?->first_name ?? '')),
-                $r->days_worked,
-                $r->days_absent,
-                $r->late_minutes,
-                $r->overtime_minutes,
-                $r->basic_pay,
-                $r->overtime_pay,
-                $r->night_diff_pay,
-                $r->holiday_pay,
-                $r->rest_day_pay,
-                $r->allowance,
-                $r->de_minimis,
-                $r->gross_pay,
-                $r->sss,
-                $r->philhealth,
-                $r->pagibig,
-                $r->withholding_tax,
-                $r->absences_deduction,
-                $r->tardiness_deduction,
-                $r->loans_deduction,
-                $r->total_deductions,
-                $r->net_pay,
-            ]);
+                ($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? ''),
+                (float) $r->days_worked,
+                (float) $r->days_absent,
+                (int) $r->late_minutes,
+                (int) $r->overtime_minutes,
+                (float) $r->basic_pay,
+                (float) $r->overtime_pay,
+                (float) $r->night_diff_pay,
+                (float) $r->holiday_pay,
+                (float) $r->rest_day_pay,
+                (float) $r->allowance,
+                (float) $r->de_minimis,
+                (float) $r->gross_pay,
+                (float) $r->sss,
+                (float) $r->philhealth,
+                (float) $r->pagibig,
+                (float) $r->withholding_tax,
+                (float) $r->absences_deduction,
+                (float) $r->tardiness_deduction,
+                (float) $r->loans_deduction,
+                (float) $r->total_deductions,
+                (float) $r->net_pay,
+            ];
         }
 
         $label = $run ? str_replace(' ', '_', $run->name) : $payrollRunId;
 
-        return $this->csvResponse(implode("\n", $lines), "payroll_{$label}.csv");
+        return XlsxReport::download("payroll_{$label}.xlsx", $headers, $data, [
+            'title' => 'Payroll Register'.($run ? ' — '.$run->name : ''),
+            'subtitle' => $run ? "Period {$run->period_start} to {$run->period_end}" : 'Generated '.now()->format('M d, Y g:i A'),
+        ]);
     }
 
     /**
@@ -926,21 +946,5 @@ class ReportController extends Controller
 
         return response()->download($zipPath, $filename, ['Content-Type' => 'application/zip'])
             ->deleteFileAfterSend(true);
-    }
-
-    private function csv(string $value): string
-    {
-        if (str_contains($value, ',') || str_contains($value, '"') || str_contains($value, "\n")) {
-            return '"' . str_replace('"', '""', $value) . '"';
-        }
-        return $value;
-    }
-
-    private function csvResponse(string $content, string $filename): Response
-    {
-        return response($content, 200, [
-            'Content-Type'        => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ]);
     }
 }

@@ -1,6 +1,6 @@
 import { api } from "./api";
 
-async function downloadCsv(url: string, params: Record<string, string | number | undefined>, filename: string) {
+async function downloadFile(url: string, params: Record<string, string | number | undefined>, filename: string) {
   const filtered = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== ""));
   const qs = new URLSearchParams(filtered as Record<string, string>).toString();
   const { data } = await api.get<Blob>(`${url}${qs ? "?" + qs : ""}`, { responseType: "blob" });
@@ -13,16 +13,16 @@ async function downloadCsv(url: string, params: Record<string, string | number |
 }
 
 export function downloadEmployeeRoster(params: { department_id?: number | "" } = {}) {
-  return downloadCsv("/api/v1/employees/export", { department_id: params.department_id || undefined }, "employee_roster.csv");
+  return downloadFile("/api/v1/employees/export", { department_id: params.department_id || undefined }, "employee_roster.xlsx");
 }
 
 export function downloadDtrReport(params: { date_from: string; date_to: string; employee_id?: number | ""; department_id?: number | "" }) {
-  return downloadCsv("/api/v1/reports/dtr", {
+  return downloadFile("/api/v1/reports/dtr", {
     date_from: params.date_from,
     date_to: params.date_to,
     employee_id: params.employee_id || undefined,
     department_id: params.department_id || undefined,
-  }, `dtr_${params.date_from}_to_${params.date_to}.csv`);
+  }, `dtr_${params.date_from}_to_${params.date_to}.xlsx`);
 }
 
 export function downloadLeaveReport(params: {
@@ -32,13 +32,13 @@ export function downloadLeaveReport(params: {
   employee_id?: number | "";
   department_id?: number | "";
 }) {
-  return downloadCsv("/api/v1/reports/leave", {
+  return downloadFile("/api/v1/reports/leave", {
     date_from: params.date_from || undefined,
     date_to: params.date_to || undefined,
     status: params.status || undefined,
     employee_id: params.employee_id || undefined,
     department_id: params.department_id || undefined,
-  }, "leave_report.csv");
+  }, "leave_report.xlsx");
 }
 
 export function downloadOvertimeReport(params: {
@@ -46,37 +46,37 @@ export function downloadOvertimeReport(params: {
   date_to?: string;
   status?: string;
 }) {
-  return downloadCsv("/api/v1/reports/overtime", {
+  return downloadFile("/api/v1/reports/overtime", {
     date_from: params.date_from || undefined,
     date_to: params.date_to || undefined,
     status: params.status || undefined,
-  }, "overtime_report.csv");
+  }, "overtime_report.xlsx");
 }
 
 export function downloadPayrollReport(payrollRunId: number, label: string) {
-  return downloadCsv(`/api/v1/reports/payroll/${payrollRunId}`, {}, `payroll_${label}.csv`);
+  return downloadFile(`/api/v1/reports/payroll/${payrollRunId}`, {}, `payroll_${label}.xlsx`);
 }
 
 export function downloadAttendanceSummary(params: { date_from: string; date_to: string; employee_id?: number | ""; department_id?: number | "" }) {
-  return downloadCsv("/api/v1/reports/attendance-summary", {
+  return downloadFile("/api/v1/reports/attendance-summary", {
     date_from: params.date_from,
     date_to: params.date_to,
     employee_id: params.employee_id || undefined,
     department_id: params.department_id || undefined,
-  }, `attendance_summary_${params.date_from}_to_${params.date_to}.csv`);
+  }, `attendance_summary_${params.date_from}_to_${params.date_to}.xlsx`);
 }
 
 export function downloadTimeLogsReport(params: { from?: string; to?: string; employee_id?: number | ""; department_id?: number | "" }) {
-  return downloadCsv("/api/v1/time-logs/export", {
+  return downloadFile("/api/v1/time-logs/export", {
     from: params.from || undefined,
     to: params.to || undefined,
     employee_id: params.employee_id || undefined,
     department_id: params.department_id || undefined,
-  }, "time_logs.csv");
+  }, "time_logs.xlsx");
 }
 
 export function downloadCompensationReport() {
-  return downloadCsv("/api/v1/reports/compensation", {}, "compensation.csv");
+  return downloadFile("/api/v1/reports/compensation", {}, "compensation.xlsx");
 }
 
 /**
@@ -112,11 +112,11 @@ export async function downloadAgencyAttendance(params: {
 }
 
 export function downloadLoansReport() {
-  return downloadCsv("/api/v1/payroll/loans/export", {}, "loans.csv");
+  return downloadFile("/api/v1/payroll/loans/export", {}, "loans.xlsx");
 }
 
 export function downloadThirteenthMonth(year: number) {
-  return downloadCsv("/api/v1/reports/thirteenth-month", { year }, `13th_month_${year}.csv`);
+  return downloadFile("/api/v1/reports/thirteenth-month", { year }, `13th_month_${year}.xlsx`);
 }
 
 /** Year-to-Date payroll workbook (in-system runs + prior carry-over), as XLSX. */
@@ -134,7 +134,7 @@ export async function downloadYtd(year: number) {
 
 export function downloadRemittance(type: "sss" | "philhealth" | "pagibig" | "tax", year: number, month: number) {
   const name = type === "tax" ? `bir_1601c_${year}_${month}` : `remittance_${type}_${year}_${month}`;
-  return downloadCsv("/api/v1/reports/remittance", { type, year, month }, `${name}.csv`);
+  return downloadFile("/api/v1/reports/remittance", { type, year, month }, `${name}.xlsx`);
 }
 
 /**

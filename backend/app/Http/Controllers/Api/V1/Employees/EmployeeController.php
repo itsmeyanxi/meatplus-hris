@@ -32,41 +32,29 @@ class EmployeeController extends Controller
     }
 
     /**
-     * Export the (filtered) employee list as a CSV. Columns are import-compatible
-     * so an export can be edited and re-imported.
+     * Export the (filtered) employee list as a styled Excel workbook. Columns are
+     * import-compatible so an export can be edited and re-imported.
      */
-    public function export(Request $request): StreamedResponse
+    public function export(Request $request): \Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         abort_unless($request->user()->can('employee.view'), 403);
 
         $rows = $this->filteredQuery($request)->orderBy('last_name')->orderBy('first_name')->get();
 
-        return response()->streamDownload(function () use ($rows) {
-            $out = fopen('php://output', 'w');
-            fputcsv($out, [
-                'Employee ID', 'Last Name', 'Middle Name', 'First Name', 'Gender', 'Civil Status',
-                'Department', 'Location', 'Email', 'Position', 'Employment Type', 'Date Hired', 'Birth Date', 'Status',
-            ]);
-            foreach ($rows as $e) {
-                fputcsv($out, [
-                    $e->employee_no,
-                    $e->last_name,
-                    $e->middle_name,
-                    $e->first_name,
-                    $e->gender,
-                    $e->civil_status,
-                    $e->department?->name,
-                    $e->branch?->name,
-                    $e->email_company,
-                    $e->position?->title,
-                    $e->employmentType?->name,
-                    $e->date_hired?->toDateString(),
-                    $e->birth_date?->toDateString(),
-                    $e->is_active ? 'Active' : 'Inactive',
-                ]);
-            }
-            fclose($out);
-        }, 'employees.csv', ['Content-Type' => 'text/csv']);
+        $headers = [
+            'Employee ID', 'Last Name', 'Middle Name', 'First Name', 'Gender', 'Civil Status',
+            'Department', 'Location', 'Email', 'Position', 'Employment Type', 'Date Hired', 'Birth Date', 'Status',
+        ];
+        $data = $rows->map(fn ($e) => [
+            $e->employee_no, $e->last_name, $e->middle_name, $e->first_name, $e->gender, $e->civil_status,
+            $e->department?->name, $e->branch?->name, $e->email_company, $e->position?->title,
+            $e->employmentType?->name, $e->date_hired?->toDateString(), $e->birth_date?->toDateString(),
+            $e->is_active ? 'Active' : 'Inactive',
+        ]);
+
+        return \App\Support\XlsxReport::download('employees_'.now()->format('Ymd').'.xlsx', $headers, $data, [
+            'title' => 'Employee Roster',
+        ]);
     }
 
     /** Build the employee listing query with all supported filters applied. */

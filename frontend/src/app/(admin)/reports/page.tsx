@@ -33,7 +33,7 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports" description="Download data exports as CSV files, or the full company dataset as a zipped Excel bundle." />
+      <PageHeader title="Reports" description="Download data exports as formatted Excel files, or the full company dataset as a zipped Excel bundle." />
 
       <SectionTitle>Attendance</SectionTitle>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -90,7 +90,7 @@ function SimpleDownloadCard({ title, description, fn }: { title: string; descrip
   return (
     <ReportCard title={title} description={description}>
       {error && <p className="text-xs text-red-600">{error}</p>}
-      <DownloadButton onClick={download} loading={loading}>Download CSV</DownloadButton>
+      <DownloadButton onClick={download} loading={loading}>Download Excel</DownloadButton>
     </ReportCard>
   );
 }
@@ -144,7 +144,7 @@ function RangeReportCard({
           <EmployeeSearchSelect value={employeeId} onChange={(id) => setEmployeeId(id === "" ? "" : Number(id))} placeholder="All employees" className={fieldCls} /></label>
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
-      <DownloadButton onClick={download} loading={loading}>Download CSV</DownloadButton>
+      <DownloadButton onClick={download} loading={loading}>Download Excel</DownloadButton>
     </ReportCard>
   );
 }
@@ -184,7 +184,7 @@ function ThirteenthMonthCard() {
         <input type="number" min={2020} max={2100} value={year} onChange={(e) => setYear(Number(e.target.value))} className={fieldCls} />
       </label>
       {error && <p className="text-xs text-red-600">{error}</p>}
-      <DownloadButton onClick={download} loading={loading}>Download CSV</DownloadButton>
+      <DownloadButton onClick={download} loading={loading}>Download Excel</DownloadButton>
     </ReportCard>
   );
 }
@@ -233,7 +233,7 @@ function RemittanceCard() {
             options={["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m, i) => ({ value: String(i + 1), label: m }))} /></label>
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
-      <DownloadButton onClick={download} loading={loading}>Download CSV</DownloadButton>
+      <DownloadButton onClick={download} loading={loading}>Download Excel</DownloadButton>
     </ReportCard>
   );
 }
@@ -378,7 +378,7 @@ function EmployeeRosterCard() {
         </label>
       </div>
       <DownloadButton onClick={download} loading={loading}>
-        Download CSV
+        Download Excel
       </DownloadButton>
     </ReportCard>
   );
@@ -468,7 +468,7 @@ function DtrReportCard() {
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
       <DownloadButton onClick={download} loading={loading}>
-        Download CSV
+        Download Excel
       </DownloadButton>
     </ReportCard>
   );
@@ -566,7 +566,7 @@ function LeaveReportCard() {
         </label>
       </div>
       <DownloadButton onClick={download} loading={loading}>
-        Download CSV
+        Download Excel
       </DownloadButton>
     </ReportCard>
   );
@@ -619,7 +619,7 @@ function OvertimeReportCard() {
         </label>
       </div>
       <DownloadButton onClick={download} loading={loading}>
-        Download CSV
+        Download Excel
       </DownloadButton>
     </ReportCard>
   );
@@ -664,7 +664,7 @@ function PayrollReportCard() {
       />
       {error && <p className="text-xs text-red-600">{error}</p>}
       <DownloadButton onClick={download} loading={loading}>
-        Download CSV
+        Download Excel
       </DownloadButton>
     </ReportCard>
   );
