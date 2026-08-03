@@ -163,6 +163,9 @@ export default function AgencyDetailPage() {
     qc.invalidateQueries({ queryKey: ["agencies"] });
   };
 
+  // Board filter — click a stat card to narrow the "today" table to that group.
+  const [boardFilter, setBoardFilter] = useState<"all" | "present" | "complete" | "no_out" | "no_punch">("all");
+
   const [dateFrom, setDateFrom] = useState(firstOfMonth());
   const [dateTo, setDateTo] = useState(today());
   const [workerId, setWorkerId] = useState<number | "">("");
@@ -226,6 +229,23 @@ export default function AgencyDetailPage() {
   const s = data?.summary;
   const rows = data?.employees ?? [];
 
+  // "Present" = anyone who has already punched in today (In & Out or No time-out).
+  const matchesFilter = (r: AgencyTodayRow): boolean => {
+    if (boardFilter === "all") return true;
+    if (boardFilter === "present") return r.status !== "no_punch";
+    return r.status === boardFilter;
+  };
+  const boardRows = rows.filter(matchesFilter);
+  // Clicking the active card again clears the filter.
+  const toggleFilter = (f: typeof boardFilter) => setBoardFilter((cur) => (cur === f ? "all" : f));
+  const FILTER_LABEL: Record<typeof boardFilter, string> = {
+    all: "all workers",
+    present: "present today",
+    complete: "in & out",
+    no_out: "no time-out",
+    no_punch: "not in yet",
+  };
+
   return (
     <div className="space-y-4">
       <Link href="/agencies" className="text-sm text-slate-500 hover:text-slate-900">← {term.Plural}</Link>
@@ -252,12 +272,12 @@ export default function AgencyDetailPage() {
         }
       />
 
-      {/* Today's attendance stats */}
+      {/* Today's attendance stats — click a card to filter the board below */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Present today" value={s?.present} tone="emerald" />
-        <Stat label="In & Out" value={s?.complete} tone="sky" />
-        <Stat label="No time-out" value={s?.no_out} tone="amber" />
-        <Stat label="Not in yet" value={s?.no_punch} tone="slate" />
+        <Stat label="Present today" value={s?.present} tone="emerald" active={boardFilter === "present"} onClick={() => toggleFilter("present")} />
+        <Stat label="In & Out" value={s?.complete} tone="sky" active={boardFilter === "complete"} onClick={() => toggleFilter("complete")} />
+        <Stat label="No time-out" value={s?.no_out} tone="amber" active={boardFilter === "no_out"} onClick={() => toggleFilter("no_out")} />
+        <Stat label="Not in yet" value={s?.no_punch} tone="slate" active={boardFilter === "no_punch"} onClick={() => toggleFilter("no_punch")} />
       </div>
 
       {/* Report generator */}
@@ -349,7 +369,15 @@ export default function AgencyDetailPage() {
       {/* Today's board */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-900">Today&rsquo;s time in / out{data?.date ? ` · ${data.date}` : ""}</h2>
+          <h2 className="text-base font-semibold text-slate-900">
+            Today&rsquo;s time in / out{data?.date ? ` · ${data.date}` : ""}
+            {boardFilter !== "all" && (
+              <span className="ml-2 text-sm font-normal text-slate-500">
+                — {boardRows.length} {FILTER_LABEL[boardFilter]}
+                <button onClick={() => setBoardFilter("all")} className="ml-2 text-xs font-medium text-teal-700 hover:underline">Show all</button>
+              </span>
+            )}
+          </h2>
           <span className="text-xs text-slate-400">auto-refreshes every minute</span>
         </div>
         <TableShell>
@@ -366,7 +394,10 @@ export default function AgencyDetailPage() {
             <tbody className="divide-y divide-slate-100">
               {isLoading && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>}
               {!isLoading && rows.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500">No workers in this {term.singular}.</td></tr>}
-              {rows.map((e) => (
+              {!isLoading && rows.length > 0 && boardRows.length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500">No workers {FILTER_LABEL[boardFilter]}.</td></tr>
+              )}
+              {boardRows.map((e) => (
                 <tr key={e.id} className="hover:bg-slate-50">
                   <td className="px-4 py-2.5"><span className="font-mono text-slate-900">{e.employee_no}</span></td>
                   <td className="px-4 py-2.5">
@@ -466,17 +497,23 @@ function AddWorkerModal({ branchId, agencyName, onClose, onDone }: { branchId: n
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value?: number; tone: "emerald" | "sky" | "amber" | "slate" }) {
+function Stat({ label, value, tone, active, onClick }: { label: string; value?: number; tone: "emerald" | "sky" | "amber" | "slate"; active?: boolean; onClick?: () => void }) {
   const tones = {
-    emerald: "bg-emerald-50 text-emerald-700",
-    sky: "bg-sky-50 text-sky-700",
-    amber: "bg-amber-50 text-amber-700",
-    slate: "bg-slate-100 text-slate-600",
+    emerald: { base: "bg-emerald-50 text-emerald-700", ring: "ring-emerald-500" },
+    sky: { base: "bg-sky-50 text-sky-700", ring: "ring-sky-500" },
+    amber: { base: "bg-amber-50 text-amber-700", ring: "ring-amber-500" },
+    slate: { base: "bg-slate-100 text-slate-600", ring: "ring-slate-400" },
   };
+  const t = tones[tone];
   return (
-    <div className={`rounded-2xl px-4 py-3 ${tones[tone]}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-2xl px-4 py-3 text-left transition ${t.base} hover:brightness-95 ${active ? `ring-2 ${t.ring} ring-offset-1` : ""}`}
+    >
       <div className="text-2xl font-bold tabular-nums">{value ?? "—"}</div>
-      <div className="text-xs font-medium">{label}</div>
-    </div>
+      <div className="text-xs font-medium">{label}{active && " ·  filtering"}</div>
+    </button>
   );
 }
