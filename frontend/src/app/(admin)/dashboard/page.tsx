@@ -108,6 +108,18 @@ export default function DashboardPage() {
     return { from: ymd(first), to: ymd(last) };
   }, [today]);
 
+  // Honour the it_admin "view as role" preview so the dashboard content matches
+  // the previewed role — e.g. previewing as an employee shows the employee
+  // dashboard (no org-wide admin stats), not the admin one.
+  const [previewRole, setPreviewRole] = useState<string | null>(() =>
+    typeof window !== "undefined" ? localStorage.getItem("previewRole") : null,
+  );
+  useEffect(() => {
+    const handler = (e: Event) => setPreviewRole((e as CustomEvent<string | null>).detail);
+    window.addEventListener("preview-role-change", handler);
+    return () => window.removeEventListener("preview-role-change", handler);
+  }, []);
+
   const { data: meData, isLoading: meLoading } = useQuery({
     queryKey: ["me"],
     queryFn: getMe,
@@ -119,7 +131,12 @@ export default function DashboardPage() {
   const hasEmployee = Boolean(user?.employee);
   const empId = user?.employee?.id;
 
-  const viewGroup = useMemo(() => getViewGroup(roles), [roles]);
+  // Previewing is an it_admin-only tool; only then does previewRole take effect.
+  const isItAdmin = roles.includes("it_admin");
+  const viewGroup = useMemo(
+    () => getViewGroup(isItAdmin && previewRole ? [previewRole] : roles),
+    [roles, previewRole, isItAdmin],
+  );
 
   const needsAdminStats = ["admin", "hr", "payroll", "manager", "dept_admin"].includes(viewGroup);
   const needsPayroll = ["admin", "payroll"].includes(viewGroup);
