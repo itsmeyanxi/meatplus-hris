@@ -33,12 +33,31 @@ function mdy(workDate: string): string {
   return `${m}/${d}/${y.slice(2)}`;
 }
 
+/** Minutes → a compact hours label, e.g. 90 → "1.5". */
+function fmtHrs(minutes: number): string {
+  const h = minutes / 60;
+  return Number.isInteger(h) ? String(h) : h.toFixed(1);
+}
+
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
 
-type PunchEvent = { id: string; date: string; dir: "IN" | "OUT"; ts: string; late?: boolean };
+/**
+ * One day in the attendance feed. Unlike a raw punch list, this reflects the
+ * whole day's status — so leave, OB, holiday, rest-day and OT days show up even
+ * when there's no clock in/out.
+ */
+type AttDayStatus = "present" | "late" | "leave" | "ob" | "holiday" | "rest_day" | "absent";
+type AttDay = {
+  date: string;
+  status: AttDayStatus;
+  actualIn: string | null;
+  actualOut: string | null;
+  otMinutes: number;
+  holidayName?: string | null;
+};
 
 // ── Role group resolver ────────────────────────────────────────────────────
 
@@ -65,8 +84,10 @@ interface SharedProps {
 }
 
 interface PersonalProps {
-  events: PunchEvent[];
-  summary: { present: number; late: number; absent: number; leave: number } | undefined;
+  feed: AttDay[];
+  summary:
+    | { present: number; late: number; absent: number; leave: number; ob: number; overtime_minutes: number }
+    | undefined;
   balances: { id: number; leave_type: { name: string }; current_balance: number }[] | undefined;
   pendingCount: number | undefined;
   monthLabel: string;
@@ -150,14 +171,32 @@ export default function DashboardPage() {
 
   const summary = attendance?.summary;
 
-  const events: PunchEvent[] = (logData?.data ?? [])
-    .flatMap((r) => {
-      const out: PunchEvent[] = [];
-      if (r.actual_out) out.push({ id: `${r.id}-out`, date: r.work_date, dir: "OUT", ts: r.actual_out });
-      if (r.actual_in)  out.push({ id: `${r.id}-in`,  date: r.work_date, dir: "IN",  ts: r.actual_in, late: r.late_minutes > 0 });
-      return out;
+  // Build a per-day feed so leave / OB / holiday / rest-day / OT are all reflected —
+  // not just days that happen to have a raw clock in/out punch.
+  const obDates = new Set(logData?.ob_dates ?? []);
+  const feed: AttDay[] = (logData?.data ?? [])
+    .map((r): AttDay | null => {
+      const hours = Number(r.hours_worked) || 0;
+      let status: AttDayStatus;
+      if (r.is_on_leave) status = "leave";
+      else if (obDates.has(r.work_date)) status = "ob";
+      else if (r.is_absent) status = "absent";
+      else if (r.holiday_type && hours === 0) status = "holiday";
+      else if (r.is_rest_day && hours === 0) status = "rest_day";
+      else if (r.late_minutes > 0) status = "late";
+      else if (hours > 0 || r.actual_in) status = "present";
+      else return null; // nothing happened this day — skip it
+      return {
+        date: r.work_date,
+        status,
+        actualIn: r.actual_in,
+        actualOut: r.actual_out,
+        otMinutes: r.overtime_minutes ?? 0,
+        holidayName: r.holiday_name,
+      };
     })
-    .sort((a, b) => b.ts.localeCompare(a.ts));
+    .filter((d): d is AttDay => d !== null)
+    .sort((a, b) => b.date.localeCompare(a.date));
 
   const recentRuns = (payrollRuns ?? []).slice().reverse().slice(0, 5);
 
@@ -176,7 +215,7 @@ export default function DashboardPage() {
   };
 
   const personalProps: PersonalProps = {
-    events,
+    feed,
     summary,
     balances: balances ?? [],
     pendingCount: pending?.pending_total,
@@ -271,7 +310,7 @@ function AdminView({
       {/* Personal attendance (shown when admin account is linked to an employee record) */}
       {personal.hasEmployee && (
         <div className="grid items-start gap-4 lg:grid-cols-2">
-          <AttendanceLogPanel events={personal.events} />
+          <AttendanceLogPanel feed={personal.feed} />
           <PersonalPanel personal={personal} />
         </div>
       )}
@@ -499,7 +538,7 @@ function ManagerView({ adminStats, perms, personal }: SharedProps & { personal: 
 
       {/* Personal + manage */}
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        {personal.hasEmployee ? <AttendanceLogPanel events={personal.events} /> : (
+        {personal.hasEmployee ? <AttendanceLogPanel feed={personal.feed} /> : (
           <Panel>
             <CardHeader icon={<FolderIcon />} title="Quick Actions" />
             <div className="grid grid-cols-2 gap-2">
@@ -563,7 +602,7 @@ function TimekeeperView({ personal }: { personal: PersonalProps }) {
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
         {personal.hasEmployee
-          ? <AttendanceLogPanel events={personal.events} />
+          ? <AttendanceLogPanel feed={personal.feed} />
           : <Panel>
               <CardHeader icon={<FolderIcon />} title="More Tools" />
               <div className="grid grid-cols-2 gap-2">
@@ -634,7 +673,7 @@ function DeptAdminView({ adminStats, perms, personal }: SharedProps & { personal
 // Personal-only — attendance stats, log, and leave credits.
 
 function EmployeeView({ personal }: { personal: PersonalProps }) {
-  const { events, summary, balances, pendingCount, monthLabel, hasEmployee } = personal;
+  const { feed, summary, monthLabel, hasEmployee } = personal;
 
   if (!hasEmployee) {
     return (
@@ -649,15 +688,11 @@ function EmployeeView({ personal }: { personal: PersonalProps }) {
 
   return (
     <>
-      {/* Personal stats */}
-      <section className="grid grid-cols-3 gap-3">
-        <EmpStatCard label={`Present · ${monthLabel}`} value={summary?.present ?? null} href="/my-attendance" color="emerald" />
-        <EmpStatCard label="Late"                       value={summary?.late    ?? null} href="/my-attendance" color="amber"   />
-        <EmpStatCard label="Absent"                     value={summary?.absent  ?? null} href="/my-attendance" color="red"     />
-      </section>
+      {/* Personal stats — the full picture for the month, not just present/late/absent */}
+      <AttendanceSummaryCards summary={summary} monthLabel={monthLabel} />
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        <AttendanceLogPanel events={events} />
+        <AttendanceLogPanel feed={feed} />
         <PersonalPanel personal={personal} />
       </div>
 
@@ -669,31 +704,50 @@ function EmployeeView({ personal }: { personal: PersonalProps }) {
 
 // ── Shared section components ──────────────────────────────────────────────
 
-function AttendanceLogPanel({ events }: { events: PunchEvent[] }) {
+const DAY_STATUS_META: Record<AttDayStatus, { label: string; cls: string }> = {
+  present:  { label: "Present",  cls: "bg-emerald-50 text-emerald-700" },
+  late:     { label: "Late",     cls: "bg-red-50 text-red-600" },
+  leave:    { label: "Leave",    cls: "bg-violet-50 text-violet-700" },
+  ob:       { label: "OB",       cls: "bg-sky-50 text-sky-700" },
+  holiday:  { label: "Holiday",  cls: "bg-amber-50 text-amber-700" },
+  rest_day: { label: "Rest day", cls: "bg-slate-100 text-slate-500" },
+  absent:   { label: "Absent",   cls: "bg-red-100 text-red-700" },
+};
+
+/** Day-status feed — reflects leave / OB / holiday / rest-day / OT, not just raw punches. */
+function AttendanceLogPanel({ feed }: { feed: AttDay[] }) {
   return (
     <Panel>
       <CardHeader icon={<CalendarIcon />} title="Attendance" />
-      {events.length === 0
-        ? <EmptyNote>No clock in/out records in the last 30 days.</EmptyNote>
+      {feed.length === 0
+        ? <EmptyNote>No attendance in the last 30 days.</EmptyNote>
         : <div className="-mx-1.5 max-h-72 space-y-0.5 overflow-y-auto px-1.5">
-            {events.map((e) => (
-              <div key={e.id}
-                className="grid grid-cols-3 items-center rounded-lg px-2.5 py-1.5 text-[13px] transition hover:bg-slate-50">
-                <span className="text-sm text-slate-500">{mdy(e.date)}</span>
-                <span className="justify-self-center">
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    e.dir === "IN"
-                      ? e.late ? "bg-red-50 text-red-600" : "bg-sky-50 text-sky-700"
-                      : "bg-orange-50 text-orange-600"
-                  }`}>
-                    {e.dir}
+            {feed.map((d) => {
+              const meta = DAY_STATUS_META[d.status];
+              const hasPunch = d.status === "present" || d.status === "late";
+              const timeText = hasPunch
+                ? `${d.actualIn ? to12h(d.actualIn) : "—"} – ${d.actualOut ? to12h(d.actualOut) : "—"}`
+                : d.status === "holiday" && d.holidayName
+                  ? d.holidayName
+                  : "";
+              return (
+                <div key={d.date}
+                  className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] transition hover:bg-slate-50">
+                  <span className="text-sm text-slate-500">{mdy(d.date)}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${meta.cls}`}>{meta.label}</span>
+                    {d.otMinutes > 0 && (
+                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
+                        +{fmtHrs(d.otMinutes)} OT
+                      </span>
+                    )}
                   </span>
-                </span>
-                <span className="justify-self-end font-mono text-sm font-medium tabular-nums text-slate-800">
-                  {to12h(e.ts)}
-                </span>
-              </div>
-            ))}
+                  <span className="justify-self-end font-mono text-sm font-medium tabular-nums text-slate-700">
+                    {timeText}
+                  </span>
+                </div>
+              );
+            })}
           </div>
       }
       <div className="mt-3 border-t border-slate-100 pt-3 text-center">
@@ -702,6 +756,23 @@ function AttendanceLogPanel({ events }: { events: PunchEvent[] }) {
         </Link>
       </div>
     </Panel>
+  );
+}
+
+/** Whole-month attendance breakdown: present / late / absent / leave / OB / OT. */
+function AttendanceSummaryCards({
+  summary, monthLabel,
+}: { summary: PersonalProps["summary"]; monthLabel: string }) {
+  const otHrs = summary ? fmtHrs(summary.overtime_minutes) : null;
+  return (
+    <section className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+      <EmpStatCard label={`Present · ${monthLabel}`} value={summary?.present ?? null} href="/my-attendance" color="emerald" />
+      <EmpStatCard label="Late"   value={summary?.late   ?? null} href="/my-attendance" color="amber" />
+      <EmpStatCard label="Absent" value={summary?.absent ?? null} href="/my-attendance" color="red" />
+      <EmpStatCard label="Leave"  value={summary?.leave  ?? null} href="/my-attendance" color="violet" />
+      <EmpStatCard label="OB"     value={summary?.ob     ?? null} href="/official-businesses" color="sky" />
+      <EmpStatCard label="OT (hrs)" value={otHrs} href="/overtimes" color="indigo" />
+    </section>
   );
 }
 
@@ -846,10 +917,12 @@ const EMP_COLOR_MAP = {
   amber:   { card: "bg-amber-50 border-amber-200",     num: "text-amber-800",   label: "text-amber-600" },
   red:     { card: "bg-red-50 border-red-200",         num: "text-red-800",     label: "text-red-500" },
   sky:     { card: "bg-sky-50 border-sky-200",         num: "text-sky-800",     label: "text-sky-600" },
+  violet:  { card: "bg-violet-50 border-violet-200",   num: "text-violet-800",  label: "text-violet-600" },
+  indigo:  { card: "bg-indigo-50 border-indigo-200",   num: "text-indigo-800",  label: "text-indigo-600" },
 } as const;
 
 function EmpStatCard({ label, value, href, color }: {
-  label: string; value: number | null; href: string; color: keyof typeof EMP_COLOR_MAP;
+  label: string; value: number | string | null; href: string; color: keyof typeof EMP_COLOR_MAP;
 }) {
   const c = EMP_COLOR_MAP[color];
   return (

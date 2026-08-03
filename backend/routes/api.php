@@ -185,6 +185,7 @@ Route::prefix('v1')->group(function () {
         Route::get('attendance-devices/{attendanceDevice}/users', [AttendanceDeviceController::class, 'users']);
 
         Route::get('time-logs', [TimeLogController::class, 'index']);
+        Route::get('my/time-logs', [TimeLogController::class, 'mine']); // self-service: own punches
         Route::get('time-logs/export', [TimeLogController::class, 'export']);
         Route::get('time-logs/devices', [TimeLogController::class, 'devices']);
         Route::post('time-logs', [TimeLogController::class, 'store']);

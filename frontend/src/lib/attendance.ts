@@ -130,6 +130,12 @@ export type AttendanceSummary = {
   leave: number;
   holiday: number;
   rest_day: number;
+  /** Days covered by an approved Official Business request. */
+  ob: number;
+  /** Total credited overtime for the range, in minutes. */
+  overtime_minutes: number;
+  /** Total undertime for the range, in minutes. */
+  undertime_minutes: number;
 };
 
 export type ScheduleAssignment = {
@@ -197,9 +203,11 @@ export const holidaysApi = {
 };
 
 export const timeLogsApi = {
-  list: async (params: { employee_id?: number; from?: string; to?: string; device_id?: string; company_id?: number; department_id?: number } = {}): Promise<TimeLog[]> => {
-    const { data } = await api.get<Listed<TimeLog>>("/api/v1/time-logs", { params });
-    return data.data;
+  list: async (
+    params: { employee_id?: number; from?: string; to?: string; device_id?: string; company_id?: number; department_id?: number } = {},
+  ): Promise<{ punches: TimeLog[]; events: AttendanceEvent[] }> => {
+    const { data } = await api.get<{ data: TimeLog[]; events?: AttendanceEvent[] }>("/api/v1/time-logs", { params });
+    return { punches: data.data ?? [], events: data.events ?? [] };
   },
   devices: async (): Promise<TimeLogDevice[]> => {
     const { data } = await api.get<{ data: TimeLogDevice[] }>("/api/v1/time-logs/devices");
@@ -227,12 +235,49 @@ export const myAttendanceApi = {
   list: async (
     from: string,
     to: string,
-  ): Promise<{ data: DailyTimeRecord[]; summary: AttendanceSummary }> => {
+  ): Promise<{ data: DailyTimeRecord[]; summary: AttendanceSummary; ob_dates: string[] }> => {
     const { data } = await api.get<{
       data: DailyTimeRecord[];
       summary: AttendanceSummary;
+      ob_dates?: string[];
     }>("/api/v1/my/daily-time-records", { params: { from, to } });
-    return data;
+    return { ...data, ob_dates: data.ob_dates ?? [] };
+  },
+};
+
+/**
+ * A non-punch attendance event surfaced alongside the raw punch log: approved
+ * Official Business (off-site, no punch), Certificate of Attendance (a certified
+ * missed punch), or Overtime (approved extra hours). Each is clearly labelled.
+ */
+export type AttendanceEvent = {
+  type: "ob" | "coa" | "ot";
+  label: string;
+  employee_id: number | null;
+  employee_no: string | null;
+  employee_name: string | null;
+  company_code: string | null;
+  company_name: string | null;
+  date: string | null;
+  date_to: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  hours: number | null;
+  missed_punch: "in" | "out" | "both" | null;
+  detail: string | null;
+  reason: string | null;
+  /** Name of the approver. */
+  approved_by: string | null;
+  /** Preformatted approval timestamp, ready to display. */
+  approved_at: string | null;
+};
+
+// Self-service: the logged-in user's own punch log (time in/out records), plus
+// approved OB / COA / OT events so those days aren't invisible on a raw log.
+export const myTimeLogsApi = {
+  list: async (params: { from?: string; to?: string } = {}): Promise<{ punches: TimeLog[]; events: AttendanceEvent[] }> => {
+    const { data } = await api.get<{ data: TimeLog[]; events: AttendanceEvent[] }>("/api/v1/my/time-logs", { params });
+    return { punches: data.data ?? [], events: data.events ?? [] };
   },
 };
 

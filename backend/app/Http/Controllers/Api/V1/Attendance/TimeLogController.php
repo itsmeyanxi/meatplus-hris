@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Attendance;
 
 use App\Domain\Attendance\Models\TimeLog;
+use App\Domain\Attendance\Services\AttendanceEventResolver;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendance\TimeLogRequest;
 use App\Http\Resources\Attendance\TimeLogResource;
@@ -12,7 +13,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class TimeLogController extends Controller
 {
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(Request $request, AttendanceEventResolver $eventResolver): JsonResponse
     {
         $user = $request->user();
         abort_unless($user->can('attendance.view'), 403);
@@ -24,75 +25,144 @@ class TimeLogController extends Controller
             ->with('employee.branch', 'employee.company', 'device.branch')
             ->orderByDesc('logged_at'); // newest punches first
 
+        $employeeId = null;
         // HR (attendance.view.any) sees everyone; everyone else is locked to their own logs.
         if ($user->can('attendance.view.any')) {
             if ($eid = $request->query('employee_id')) {
                 $q->where('employee_id', $eid);
+                $employeeId = (int) $eid;
             }
         } else {
             $employee = $user->employee;
             abort_unless($employee, 403, 'Your account is not linked to an employee record.');
             $q->where('employee_id', $employee->id);
+            $employeeId = $employee->id;
         }
 
-        if ($from = $request->query('from')) {
+        $from = $request->query('from');
+        $to = $request->query('to');
+        if ($from) {
             $q->where('logged_at', '>=', $from);
         }
-        if ($to = $request->query('to')) {
+        if ($to) {
             $q->where('logged_at', '<=', $to.' 23:59:59');
         }
-        if ($device = $request->query('device_id')) {
+        $device = $request->query('device_id');
+        if ($device) {
             $q->where('device_id', $device);
         }
         if ($cid = $request->query('company_id')) {
             $q->where('company_id', $cid);
         }
-        if ($dept = $request->query('department_id')) {
+        $dept = $request->query('department_id');
+        if ($dept) {
             $q->whereHas('employee', fn ($e) => $e->where('department_id', $dept));
         }
 
-        return TimeLogResource::collection($q->limit(500)->get());
+        // OB / COA / OT events for the same scope. These have no device, so we omit
+        // them when the caller is filtering to a specific terminal (punch-only intent).
+        $events = $device
+            ? []
+            : $eventResolver->resolve($from, $to, $employeeId, $dept ? (int) $dept : null);
+
+        return response()->json([
+            'data' => TimeLogResource::collection($q->limit(500)->get()),
+            'events' => $events,
+        ]);
+    }
+
+    /**
+     * Self-service: the authenticated user's own punch log for a date range.
+     * No attendance.view needed — scoped strictly to their linked employee record,
+     * mirroring my/daily-time-records. Powers the employee "My Time Logs" page.
+     *
+     * Also returns approved OB / COA / OT for the range as labelled events. Those
+     * aren't hardware punches (OB is off-site, COA is a certified missed punch, OT
+     * is approved extra hours), so a raw punch log would leave them invisible — we
+     * surface them explicitly alongside the punches.
+     */
+    public function mine(Request $request, AttendanceEventResolver $events): JsonResponse
+    {
+        $employee = $request->user()->employee;
+        abort_unless($employee, 403, 'Your account is not linked to an employee record.');
+
+        $from = $request->query('from');
+        $to = $request->query('to');
+
+        $q = TimeLog::query()
+            ->with('employee.branch', 'employee.company', 'device.branch')
+            ->where('employee_id', $employee->id)
+            ->orderByDesc('logged_at');
+
+        if ($from) {
+            $q->where('logged_at', '>=', $from);
+        }
+        if ($to) {
+            $q->where('logged_at', '<=', $to.' 23:59:59');
+        }
+
+        $logs = $q->limit(500)->get();
+
+        return response()->json([
+            'data' => TimeLogResource::collection($logs),
+            'events' => $events->resolve($from, $to, $employee->id),
+        ]);
     }
 
     /**
      * Export the (filtered) punch log as CSV. Honours the same filters and the
      * company scope as index(); streamed in chunks so a large range stays memory-safe.
      */
-    public function export(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function export(Request $request, AttendanceEventResolver $eventResolver): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $user = $request->user();
         abort_unless($user->can('attendance.view'), 403);
 
         $q = TimeLog::query()->with('employee.branch', 'employee.company', 'device.branch');
 
+        $employeeId = null;
         if ($user->can('attendance.view.any')) {
             if ($eid = $request->query('employee_id')) {
                 $q->where('employee_id', $eid);
+                $employeeId = (int) $eid;
             }
         } else {
             $employee = $user->employee;
             abort_unless($employee, 403, 'Your account is not linked to an employee record.');
             $q->where('employee_id', $employee->id);
+            $employeeId = $employee->id;
         }
-        if ($from = $request->query('from')) {
+        $from = $request->query('from');
+        $to = $request->query('to');
+        if ($from) {
             $q->where('logged_at', '>=', $from);
         }
-        if ($to = $request->query('to')) {
+        if ($to) {
             $q->where('logged_at', '<=', $to.' 23:59:59');
         }
-        if ($device = $request->query('device_id')) {
+        $device = $request->query('device_id');
+        if ($device) {
             $q->where('device_id', $device);
         }
         if ($cid = $request->query('company_id')) {
             $q->where('company_id', $cid);
         }
-        if ($dept = $request->query('department_id')) {
+        $dept = $request->query('department_id');
+        if ($dept) {
             $q->whereHas('employee', fn ($e) => $e->where('department_id', $dept));
         }
 
-        return response()->streamDownload(function () use ($q) {
+        // OB / COA / OT for the same scope (omitted when filtering to one terminal).
+        $events = $device
+            ? collect()
+            : $eventResolver->resolve($from, $to, $employeeId, $dept ? (int) $dept : null);
+
+        return response()->streamDownload(function () use ($q, $events) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Logged At', 'Employee No', 'Employee Name', 'Company', 'Direction', 'Source', 'Device', 'Location']);
+            fputcsv($out, [
+                'Logged At', 'Type', 'Employee No', 'Employee Name', 'Company',
+                'Direction', 'Source', 'Device', 'Location', 'Reason', 'Approved By', 'Approved At',
+            ]);
 
             // lazy() chunks by primary key and keeps eager-loads, so 60k+ rows
             // stream without exhausting memory.
@@ -102,6 +172,7 @@ class TimeLogController extends Controller
                     : $l->employee?->branch;
                 fputcsv($out, [
                     $l->logged_at?->format('Y-m-d h:i:s A'),
+                    'Punch',
                     $l->employee?->employee_no,
                     $l->employee?->full_name,
                     $l->employee?->company?->code,
@@ -109,8 +180,39 @@ class TimeLogController extends Controller
                     $l->source,
                     $l->device?->name ?? $l->device_id,
                     $branch?->name,
+                    '', '', '',
                 ]);
             }
+
+            // Append OB / COA / OT events with their reason + approver + approval time.
+            foreach ($events as $ev) {
+                $when = trim(($ev['date'] ?? '').' '.($ev['start_time'] ?? ''));
+                if (($ev['date_to'] ?? null) && $ev['date_to'] !== $ev['date']) {
+                    $when = $ev['date'].' – '.$ev['date_to'];
+                }
+                $direction = match ($ev['type']) {
+                    'coa' => match ($ev['missed_punch'] ?? null) {
+                        'both' => 'Missed In & Out', 'out' => 'Missed Out', 'in' => 'Missed In', default => 'Certified',
+                    },
+                    'ot' => $ev['hours'] !== null ? $ev['hours'].' hrs' : 'Overtime',
+                    default => 'Off-site',
+                };
+                fputcsv($out, [
+                    $when,
+                    $ev['label'],
+                    $ev['employee_no'],
+                    $ev['employee_name'],
+                    $ev['company_code'],
+                    $direction,
+                    $ev['label'],
+                    '',
+                    $ev['detail'],
+                    $ev['reason'],
+                    $ev['approved_by'],
+                    $ev['approved_at'],
+                ]);
+            }
+
             fclose($out);
         }, 'time-logs.csv', ['Content-Type' => 'text/csv']);
     }

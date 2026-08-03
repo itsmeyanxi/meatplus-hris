@@ -1,9 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { getMe } from "@/lib/auth";
-import { timeLogsApi, timeLogsExportUrl, type TimeLog, type TimeLogInput } from "@/lib/attendance";
+import { timeLogsApi, timeLogsExportUrl, type AttendanceEvent, type TimeLog, type TimeLogInput } from "@/lib/attendance";
+import { EVENT_BADGE, eventWhen, eventDirectionLabel } from "@/components/attendance/attendance-events";
 import { getLookup } from "@/lib/employees";
 import { PunchLocation } from "@/components/attendance/PunchLocation";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
@@ -53,7 +54,7 @@ export default function TimeLogsPage() {
   });
 
   const filterKey = ["time-logs", { employeeId, from, to, deviceId, companyId, departmentId }];
-  const { data: items = [] } = useQuery({
+  const { data: result = { punches: [], events: [] } } = useQuery({
     queryKey: filterKey,
     queryFn: () =>
       timeLogsApi.list({
@@ -65,6 +66,21 @@ export default function TimeLogsPage() {
         department_id: departmentId === "" ? undefined : Number(departmentId),
       }),
   });
+
+  // Merge raw punches with OB / COA / OT events into one date-sorted timeline so
+  // off-site work (OB), certified missed punches (COA) and overtime all show up.
+  type Row =
+    | { kind: "punch"; sortTs: string; log: TimeLog }
+    | { kind: "event"; sortTs: string; ev: AttendanceEvent };
+  const rows = useMemo<Row[]>(() => {
+    const punchRows: Row[] = result.punches.map((log) => ({ kind: "punch", sortTs: log.logged_at, log }));
+    const eventRows: Row[] = result.events.map((ev) => ({
+      kind: "event",
+      sortTs: `${ev.date ?? "0000-00-00"}T${ev.start_time ?? "23:59"}:00`,
+      ev,
+    }));
+    return [...punchRows, ...eventRows].sort((a, b) => b.sortTs.localeCompare(a.sortTs));
+  }, [result]);
 
   const [form, setForm] = useState<TimeLogInput>({
     employee_id: 0,
@@ -95,7 +111,7 @@ export default function TimeLogsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Time logs"
-        description="Append-only raw punches. Enter logs manually here; biometric/web/mobile sources populate automatically once integrated."
+        description="Raw punches plus labelled Official Business, Certificate of Attendance and Overtime — so off-site work and certified/approved time show up, not just biometric taps."
         actions={<AppButton variant="secondary" onClick={onExport}>Export CSV</AppButton>}
       />
 
@@ -170,46 +186,96 @@ export default function TimeLogsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-slate-600">
-              {["Logged at", "Employee", "Company", "Direction", "Source", "Location"].map((h) => (
+              {["Logged at", "Employee", "Company", "Direction", "Source", "Location / Reason", "Approval"].map((h) => (
                 <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {items.length === 0 && (
+            {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-16 text-center">
+                <td colSpan={7} className="px-4 py-16 text-center">
                   <p className="text-sm font-medium text-slate-700">No logs in this range</p>
                   <p className="mt-1 text-sm text-slate-500">Adjust the filter or add a manual log above.</p>
                 </td>
               </tr>
             )}
-            {items.map((l: TimeLog) => (
-              <tr key={l.id} className="border-t border-slate-100 transition hover:bg-slate-50/70">
-                <td className="px-4 py-3 text-xs tabular-nums text-slate-600">{fmtLoggedAt(l.logged_at)}</td>
-                <td className="px-4 py-3">
-                  <div className="font-medium text-slate-800">{l.employee_name ?? "—"}</div>
-                  <div className="text-xs text-slate-400">#{l.employee_no ?? l.employee_id}</div>
-                </td>
-                <td className="px-4 py-3">
-                  {l.company_code ? (
-                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600" title={l.company_name ?? undefined}>
-                      {l.company_code}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-slate-400">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 capitalize text-slate-700">{l.direction.replace("_", " ")}</td>
-                <td className="px-4 py-3 text-slate-500">
-                  {l.source}
-                  {(l.device_name || l.device_id) && (
-                    <span className="ml-1 text-xs text-slate-400">· {l.device_name ?? l.device_id}</span>
-                  )}
-                </td>
-                <td className="px-4 py-3"><PunchLocation lat={l.lat} lng={l.lng} geo={l.geo} siteLabel={l.site_location} siteLat={l.site_lat} siteLng={l.site_lng} /></td>
-              </tr>
-            ))}
+            {rows.map((row) =>
+              row.kind === "punch" ? (
+                (() => {
+                  const l = row.log;
+                  return (
+                    <tr key={`p-${l.id}`} className="border-t border-slate-100 transition hover:bg-slate-50/70">
+                      <td className="px-4 py-3 text-xs tabular-nums text-slate-600">{fmtLoggedAt(l.logged_at)}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-slate-800">{l.employee_name ?? "—"}</div>
+                        <div className="text-xs text-slate-400">#{l.employee_no ?? l.employee_id}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {l.company_code ? (
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600" title={l.company_name ?? undefined}>
+                            {l.company_code}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 capitalize text-slate-700">{l.direction.replace("_", " ")}</td>
+                      <td className="px-4 py-3 text-slate-500">
+                        {l.source}
+                        {(l.device_name || l.device_id) && (
+                          <span className="ml-1 text-xs text-slate-400">· {l.device_name ?? l.device_id}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3"><PunchLocation lat={l.lat} lng={l.lng} geo={l.geo} siteLabel={l.site_location} siteLat={l.site_lat} siteLng={l.site_lng} /></td>
+                      <td className="px-4 py-3 text-xs text-slate-400">—</td>
+                    </tr>
+                  );
+                })()
+              ) : (
+                (() => {
+                  const ev = row.ev;
+                  const badge = EVENT_BADGE[ev.type];
+                  return (
+                    <tr key={`e-${ev.type}-${ev.employee_id}-${ev.date}-${ev.start_time ?? ""}`} className="border-t border-slate-100 bg-slate-50/40 transition hover:bg-slate-50">
+                      <td className="px-4 py-3 text-xs tabular-nums text-slate-600">{eventWhen(ev)}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-slate-800">{ev.employee_name ?? "—"}</div>
+                        <div className="text-xs text-slate-400">#{ev.employee_no ?? ev.employee_id}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {ev.company_code ? (
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600" title={ev.company_name ?? undefined}>
+                            {ev.company_code}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">{eventDirectionLabel(ev)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${badge.cls}`}>{badge.label}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-600">
+                        {ev.detail && <div>{ev.detail}</div>}
+                        {ev.reason && <div className="text-xs text-slate-400">{ev.reason}</div>}
+                        {!ev.detail && !ev.reason && <span className="text-slate-400">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        {ev.approved_by ? (
+                          <>
+                            <div className="font-medium text-slate-600">{ev.approved_by}</div>
+                            {ev.approved_at && <div className="text-slate-400">{ev.approved_at}</div>}
+                          </>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })()
+              ),
+            )}
           </tbody>
         </table>
       </TableShell>

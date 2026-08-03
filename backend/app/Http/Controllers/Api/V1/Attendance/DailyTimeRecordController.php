@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Attendance;
 
 use App\Domain\Attendance\Models\DailyTimeRecord;
 use App\Domain\Attendance\Models\Holiday;
+use App\Domain\Attendance\Models\OfficialBusinessRequest;
 use App\Domain\Attendance\Services\DtrComputer;
 use App\Domain\HRIS\Models\Employee;
 use App\Http\Controllers\Controller;
@@ -95,7 +96,33 @@ class DailyTimeRecordController extends Controller
             ->get()
             ->keyBy(fn (Holiday $h) => $h->holiday_date->toDateString());
 
-        $summary = ['present' => 0, 'late' => 0, 'absent' => 0, 'leave' => 0, 'holiday' => 0, 'rest_day' => 0];
+        // Approved Official Business overlapping the range. OB certifies presence, so
+        // in the DTR an OB day looks like a plain "present" row — it carries no OB flag
+        // of its own. We resolve the covered dates here so the UI can label them and
+        // the summary can count them distinctly (they still count as present too).
+        $obDates = [];
+        $obRequests = OfficialBusinessRequest::query()
+            ->where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->get();
+        foreach ($obRequests as $ob) {
+            $start = $ob->date;
+            $end = $ob->date_to ?? $ob->date;
+            if (! $start) {
+                continue;
+            }
+            for ($d = $start->copy(); $d->lte($end); $d->addDay()) {
+                $ds = $d->toDateString();
+                if ((! $from || $ds >= $from) && (! $to || $ds <= $to)) {
+                    $obDates[$ds] = true;
+                }
+            }
+        }
+
+        $summary = [
+            'present' => 0, 'late' => 0, 'absent' => 0, 'leave' => 0, 'holiday' => 0, 'rest_day' => 0,
+            'ob' => 0, 'overtime_minutes' => 0, 'undertime_minutes' => 0,
+        ];
         foreach ($records as $r) {
             if ($r->holiday_type) {
                 $r->holiday_name = $holidays->get($r->work_date->toDateString())?->name;
@@ -104,11 +131,15 @@ class DailyTimeRecordController extends Controller
             if (array_key_exists($status, $summary)) {
                 $summary[$status]++;
             }
+            $summary['overtime_minutes'] += (int) $r->overtime_minutes;
+            $summary['undertime_minutes'] += (int) $r->undertime_minutes;
         }
+        $summary['ob'] = count($obDates);
 
         return response()->json([
             'data' => DailyTimeRecordResource::collection($records),
             'summary' => $summary,
+            'ob_dates' => array_keys($obDates),
         ]);
     }
 
