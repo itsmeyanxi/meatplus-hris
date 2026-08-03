@@ -285,8 +285,9 @@ export default function DashboardPage() {
       {/* ── Web time clock (anyone linked to an employee record) ── */}
       {hasEmployee && <TimeClockCard />}
 
-      {/* ── Quick access: requests awaiting my approval (hidden when none) ── */}
-      <ApprovalQuickCard />
+      {/* ── Quick access: requests awaiting my approval (approvers only; hidden
+             for the employee view since employees don't approve anything) ── */}
+      {viewGroup !== "employee" && <ApprovalQuickCard />}
 
       {/* ── Role-specific views ── */}
       {viewGroup === "admin"      && <AdminView      {...sharedProps} payrollRuns={recentRuns} personal={personalProps} />}
