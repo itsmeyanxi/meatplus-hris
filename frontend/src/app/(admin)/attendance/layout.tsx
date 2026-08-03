@@ -28,7 +28,7 @@ export default function AttendanceLayout({ children }: { children: ReactNode }) 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const perms = me?.user.permissions ?? [];
   const roles = me?.user.roles ?? [];
-  const isSuperAdmin = roles.includes("it_admin") || roles.includes("admin");
+  const isSuperAdmin = roles.includes("super_admin") || roles.includes("admin") || roles.includes("it_admin");
 
   const visible = TABS.filter((t) => {
     if (isSuperAdmin) return true;

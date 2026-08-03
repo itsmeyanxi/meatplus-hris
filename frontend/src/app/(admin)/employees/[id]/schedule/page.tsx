@@ -70,7 +70,7 @@ export default function EmployeeSchedulePage() {
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const perms = me?.user.permissions ?? [];
-  const canManage = (me?.user.roles?.includes("it_admin") ?? false) || (me?.user.roles?.includes("admin") ?? false) || perms.includes("attendance.manage");
+  const canManage = (me?.user.roles?.includes("super_admin") ?? false) || (me?.user.roles?.includes("it_admin") ?? false) || (me?.user.roles?.includes("admin") ?? false) || perms.includes("attendance.manage");
 
   const { data: assignments = [], isLoading } = useQuery({
     queryKey: ["employee-schedule", employeeId],

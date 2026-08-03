@@ -64,7 +64,9 @@ type AttDay = {
 type ViewGroup = "admin" | "hr" | "payroll" | "manager" | "timekeeper" | "dept_admin" | "employee";
 
 function getViewGroup(roles: string[]): ViewGroup {
-  if (roles.includes("admin") || roles.includes("it_admin")) return "admin";
+  // super_admin (top tier) and company-level admin both get the full admin dashboard,
+  // as does it_admin. super_admin > admin > it_admin.
+  if (roles.includes("super_admin") || roles.includes("admin") || roles.includes("it_admin")) return "admin";
   if (roles.some((r) => ["hr_admin", "hr_officer", "hr_coordinator"].includes(r))) return "hr";
   if (roles.includes("payroll_officer")) return "payroll";
   if (roles.some((r) => ["dept_head", "supervisor", "team_lead", "garahe_teamlead"].includes(r))) return "manager";
