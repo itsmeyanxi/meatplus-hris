@@ -120,7 +120,7 @@ export function CommandPalette() {
                 onClick={() => go(it.href)}
                 className={`flex w-full items-center gap-3 px-4 py-2 text-left ${i === active ? "bg-slate-100" : ""}`}
               >
-                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-semibold ${it.type === "employee" ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-500"}`}>
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-semibold ${it.type === "employee" ? "bg-brand-50 text-brand-700" : "bg-slate-100 text-slate-500"}`}>
                   {it.type === "employee" ? "👤" : "→"}
                 </span>
                 <span className="min-w-0">

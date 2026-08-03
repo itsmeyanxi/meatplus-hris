@@ -150,7 +150,7 @@ export default function AccessRequestsPage() {
         <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
           You don&apos;t have permission to view access requests.
         </p>
-        <Link href="/dashboard" className="mt-6 inline-flex rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800">
+        <Link href="/dashboard" className="mt-6 inline-flex rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700">
           Back to dashboard
         </Link>
       </AppCard>

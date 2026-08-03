@@ -64,16 +64,16 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 export function AppButton({ variant = "primary", className = "", ...props }: ButtonProps) {
   const variantClass =
     variant === "primary"
-      ? "border border-slate-900 bg-slate-900 text-white hover:bg-slate-800"
+      ? "border border-brand-600 bg-brand-600 text-white hover:bg-brand-700"
       : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50";
 
   return (
     <button
       {...props}
-      className={`rounded-xl px-3.5 py-2.5 text-sm font-medium shadow-sm transition 
+      className={`rounded-xl px-3.5 py-2.5 text-sm font-medium shadow-sm transition
         /* Minimum mobile touch-target alignment & focus handling */
-        disabled:cursor-not-allowed disabled:opacity-50 
-        outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2
+        disabled:cursor-not-allowed disabled:opacity-50
+        outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2
         ${variantClass} ${className}`}
     />
   );

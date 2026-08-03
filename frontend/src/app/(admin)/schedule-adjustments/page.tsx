@@ -26,7 +26,7 @@ function to12h(t: string | null): string {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
-const inputCls = "w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100";
+const inputCls = "w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
 
 type Tab = "pending" | "approved" | "rejected";
 
@@ -86,7 +86,7 @@ export default function ScheduleAdjustmentsPage() {
             className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50 ${
               showForm
                 ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                : "bg-slate-900 text-white hover:bg-slate-800"
+                : "bg-brand-600 text-white hover:bg-brand-700"
             }`}
           >
             {showForm ? (
@@ -125,7 +125,7 @@ export default function ScheduleAdjustmentsPage() {
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-500">Filter by employee:</span>
           <EmployeeSearchSelect
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-teal-500 min-w-[200px]"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-brand-500 min-w-[200px]"
             value={viewEmpId ?? ""}
             onChange={(id) => setViewEmpId(id === "" ? null : Number(id))}
             placeholder="All employees"
@@ -282,7 +282,7 @@ function RequestRow({
           <td colSpan={isHR ? 7 : 6} className="px-5 pb-3 pt-1">
             <div className="flex items-center gap-2">
               <input
-                className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-teal-500"
+                className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-brand-500"
                 placeholder={acting === "reject" ? "Rejection reason (required)…" : "Remarks (optional)…"}
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
@@ -387,11 +387,11 @@ function ApplicationForm({
           <div className="grid grid-cols-3 gap-6 text-sm">
             <div>
               <p className="text-xs font-semibold text-slate-500 mb-0.5">Schedule Type</p>
-              <p className="text-teal-700 font-medium">{currentSched?.name ?? "—"}</p>
+              <p className="text-brand-700 font-medium">{currentSched?.name ?? "—"}</p>
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-500 mb-0.5">Schedule Code</p>
-              <p className="text-teal-700 font-medium">{currentSched?.code ?? "—"}</p>
+              <p className="text-brand-700 font-medium">{currentSched?.code ?? "—"}</p>
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-500 mb-0.5">Effective Since</p>
@@ -451,7 +451,7 @@ function ApplicationForm({
           <button
             type="submit"
             disabled={create.isPending}
-            className="rounded-lg bg-teal-600 px-6 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
+            className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
           >
             {create.isPending ? "Submitting…" : "Proceed"}
           </button>

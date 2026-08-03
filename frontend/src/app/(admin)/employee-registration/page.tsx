@@ -1060,7 +1060,7 @@ export default function EmployeeRegistrationPage() {
                         <button
                           type="button"
                           onClick={() => setActive(SECTIONS[idx + 1].key)}
-                          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
                         >
                           Next section →
                         </button>
@@ -1113,7 +1113,7 @@ export default function EmployeeRegistrationPage() {
               <button
                 type="submit"
                 disabled={register.isPending || !requiredDone}
-                className="flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
               >
                 {register.isPending ? (
                   <>
@@ -1161,7 +1161,7 @@ function BasicSection({ form, photoPreview, photoError, onPickPhoto }: {
           )}
         </div>
 
-        <label className="mt-2 flex cursor-pointer items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800">
+        <label className="mt-2 flex cursor-pointer items-center justify-center rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-brand-700">
           {photoPreview ? "Change photo" : "Choose photo"}
           <input
             type="file"
@@ -2256,7 +2256,7 @@ function EducationSection({ rows, onAdd, onRemove, onChange }: {
       <button
         type="button"
         onClick={onAdd}
-        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+        className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
       >
         Add Educational Background
       </button>
@@ -2342,7 +2342,7 @@ function PerformanceSection({ rows, onAdd, onRemove, onChange }: {
       <button
         type="button"
         onClick={onAdd}
-        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+        className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
       >
         Add Performance Goal
       </button>
@@ -2417,7 +2417,7 @@ function AddButton({ onClick, children }: { onClick: () => void; children: React
     <button
       type="button"
       onClick={onClick}
-      className="mb-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+      className="mb-3 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
     >
       {children}
     </button>
@@ -2599,7 +2599,7 @@ function ContactSection({
         <button
           type="button"
           onClick={onAdd}
-          className="mb-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+          className="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
         >
           Add New Emergency Contact
         </button>
@@ -2748,7 +2748,7 @@ function SuccessScreen({ result, onAnother }: { result: RegistrationResult; onAn
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Link href={`/employees/${result.employeeId}`} className="flex flex-1 items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+        <Link href={`/employees/${result.employeeId}`} className="flex flex-1 items-center justify-center rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700">
           View Profile
         </Link>
         <button onClick={onAnother} className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">

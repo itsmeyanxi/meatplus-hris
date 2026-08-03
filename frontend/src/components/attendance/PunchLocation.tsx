@@ -36,7 +36,7 @@ export function PunchLocation({
           href={`https://www.google.com/maps?q=${siteLat},${siteLng}`}
           target="_blank"
           rel="noopener noreferrer"
-          className={`inline-flex items-center text-xs font-medium text-slate-600 hover:text-teal-700 hover:underline ${className}`}
+          className={`inline-flex items-center text-xs font-medium text-slate-600 hover:text-brand-700 hover:underline ${className}`}
           title={`${siteLabel} — open site location in Google Maps`}
         >
           {inner}
@@ -58,7 +58,7 @@ export function PunchLocation({
         href={maps}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-0.5 text-xs font-medium text-slate-600 hover:text-teal-700 hover:underline"
+        className="inline-flex items-center gap-0.5 text-xs font-medium text-slate-600 hover:text-brand-700 hover:underline"
         title={`${lat.toFixed(5)}, ${lng.toFixed(5)} — open in Google Maps`}
       >
         📍 Map

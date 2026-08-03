@@ -82,7 +82,7 @@ export function useConfirm() {
             type="button"
             onClick={() => close(true)}
             className={`rounded-xl px-3.5 py-2 text-sm font-medium text-white transition ${
-              opts.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"
+              opts.danger ? "bg-red-600 hover:bg-red-700" : "bg-brand-600 hover:bg-brand-700"
             }`}
           >
             {opts.confirmLabel ?? "Confirm"}

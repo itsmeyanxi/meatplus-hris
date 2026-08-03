@@ -217,7 +217,7 @@ export default function EmployeesPage() {
               Export
             </button>
             <Link href="/employee-registration"
-              className="inline-flex items-center rounded-xl border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800">
+              className="inline-flex items-center rounded-xl border border-slate-900 bg-brand-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700">
               + New employee
             </Link>
           </div>
@@ -473,7 +473,7 @@ export default function EmployeesPage() {
             <button
               onClick={() => { setBulkResult(null); bulkInvite.mutate(); }}
               disabled={bulkInvite.isPending}
-              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+              className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
             >
               {bulkInvite.isPending ? "Sending…" : "Send invitations"}
             </button>
@@ -565,7 +565,7 @@ export default function EmployeesPage() {
             {/* Footer actions */}
             <div className="flex gap-2 border-t border-slate-100 p-4">
               <Link href={`/employees/${previewEmployee.id}`}
-                className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-900 bg-slate-900 px-3 py-2 text-center text-sm font-medium text-white shadow-sm transition hover:bg-slate-800">
+                className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-900 bg-brand-600 px-3 py-2 text-center text-sm font-medium text-white shadow-sm transition hover:bg-brand-700">
                 View Full Profile
               </Link>
               <AppButton variant="secondary" onClick={() => router.push(`/employees/${previewEmployee.id}/edit`)}

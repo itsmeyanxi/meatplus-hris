@@ -282,7 +282,7 @@ export default function DtrMatrixPage() {
               <button
                 onClick={() => compute.mutate()}
                 disabled={compute.isPending || visible.length === 0}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-50"
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-50"
                 title="Recompute DTR for all employees in the current view"
               >
                 {compute.isPending ? "Computing…" : "Compute all"}
@@ -326,7 +326,7 @@ export default function DtrMatrixPage() {
             <button
               onClick={() => { setCpDone(false); computeOne.mutate(); }}
               disabled={computeOne.isPending || !cpEmpId || !cpFrom || !cpTo}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-50"
+              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-50"
             >
               {computeOne.isPending ? "Computing…" : "Compute"}
             </button>

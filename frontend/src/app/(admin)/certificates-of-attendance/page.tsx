@@ -185,7 +185,7 @@ function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; ca
           <p className="text-sm font-semibold text-slate-800">File certificate of attendance</p>
           <p className="text-xs text-slate-500">Use this when a punch was missed and you need to certify your actual time.</p>
         </div>
-        <button onClick={() => setOpen((v) => !v)} className="rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+        <button onClick={() => setOpen((v) => !v)} className="rounded-lg bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-brand-700">
           {open ? "Cancel" : "+ File COA"}
         </button>
       </div>
@@ -251,7 +251,7 @@ function FileCOAForm({ employeeId, canManage, meData }: { employeeId: number; ca
 
           <div className="flex justify-end border-t border-slate-100 px-6 py-4">
             <button type="submit" disabled={create.isPending}
-              className="rounded-lg bg-slate-900 px-8 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60">
+              className="rounded-lg bg-brand-600 px-8 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">
               {create.isPending ? "Submitting…" : "Submit"}
             </button>
           </div>

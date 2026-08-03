@@ -12,7 +12,7 @@ import { COASection } from "@/components/coa/COASection";
 // ── Permission category metadata ──────────────────────────────────────────
 
 const PERM_CATEGORIES: Record<string, { label: string; cls: string }> = {
-  leave:          { label: "Leave",          cls: "bg-teal-50 text-teal-700 border-teal-200" },
+  leave:          { label: "Leave",          cls: "bg-brand-50 text-brand-700 border-brand-200" },
   attendance:     { label: "Attendance",     cls: "bg-blue-50 text-blue-700 border-blue-200" },
   payroll:        { label: "Payroll",        cls: "bg-violet-50 text-violet-700 border-violet-200" },
   compensation:   { label: "Compensation",   cls: "bg-purple-50 text-purple-700 border-purple-200" },

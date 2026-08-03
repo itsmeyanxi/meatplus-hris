@@ -359,7 +359,7 @@ function SchedulesPageInner() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search schedules by name or code…"
-            className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-teal-500"
+            className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-500"
           />
         </div>
       )}
@@ -403,7 +403,7 @@ function SchedulesPageInner() {
                       const d = s.days?.find((x) => x.day_of_week === dow);
                       const rest = !d || d.is_rest_day;
                       return (
-                        <div key={dow} className={`rounded-lg border p-1.5 text-center ${rest ? "border-slate-100 bg-slate-50" : "border-teal-100 bg-teal-50/60"}`}>
+                        <div key={dow} className={`rounded-lg border p-1.5 text-center ${rest ? "border-slate-100 bg-slate-50" : "border-brand-100 bg-brand-50/60"}`}>
                           <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{DAY_NAMES[dow]}</div>
                           {rest ? (
                             <div className="mt-1 text-[10px] font-medium text-slate-400">Rest</div>
@@ -411,7 +411,7 @@ function SchedulesPageInner() {
                             <>
                               <div className="mt-1 text-[11px] font-semibold tabular-nums text-slate-700">{d!.time_in?.slice(0, 5)}</div>
                               <div className="text-[10px] tabular-nums text-slate-400">{d!.time_out?.slice(0, 5)}</div>
-                              <div className="mt-0.5 text-[10px] font-medium text-teal-600">{Number(d!.required_hours)}h</div>
+                              <div className="mt-0.5 text-[10px] font-medium text-brand-600">{Number(d!.required_hours)}h</div>
                             </>
                           )}
                         </div>

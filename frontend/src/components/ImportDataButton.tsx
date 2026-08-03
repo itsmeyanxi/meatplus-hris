@@ -112,14 +112,14 @@ export function ImportDataButton({
 
             <div className="mt-5 flex justify-end gap-2">
               {result ? (
-                <button onClick={close} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">Done</button>
+                <button onClick={close} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">Done</button>
               ) : (
                 <>
                   <button onClick={close} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
                   <button
                     onClick={() => upload.mutate()}
                     disabled={!file || upload.isPending}
-                    className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                    className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
                   >
                     {upload.isPending ? "Importing…" : "Import"}
                   </button>

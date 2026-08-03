@@ -90,7 +90,7 @@ export function EmployeeSearchSelect({
       <button
         type="button"
         onClick={() => (open ? setOpen(false) : openList())}
-        className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm outline-none focus:border-teal-500"
+        className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm outline-none focus:border-brand-500"
       >
         <span className={value === "" ? "text-slate-400" : "text-slate-800"}>
           {value === "" ? placeholder : selectedLabel || `#${value}`}
@@ -113,7 +113,7 @@ export function EmployeeSearchSelect({
               value={term}
               onChange={(e) => setTerm(e.target.value)}
               placeholder="Search name or ID…"
-              className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-teal-500"
+              className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-brand-500"
             />
           </div>
           <ul className="max-h-64 overflow-y-auto py-1 text-sm">
@@ -133,7 +133,7 @@ export function EmployeeSearchSelect({
                 <button
                   type="button"
                   onClick={() => pick(e)}
-                  className={`flex w-full flex-col px-3 py-1.5 text-left hover:bg-slate-50 ${e.id === value ? "bg-teal-50" : ""}`}
+                  className={`flex w-full flex-col px-3 py-1.5 text-left hover:bg-slate-50 ${e.id === value ? "bg-brand-50" : ""}`}
                 >
                   <span className="font-medium text-slate-800">{e.full_name}</span>
                   <span className="font-mono text-xs text-slate-400">{e.employee_no}{e.company ? ` · ${e.company.code}` : ""}</span>

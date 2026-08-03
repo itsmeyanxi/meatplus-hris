@@ -57,7 +57,7 @@ export function RunAdjustments({ runId, editable, onChanged }: { runId: number; 
         <div className="mb-3 flex justify-end">
           <button
             onClick={() => setOpen((v) => !v)}
-            className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+            className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
           >
             {open ? "Cancel" : "+ Add adjustment"}
           </button>
@@ -89,7 +89,7 @@ export function RunAdjustments({ runId, editable, onChanged }: { runId: number; 
               <button
                 onClick={() => add.mutate()}
                 disabled={!canSubmit || add.isPending}
-                className="shrink-0 rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+                className="shrink-0 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
               >
                 Add
               </button>

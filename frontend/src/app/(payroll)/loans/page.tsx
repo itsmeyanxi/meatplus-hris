@@ -17,7 +17,7 @@ const TYPE_BADGE: Record<string, string> = {
   sss_salary: "bg-sky-50 text-sky-700 ring-sky-200",
   sss_calamity: "bg-blue-50 text-blue-700 ring-blue-200",
   pagibig_mpl: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  pagibig_calamity: "bg-teal-50 text-teal-700 ring-teal-200",
+  pagibig_calamity: "bg-brand-50 text-brand-700 ring-brand-200",
   cash_advance: "bg-amber-50 text-amber-700 ring-amber-200",
   company: "bg-violet-50 text-violet-700 ring-violet-200",
   other: "bg-slate-100 text-slate-600 ring-slate-200",

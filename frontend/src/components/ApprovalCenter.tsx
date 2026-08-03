@@ -9,7 +9,7 @@ const TYPE_STYLES: Record<string, string> = {
   overtime: "bg-amber-50 text-amber-700",
   official_business: "bg-sky-50 text-sky-700",
   undertime: "bg-orange-50 text-orange-700",
-  coa: "bg-teal-50 text-teal-700",
+  coa: "bg-brand-50 text-brand-700",
   correction: "bg-rose-50 text-rose-700",
 };
 
@@ -36,7 +36,7 @@ export function ApprovalQuickCard() {
           <h3 className="text-sm font-semibold text-slate-800">Pending approvals</h3>
           <p className="text-xs text-slate-500">Requests waiting on you</p>
         </div>
-        <span className={`flex h-9 min-w-9 items-center justify-center rounded-full px-2 text-sm font-bold text-white ${total > 0 ? "bg-teal-600" : "bg-slate-300"}`}>{total}</span>
+        <span className={`flex h-9 min-w-9 items-center justify-center rounded-full px-2 text-sm font-bold text-white ${total > 0 ? "bg-brand-600" : "bg-slate-300"}`}>{total}</span>
       </div>
       {total === 0 ? (
         <p className="mt-3 rounded-lg bg-slate-50 px-3 py-4 text-center text-xs text-slate-400">You’re all caught up — nothing waiting.</p>
@@ -55,7 +55,7 @@ export function ApprovalQuickCard() {
           ))}
         </ul>
       )}
-      <Link href="/my-team" className="mt-3 block text-center text-xs font-semibold text-teal-700 hover:underline">
+      <Link href="/my-team" className="mt-3 block text-center text-xs font-semibold text-brand-700 hover:underline">
         {total > 0 ? `Review all (${total}) →` : "Open Approval Center →"}
       </Link>
     </div>
@@ -72,7 +72,7 @@ export function ApprovalList() {
       <div className="flex items-center gap-2">
         <h3 className="text-sm font-semibold text-slate-800">Pending approvals</h3>
         {data?.total ? (
-          <span className="rounded-full bg-teal-600 px-2 py-0.5 text-xs font-bold text-white">{data.total}</span>
+          <span className="rounded-full bg-brand-600 px-2 py-0.5 text-xs font-bold text-white">{data.total}</span>
         ) : null}
       </div>
 

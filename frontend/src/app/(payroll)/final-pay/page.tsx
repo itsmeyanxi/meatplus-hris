@@ -498,7 +498,7 @@ function RecordsList({ onNew }: { onNew: () => void }) {
       <p className="text-sm font-medium text-slate-700">No final pay records yet</p>
       <p className="mt-1 text-xs text-slate-400">Click the button above to create one.</p>
       <button onClick={onNew}
-        className="mt-4 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 transition">
+        className="mt-4 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 transition">
         New Computation
       </button>
     </div>
@@ -605,7 +605,7 @@ export default function FinalPayPage() {
         </div>
         {!showForm && (
           <button onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-700 transition">
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>

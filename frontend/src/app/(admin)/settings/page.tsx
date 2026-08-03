@@ -23,7 +23,7 @@ function canManage(perms: string[]): boolean {
 // ── Shared helpers ────────────────────────────────────────────────────────
 
 const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100";
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
 
 function ConfirmDeleteButton({ onConfirm, disabled }: { onConfirm: () => void; disabled?: boolean }) {
   const [confirming, setConfirming] = useState(false);
@@ -115,7 +115,7 @@ function DepartmentsSection({ canEdit }: { canEdit: boolean }) {
         {canEdit && (
           <button
             onClick={() => { setShowAdd((v) => !v); setError(null); }}
-            className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+            className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
           >
             {showAdd ? "Cancel" : "+ Add"}
           </button>
@@ -155,7 +155,7 @@ function DepartmentsSection({ canEdit }: { canEdit: boolean }) {
             <button
               type="submit"
               disabled={create.isPending || !addName.trim()}
-              className="rounded-lg bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
+              className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
             >
               {create.isPending ? "Saving…" : "Save"}
             </button>
@@ -197,7 +197,7 @@ function DepartmentsSection({ canEdit }: { canEdit: boolean }) {
                 <button
                   type="submit"
                   disabled={update.isPending || !editName.trim()}
-                  className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
+                  className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
                 >
                   {update.isPending ? "Saving…" : "Save"}
                 </button>
@@ -316,7 +316,7 @@ function PositionsSection({ canEdit }: { canEdit: boolean }) {
         {canEdit && (
           <button
             onClick={() => { setShowAdd((v) => !v); setError(null); }}
-            className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+            className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
           >
             {showAdd ? "Cancel" : "+ Add"}
           </button>
@@ -358,7 +358,7 @@ function PositionsSection({ canEdit }: { canEdit: boolean }) {
             <button
               type="submit"
               disabled={create.isPending || !addTitle.trim()}
-              className="rounded-lg bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
+              className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
             >
               {create.isPending ? "Saving…" : "Save"}
             </button>
@@ -402,7 +402,7 @@ function PositionsSection({ canEdit }: { canEdit: boolean }) {
                 <button
                   type="submit"
                   disabled={update.isPending || !editTitle.trim()}
-                  className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
+                  className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
                 >
                   {update.isPending ? "Saving…" : "Save"}
                 </button>

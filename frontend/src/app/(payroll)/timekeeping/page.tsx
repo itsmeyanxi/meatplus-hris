@@ -84,7 +84,7 @@ export default function PayrollTimekeepingPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search employee, ID, department, or head…"
-              className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-teal-500"
+              className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-500"
             />
           </div>
           <div className="min-w-[200px]">
@@ -103,7 +103,7 @@ export default function PayrollTimekeepingPage() {
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
               className="mt-1 block rounded-lg border border-slate-200 px-3 py-2 text-sm" />
           </label>
-          <button onClick={() => refetch()} className="rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white hover:bg-slate-800">Apply cutoff</button>
+          <button onClick={() => refetch()} className="rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-700">Apply cutoff</button>
           <label className="ml-auto flex items-center gap-2 text-sm text-slate-600">
             <input type="checkbox" checked={onlyFloating} onChange={(e) => setOnlyFloating(e.target.checked)} className="rounded border-slate-300" />
             Only show floating approvals
@@ -123,7 +123,7 @@ export default function PayrollTimekeepingPage() {
         <p className="text-xs text-slate-400">
           Cutoff: {period.from} → {period.to}
           {data ? ` · showing ${rows.length} of ${data.items.length}` : ""}
-          {(search || dept) && <button onClick={() => { setSearch(""); setDept(""); }} className="ml-2 font-medium text-teal-600 hover:underline">clear filters</button>}
+          {(search || dept) && <button onClick={() => { setSearch(""); setDept(""); }} className="ml-2 font-medium text-brand-600 hover:underline">clear filters</button>}
         </p>
       )}
 

@@ -137,7 +137,7 @@ export default function AccessRequestDetailPage() {
       <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Request not found</h2>
         <p className="mt-1 text-sm text-slate-500">It may have been removed or you don&apos;t have access.</p>
-        <Link href="/access-requests" className="mt-6 inline-flex rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800">
+        <Link href="/access-requests" className="mt-6 inline-flex rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-700">
           Back to queue
         </Link>
       </div>

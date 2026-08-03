@@ -134,7 +134,7 @@ export function SearchSelect({
           onFocus={openList}
           onChange={(e) => { setOpen(true); setQuery(e.target.value); setActive(0); }}
           onKeyDown={onKeyDown}
-          className={`w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-8 text-left text-sm outline-none focus:border-teal-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 ${!open && val === "" ? "text-slate-400" : "text-slate-800"}`}
+          className={`w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-8 text-left text-sm outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 ${!open && val === "" ? "text-slate-400" : "text-slate-800"}`}
         />
         <button
           type="button"
@@ -167,7 +167,7 @@ export function SearchSelect({
                   type="button"
                   onMouseEnter={() => setActive(i)}
                   onClick={() => pick(o)}
-                  className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left ${i === active ? "bg-slate-50" : ""} ${o.value === val ? "font-medium text-teal-700" : "text-slate-700"}`}
+                  className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left ${i === active ? "bg-slate-50" : ""} ${o.value === val ? "font-medium text-brand-700" : "text-slate-700"}`}
                 >
                   <span className="truncate">{o.label || <span className="text-slate-400">{placeholder}</span>}</span>
                   {o.hint ? <span className="shrink-0 font-mono text-xs text-slate-400">{o.hint}</span> : null}

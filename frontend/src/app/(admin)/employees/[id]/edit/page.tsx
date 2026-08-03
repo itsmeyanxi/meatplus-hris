@@ -264,7 +264,7 @@ export default function EditEmployeePage() {
             role="switch"
             aria-checked={form.time_in_out_required}
             onClick={() => setForm((p) => ({ ...p, time_in_out_required: !p.time_in_out_required }))}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.time_in_out_required ? "bg-slate-900" : "bg-teal-600"}`}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.time_in_out_required ? "bg-slate-900" : "bg-brand-600"}`}
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.time_in_out_required ? "translate-x-6" : "translate-x-1"}`} />
           </button>
@@ -295,7 +295,7 @@ export default function EditEmployeePage() {
         <button
           type="submit"
           disabled={mutation.isPending || saved}
-          className="rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60 transition"
+          className="rounded-xl bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-60 transition"
         >
           {saved ? "Saved ✓" : mutation.isPending ? "Saving…" : "Save changes"}
         </button>

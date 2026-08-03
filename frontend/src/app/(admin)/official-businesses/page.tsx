@@ -186,7 +186,7 @@ function FileOBForm({ employeeId, canManage, meData }: { employeeId: number; can
         </div>
         <button
           onClick={() => setOpen((v) => !v)}
-          className="rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+          className="rounded-lg bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-brand-700"
         >
           {open ? "Cancel" : "+ File OB"}
         </button>
@@ -310,7 +310,7 @@ function FileOBForm({ employeeId, canManage, meData }: { employeeId: number; can
             <button
               type="submit"
               disabled={create.isPending}
-              className="rounded-lg bg-slate-900 px-8 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+              className="rounded-lg bg-brand-600 px-8 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
             >
               {create.isPending ? "Submitting…" : "Submit"}
             </button>

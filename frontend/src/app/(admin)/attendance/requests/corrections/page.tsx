@@ -42,7 +42,7 @@ export default function CorrectionsPage() {
           <h2 className="text-2xl font-semibold">Attendance corrections</h2>
           <p className="text-sm text-slate-500">Request a fix to a computed daily record.</p>
         </div>
-        <button onClick={() => setIsAdding((v) => !v)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800">
+        <button onClick={() => setIsAdding((v) => !v)} className="rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
           {isAdding ? "Cancel" : "+ File correction"}
         </button>
       </div>

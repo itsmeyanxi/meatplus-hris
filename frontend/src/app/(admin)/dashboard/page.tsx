@@ -442,7 +442,7 @@ function PayrollView({
         <CardHeader icon={<PayrollIcon />} title="Payroll Runs" action={
           <Link
             href="/payroll"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
           >
             <PlusIcon /> New Run
           </Link>
@@ -793,7 +793,7 @@ function PersonalPanel({ personal }: { personal: PersonalProps }) {
         action={
           <Link
             href="/leaves"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
           >
             <PlusIcon /> Apply
           </Link>
@@ -1006,7 +1006,7 @@ function QuickTile({ href, label, icon }: { href: string; label: string; icon: R
   return (
     <Link href={href}
       className="group flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white transition group-hover:bg-slate-700">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white transition group-hover:bg-brand-700">
         <span className="h-4 w-4">{icon}</span>
       </span>
       {label}

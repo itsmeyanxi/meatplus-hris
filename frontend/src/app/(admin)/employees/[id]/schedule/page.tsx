@@ -53,7 +53,7 @@ function MiniWeek({ schedule }: { schedule: WorkSchedule }) {
           <div
             key={dow}
             title={`${DOW[dow]}: ${rest ? "Rest day" : `${t12(d!.time_in)}–${t12(d!.time_out)}`}`}
-            className={`h-5 w-5 rounded text-center text-[9px] font-bold leading-5 ${rest ? "bg-slate-100 text-slate-400" : "bg-teal-100 text-teal-700"}`}
+            className={`h-5 w-5 rounded text-center text-[9px] font-bold leading-5 ${rest ? "bg-slate-100 text-slate-400" : "bg-brand-100 text-brand-700"}`}
           >
             {DOW[dow][0]}
           </div>
@@ -135,7 +135,7 @@ export default function EmployeeSchedulePage() {
               options={SCHED_TYPES.map((t) => ({ value: t.value, label: t.label, hint: t.hint }))}
             />
           </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${noPunch ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-600"}`}>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${noPunch ? "bg-brand-50 text-brand-700" : "bg-slate-100 text-slate-600"}`}>
             {noPunch ? "Always present — no punch" : "Punches in / out"}
           </span>
         </div>
@@ -163,7 +163,7 @@ export default function EmployeeSchedulePage() {
             )}
           </div>
           {canManage && (
-            <button onClick={() => setAdding((v) => !v)} className="rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+            <button onClick={() => setAdding((v) => !v)} className="rounded-lg bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-brand-700">
               {adding ? "Cancel" : "Change schedule"}
             </button>
           )}
@@ -182,7 +182,7 @@ export default function EmployeeSchedulePage() {
                   value={schedSearch}
                   onChange={(e) => setSchedSearch(e.target.value)}
                   placeholder="Search by name, time, or rest day…"
-                  className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-teal-500"
+                  className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-500"
                 />
               </div>
               <div className="mt-2 max-h-72 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200">
@@ -199,12 +199,12 @@ export default function EmployeeSchedulePage() {
                         key={s.id}
                         type="button"
                         onClick={() => setWsId(String(s.id))}
-                        className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition ${active ? "bg-teal-50 ring-1 ring-inset ring-teal-300" : "hover:bg-slate-50"}`}
+                        className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition ${active ? "bg-brand-50 ring-1 ring-inset ring-brand-300" : "hover:bg-slate-50"}`}
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold text-slate-800">{s.name}</span>
-                            {active && <span className="rounded-full bg-teal-600 px-2 py-0.5 text-[10px] font-bold text-white">Selected</span>}
+                            {active && <span className="rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-bold text-white">Selected</span>}
                           </div>
                           <div className="mt-0.5 text-xs text-slate-500">{schedSummary(s)}</div>
                         </div>
@@ -224,7 +224,7 @@ export default function EmployeeSchedulePage() {
               <button
                 onClick={() => assign.mutate()}
                 disabled={!wsId || assign.isPending}
-                className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
               >
                 {assign.isPending ? "Saving…" : "Assign schedule"}
               </button>
@@ -249,7 +249,7 @@ export default function EmployeeSchedulePage() {
                 const day = byDow.get(d);
                 const rest = !day || day.is_rest_day;
                 return (
-                  <div key={d} className={`rounded-xl border p-3 text-center ${rest ? "border-slate-100 bg-slate-50" : "border-teal-100 bg-teal-50/50"}`}>
+                  <div key={d} className={`rounded-xl border p-3 text-center ${rest ? "border-slate-100 bg-slate-50" : "border-brand-100 bg-brand-50/50"}`}>
                     <div className="text-xs font-bold uppercase tracking-wide text-slate-500">{DOW[d]}</div>
                     {rest ? (
                       <div className="mt-1 text-xs font-medium text-slate-400">Rest day</div>

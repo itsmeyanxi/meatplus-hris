@@ -176,7 +176,7 @@ export function BalancesTab() {
                             type="button"
                             onClick={() => submitAdjust(b.id)}
                             disabled={adjustMutation.isPending}
-                            className="rounded-lg bg-slate-900 px-4 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+                            className="rounded-lg bg-brand-600 px-4 py-1.5 text-xs font-medium text-white transition hover:bg-brand-700 disabled:opacity-60"
                           >
                             {adjustMutation.isPending ? "Saving…" : "Save"}
                           </button>

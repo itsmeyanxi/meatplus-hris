@@ -374,7 +374,7 @@ export default function AgencyDetailPage() {
             {boardFilter !== "all" && (
               <span className="ml-2 text-sm font-normal text-slate-500">
                 — {boardRows.length} {FILTER_LABEL[boardFilter]}
-                <button onClick={() => setBoardFilter("all")} className="ml-2 text-xs font-medium text-teal-700 hover:underline">Show all</button>
+                <button onClick={() => setBoardFilter("all")} className="ml-2 text-xs font-medium text-brand-700 hover:underline">Show all</button>
               </span>
             )}
           </h2>

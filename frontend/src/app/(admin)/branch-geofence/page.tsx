@@ -175,7 +175,7 @@ function BranchRow({ branch }: { branch: BranchGeofence }) {
             type="button"
             onClick={() => save.mutate()}
             disabled={!dirty || save.isPending}
-            className="rounded-md bg-teal-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-teal-700 disabled:opacity-40"
+            className="rounded-md bg-brand-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-brand-700 disabled:opacity-40"
           >
             {save.isPending ? "Saving…" : "Save"}
           </button>
