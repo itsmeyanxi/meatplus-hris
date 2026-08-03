@@ -10,6 +10,10 @@ module.exports = {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        // Soften pure-white surfaces to a subtle off-white — less glare on large
+        // card areas. Kept lighter than slate-50 (#f8fafc) so table-header tints
+        // still read, and near enough to #fff that text-white on navy stays crisp.
+        white: "#fbfcfe",
         // ── Corporate Navy re-skin ──────────────────────────────────────────
         // `extend` deep-merges, so we override ONLY the dark end of slate. Every
         // bg-slate-900 / text-slate-900 (sidebar, buttons, headers, headings)

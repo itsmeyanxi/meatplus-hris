@@ -5,7 +5,7 @@
 :root {
   /* ── Corporate Navy palette ── */
   --background: #f3f6fb;   /* soft cool page background — less glare than white */
-  --surface: #ffffff;
+  --surface: #fbfcfe;      /* off-white card surface */
   --surface-muted: #f6f9fc;
   --foreground: #16233d;   /* refined navy text base (was near-black #0f172a) */
   --muted: #64748b;
