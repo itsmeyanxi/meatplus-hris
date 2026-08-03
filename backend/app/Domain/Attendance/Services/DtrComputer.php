@@ -26,6 +26,14 @@ class DtrComputer
     public const LATE_GRACE_MINUTES = 15;
 
     /**
+     * Longest a single shift may span from first punch to last. A missing out-punch
+     * would otherwise pair an in-punch with the NEXT shift's punch, inventing a
+     * 20-24 hour "day". 16h comfortably covers a 12-hour shift plus overtime while
+     * rejecting overnight phantoms; a span beyond it means the out-punch is missing.
+     */
+    public const MAX_SHIFT_MINUTES = 16 * 60;
+
+    /**
      * Compute (or recompute) DailyTimeRecords for an employee across [from, to].
      * Returns the upserted DTR rows. Locked rows are skipped.
      */
@@ -313,6 +321,21 @@ class DtrComputer
         $sortedLogs = $dayLogs->sortBy('logged_at')->values();
         $actualIn = $sortedLogs->first()?->logged_at;
         $actualOut = $sortedLogs->count() > 1 ? $sortedLogs->last()?->logged_at : null;
+
+        // Cap the shift span: if the last punch is more than MAX_SHIFT_MINUTES after
+        // the first, that punch belongs to a later shift (the real out-punch was
+        // missed). Re-pick the out as the latest punch still within the cap; if none
+        // qualifies, leave the day without a time-out (incomplete) rather than
+        // fabricating a 20-24 hour shift.
+        if ($actualIn && $actualOut && $actualIn->diffInMinutes($actualOut) > self::MAX_SHIFT_MINUTES) {
+            $cutoff = $actualIn->addMinutes(self::MAX_SHIFT_MINUTES);
+            // Latest punch still within the cap window becomes the out-punch (logs are
+            // ascending, so scan from the end); if none qualifies, no time-out.
+            $withinLast = $sortedLogs->reverse()->first(
+                fn ($l) => $l->logged_at->greaterThan($actualIn) && $l->logged_at->lessThanOrEqualTo($cutoff),
+            );
+            $actualOut = $withinLast?->logged_at;
+        }
 
         // A single punch is ambiguous: count it as a departure when it falls nearer
         // the scheduled end than the scheduled start, otherwise as an arrival.
