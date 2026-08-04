@@ -16,18 +16,15 @@ class CompanyScope implements Scope
 
         $user = auth()->user();
 
-        // The `super_admin` super-role sees EVERY company's data at once — no
-        // active-company limitation. This is the one deliberate hole in tenant
-        // isolation (super_admin > admin > it_admin).
-        if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
-            return;
-        }
-
-        // Everyone else — including it_admin — sees ONLY the company they are currently
-        // in. it_admin's elevated power is over what they may *do* (see Gate::before in
-        // AppServiceProvider), NOT over what data they see: they still view one company
-        // at a time and switch companies to see another. This keeps each company's data
-        // fully isolated to that company's context.
+        // EVERYONE — including super_admin and admins — sees ONLY the company they are
+        // currently in. Cross-company visibility requires explicitly SWITCHING companies;
+        // there is no god-view of all tenants at once. A role's elevated power is over
+        // what they may *do* (see Gate::before in AppServiceProvider), NOT over what data
+        // they see. Each company's data stays isolated to that company's context.
+        //
+        // The one thing that legitimately spans companies is a user's own NOTIFICATIONS,
+        // which are keyed to the user (Laravel's notifications table), not company_id, so
+        // they are unaffected by this scope.
         if ($user->active_company_id) {
             $builder->where($model->getTable().'.company_id', $user->active_company_id);
         } else {
