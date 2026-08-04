@@ -9,8 +9,8 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import { ROLE_LABELS, usersApi, type Role, type UpdateUserInput } from "@/lib/users";
 import { getCompanies } from "@/lib/companies";
 
-// HR roles that may legitimately handle more than one company.
-const HR_ROLES: Role[] = ["hr_admin", "hr_officer", "hr_coordinator"];
+// Roles that may legitimately handle more than one company (HR + timekeeping).
+const MULTI_COMPANY_ROLES: Role[] = ["hr_admin", "hr_officer", "hr_coordinator", "timekeeper"];
 
 export default function UserDetailPage() {
   const params = useParams<{ id: string }>();
@@ -178,11 +178,11 @@ export default function UserDetailPage() {
           )}
         </div>
 
-        {/* Companies — shown for HR staff who may handle more than one company. */}
-        {(form.roles ?? user.roles).some((r) => HR_ROLES.includes(r)) && (
+        {/* Companies — shown for HR / timekeeping staff who may handle more than one company. */}
+        {(form.roles ?? user.roles).some((r) => MULTI_COMPANY_ROLES.includes(r)) && (
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600">Companies this user can access</label>
-            <p className="mb-2 text-xs text-slate-400">Tick every company this HR user handles — they can switch between the ones selected here.</p>
+            <p className="mb-2 text-xs text-slate-400">Tick every company this user handles — they can switch between the ones selected here.</p>
             <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
               {companies.map((c) => {
                 const selected = form.company_ids ?? user.companies?.map((x) => x.id) ?? [];
