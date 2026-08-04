@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -33,6 +33,19 @@ const STATUS_CLASS: Record<string, string> = {
 function statusPill(s: string): string {
   const cls = STATUS_CLASS[s] ?? (s.toLowerCase().includes("holiday") ? "s-amber" : "s-gray");
   return `<span class="pill ${cls}">${esc(s)}</span>`;
+}
+
+// Compact single-letter cell for the attendance grid (matrix) view.
+const GRID_STATUS: { re: RegExp; code: string; cls: string }[] = [
+  { re: /late/i,    code: "L", cls: "bg-amber-100 text-amber-700" },
+  { re: /present/i, code: "P", cls: "bg-emerald-100 text-emerald-700" },
+  { re: /leave/i,   code: "V", cls: "bg-violet-100 text-violet-700" },
+  { re: /absent/i,  code: "A", cls: "bg-red-100 text-red-700" },
+  { re: /holiday/i, code: "H", cls: "bg-sky-100 text-sky-700" },
+  { re: /rest/i,    code: "R", cls: "bg-slate-100 text-slate-400" },
+];
+function gridCell(status: string): { code: string; cls: string } {
+  return GRID_STATUS.find((g) => g.re.test(status)) ?? { code: "•", cls: "bg-slate-50 text-slate-400" };
 }
 
 /** A polished, self-contained printable report → the browser's "Save as PDF" produces the PDF. */
@@ -173,6 +186,25 @@ export default function AgencyDetailPage() {
   const [err, setErr] = useState<string | null>(null);
   const [viewing, setViewing] = useState(false);
   const [report, setReport] = useState<AgencyAttendanceData | null>(null);
+  const [reportView, setReportView] = useState<"grid" | "list">("grid");
+
+  // Pivot the day-records into a workers × dates matrix for the grid view.
+  const grid = useMemo(() => {
+    if (!report) return null;
+    const workersMap = new Map<string, { no: string; name: string }>();
+    const dateSet = new Set<string>();
+    const cells = new Map<string, string>();
+    for (const r of report.rows) {
+      workersMap.set(r.employee_no, { no: r.employee_no, name: r.name });
+      dateSet.add(r.date);
+      cells.set(`${r.employee_no}|${r.date}`, r.status);
+    }
+    return {
+      workers: [...workersMap.values()].sort((a, b) => a.name.localeCompare(b.name)),
+      dates: [...dateSet].sort(),
+      cells,
+    };
+  }, [report]);
 
   const viewData = async () => {
     setErr(null);
@@ -323,8 +355,61 @@ export default function AgencyDetailPage() {
                 <strong>{report.rows.length}</strong> day-records · {report.summary.present_days} present · {report.summary.absent_days} absent · {report.summary.leave_days} leave · {report.summary.total_hours} hrs
                 <span className="text-slate-400"> · {report.from} to {report.to}</span>
               </p>
-              <button onClick={() => setReport(null)} className="text-xs text-slate-400 hover:text-slate-700">Hide</button>
+              <div className="flex items-center gap-2">
+                <div className="inline-flex rounded-lg border border-slate-200 p-0.5 text-xs font-semibold">
+                  <button type="button" onClick={() => setReportView("grid")} className={`rounded-md px-2.5 py-1 transition ${reportView === "grid" ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Grid</button>
+                  <button type="button" onClick={() => setReportView("list")} className={`rounded-md px-2.5 py-1 transition ${reportView === "list" ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}>List</button>
+                </div>
+                <button onClick={() => setReport(null)} className="text-xs text-slate-400 hover:text-slate-700">Hide</button>
+              </div>
             </div>
+
+            {reportView === "grid" && grid && (
+              <div>
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="text-xs">
+                    <thead>
+                      <tr className="bg-slate-50">
+                        <th className="sticky left-0 z-10 bg-slate-50 px-2 py-2 text-left font-semibold text-slate-500">Worker</th>
+                        {grid.dates.map((d) => (
+                          <th key={d} className="px-1 py-2 text-center font-medium text-slate-400" title={d}>{d.slice(8)}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {grid.workers.map((w) => (
+                        <tr key={w.no} className="border-t border-slate-100">
+                          <td className="sticky left-0 z-10 bg-white px-2 py-1">
+                            <div className="max-w-[150px] truncate text-[13px] font-medium text-slate-800">{w.name}</div>
+                            <div className="font-mono text-[10px] text-slate-400">{w.no}</div>
+                          </td>
+                          {grid.dates.map((d) => {
+                            const st = grid.cells.get(`${w.no}|${d}`);
+                            if (!st) return <td key={d} className="px-1 py-1 text-center text-slate-200">·</td>;
+                            const c = gridCell(st);
+                            return (
+                              <td key={d} className="px-1 py-1 text-center">
+                                <span title={`${d} · ${st}`} className={`inline-block w-5 rounded py-0.5 text-[10px] font-bold ${c.cls}`}>{c.code}</span>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
+                  <span><b className="text-emerald-700">P</b> Present</span>
+                  <span><b className="text-amber-700">L</b> Late</span>
+                  <span><b className="text-violet-700">V</b> Leave</span>
+                  <span><b className="text-red-700">A</b> Absent</span>
+                  <span><b className="text-sky-700">H</b> Holiday</span>
+                  <span><b className="text-slate-400">R</b> Rest</span>
+                </div>
+              </div>
+            )}
+
+            {reportView === "list" && (
             <TableShell>
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500">
@@ -362,6 +447,7 @@ export default function AgencyDetailPage() {
                 </tbody>
               </table>
             </TableShell>
+            )}
           </div>
         )}
       </div>

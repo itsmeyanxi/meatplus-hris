@@ -32,6 +32,12 @@ class DailyTimeRecordController extends Controller
             if ($did = $request->query('department_id')) {
                 $q->whereHas('employee', fn ($eq) => $eq->where('department_id', $did));
             }
+            // Keep agency workers out of the organic attendance module — they have
+            // their own per-agency board in the Agencies module. An explicit
+            // employee_id still returns anyone (so a single agency worker can be opened).
+            if (! $request->query('employee_id')) {
+                $q->whereHas('employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)));
+            }
         } else {
             $employee = $user->employee;
             abort_unless($employee, 403, 'Your account is not linked to an employee record.');
