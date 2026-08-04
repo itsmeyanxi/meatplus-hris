@@ -109,10 +109,13 @@ class DtrComputer
             }
         }
 
-        // Approved overtime requests, keyed by date (authoritative for credited OT).
+        // Overtime is credited ONLY from an overtime request that was actually FILED
+        // in the app and approved — never auto-marked. Bulk-imported OT (no filer and
+        // no ticket number) is ignored, so it can't silently credit/pay OT.
         $overtimes = OvertimeRequest::query()
             ->where('employee_id', $employee->id)
             ->where('status', 'approved')
+            ->where(fn ($q) => $q->whereNotNull('filed_by_user_id')->orWhereNotNull('ticket_number'))
             ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
             ->get()
             ->keyBy(fn (OvertimeRequest $o) => $o->date->toDateString());
@@ -430,16 +433,16 @@ class DtrComputer
                 $undertimeMinutes = max(0, (int) round($actualOut->diffInMinutes($schedOut, false)));
             }
 
-            if ($requiredHours > 0) {
-                $overMinutes = ($hoursWorked - $requiredHours) * 60;
-                $overtimeMinutes = max(0, (int) round($overMinutes));
-            } elseif ($isRestDay || $holiday) {
-                // rest-day / holiday work — every minute is OT
+            // Regular scheduled days do NOT auto-earn OT for working past the shift —
+            // overtimeMinutes stays 0 unless a filed & approved OT request sets it below.
+            // Rest-day / holiday work is fully off-schedule, so its hours are credited
+            // (this is how those days are paid, not stay-late overtime).
+            if (($isRestDay || $holiday) && $requiredHours <= 0) {
                 $overtimeMinutes = (int) round($hoursWorked * 60);
             }
         }
 
-        // An approved overtime request is authoritative for credited OT on its date.
+        // A FILED, approved overtime request is authoritative for credited OT on its date.
         if ($overtime) {
             $overtimeMinutes = (int) round((float) $overtime->requested_hours * 60);
         }

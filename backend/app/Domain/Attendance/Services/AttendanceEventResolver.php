@@ -90,8 +90,11 @@ class AttendanceEventResolver
             ]));
         }
 
-        // --- Overtime (approved extra hours) ---
-        $otQuery = OvertimeRequest::query();
+        // --- Overtime (filed & approved extra hours) ---
+        // Only OT actually filed in the app counts — bulk-imported/auto-marked OT
+        // (no filer, no ticket) is excluded so the feed matches what payroll credits.
+        $otQuery = OvertimeRequest::query()
+            ->where(fn ($q) => $q->whereNotNull('filed_by_user_id')->orWhereNotNull('ticket_number'));
         $applyScope($otQuery, 'date');
         if ($from) {
             $otQuery->whereDate('date', '>=', $from);
