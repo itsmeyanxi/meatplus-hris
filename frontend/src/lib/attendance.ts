@@ -327,6 +327,7 @@ export type BranchGeofence = {
   city: string | null;
   province: string | null;
   is_head_office: boolean;
+  is_agency: boolean;
   is_active: boolean;
   latitude: number | null;
   longitude: number | null;

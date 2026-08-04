@@ -31,6 +31,12 @@ export default function BranchGeofencePage() {
     );
   }
 
+  // Organic worksites and agency worksites are the same kind of record (a branch
+  // with a GPS pin) but are managed as distinct groups everywhere else in the app,
+  // so keep them visually separated here too instead of one jumbled list.
+  const organic = branches.filter((b) => !b.is_agency);
+  const agencies = branches.filter((b) => b.is_agency);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -44,27 +50,73 @@ export default function BranchGeofencePage() {
         Radius defaults to <strong>250 m</strong> when left blank.
       </div>
 
+      <GeofenceSection
+        title={`${term.Singular} worksites`}
+        colLabel={term.Singular}
+        rows={organic}
+        isLoading={isLoading}
+        emptyLabel={`No ${term.plural} found for this company.`}
+      />
+
+      {(isLoading || agencies.length > 0) && (
+        <GeofenceSection
+          title="Agency worksites"
+          subtitle="Manpower-agency sites — geofenced the same way as branches."
+          colLabel="Agency"
+          rows={agencies}
+          isLoading={isLoading}
+          emptyLabel="No agency worksites for this company."
+        />
+      )}
+    </div>
+  );
+}
+
+function GeofenceSection({
+  title,
+  subtitle,
+  colLabel,
+  rows,
+  isLoading,
+  emptyLabel,
+}: {
+  title: string;
+  subtitle?: string;
+  colLabel: string;
+  rows: BranchGeofence[];
+  isLoading: boolean;
+  emptyLabel: string;
+}) {
+  return (
+    <section className="space-y-2">
+      <div>
+        <h2 className="text-sm font-semibold text-slate-700">
+          {title}
+          {!isLoading && <span className="ml-2 text-xs font-normal text-slate-400">{rows.length}</span>}
+        </h2>
+        {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+      </div>
       <TableShell>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-slate-600">
-              {[term.Singular, "Latitude", "Longitude", "Radius (m)", "Status", ""].map((h) => (
+              {[colLabel, "Latitude", "Longitude", "Radius (m)", "Status", ""].map((h) => (
                 <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {isLoading && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-400">Loading {term.plural}…</td></tr>
+              <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-400">Loading…</td></tr>
             )}
-            {!isLoading && branches.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">No {term.plural} found for this company.</td></tr>
+            {!isLoading && rows.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-500">{emptyLabel}</td></tr>
             )}
-            {branches.map((b) => <BranchRow key={b.id} branch={b} />)}
+            {rows.map((b) => <BranchRow key={b.id} branch={b} />)}
           </tbody>
         </table>
       </TableShell>
-    </div>
+    </section>
   );
 }
 

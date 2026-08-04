@@ -17,6 +17,7 @@ class BranchGeofenceResource extends JsonResource
             'city' => $this->city,
             'province' => $this->province,
             'is_head_office' => (bool) $this->is_head_office,
+            'is_agency' => (bool) $this->is_agency,
             'is_active' => (bool) $this->is_active,
             'latitude' => $this->latitude !== null ? (float) $this->latitude : null,
             'longitude' => $this->longitude !== null ? (float) $this->longitude : null,
