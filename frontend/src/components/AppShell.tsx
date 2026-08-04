@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -103,8 +103,10 @@ export function AppShell({
   // Resolve the previewed role's permission set; until it loads, stay on real access.
   const previewEntry = isItAdmin && previewRole ? rolesData?.find((r) => r.name === previewRole) : undefined;
 
+  const queryClient = useQueryClient();
   const handleLogout = async () => {
     await logout();
+    queryClient.clear(); // drop this user's cached data so the next sign-in starts clean
     router.replace("/login");
     router.refresh();
   };

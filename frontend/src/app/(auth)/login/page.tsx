@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { login, getMe, switchCompany, type Me } from "@/lib/auth";
 
@@ -62,6 +63,7 @@ async function waitForBackend(maxSeconds = 75): Promise<boolean> {
 
 export default function LoginPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [server, setServer] = useState<ServerState>("checking");
   // After sign-in, users who belong to more than one company pick which to enter.
@@ -114,6 +116,10 @@ export default function LoginPage() {
     }
     try {
       await login(values.email, values.password);
+      // Wipe any cached data from a PREVIOUS user/session in this tab — otherwise
+      // the SPA's persistent React Query cache shows the old account's dashboard
+      // until a manual refresh.
+      queryClient.clear();
       // If the account belongs to several companies, let them choose one to enter.
       const me = await getMe();
       const list = me.user.companies ?? [];
@@ -136,6 +142,7 @@ export default function LoginPage() {
     setEntering(companyId);
     try {
       await switchCompany(companyId);
+      queryClient.clear(); // fresh data for the entered company
       router.push("/dashboard");
       router.refresh();
     } catch {
