@@ -24,6 +24,10 @@ export type UserItem = {
   email: string;
   is_active: boolean;
   last_login_at: string | null;
+  /** Heartbeat of the user's last authenticated request (drives the online dot). */
+  last_seen_at: string | null;
+  /** True when the user has been active within the last few minutes. */
+  is_online: boolean;
   employee: { id: number; employee_no: string; full_name: string; position?: string | null } | null;
   suggested_role?: Role | null;
   roles: Role[];

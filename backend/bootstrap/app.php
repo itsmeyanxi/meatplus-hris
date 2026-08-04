@@ -32,6 +32,12 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureFrontendRequestsAreStateful::class,
             \App\Http\Middleware\SetPermissionsTeam::class,
         ]);
+
+        // Track "online now" — stamps last_seen_at for the authenticated user
+        // (throttled). Appended so it runs after auth has resolved the user.
+        $middleware->api(append: [
+            \App\Http\Middleware\TrackUserActivity::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (AuthenticationException $e, Request $request) {

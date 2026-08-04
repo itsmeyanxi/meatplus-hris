@@ -12,6 +12,8 @@ export default function UsersPage() {
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["users", { q }],
     queryFn: () => usersApi.list({ q: q || undefined }),
+    // Keep the online dot roughly live without hammering the API.
+    refetchInterval: 60_000,
   });
 
   return (
@@ -64,9 +66,26 @@ export default function UsersPage() {
               {items.map((u) => (
                 <tr key={u.id} className="hover:bg-slate-50">
                   <td className="px-3 py-2 font-medium">
-                    <Link href={`/users/${u.id}`} className="hover:underline">
-                      {u.name}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <span
+                        aria-label={u.is_online ? "Online now" : "Offline"}
+                        title={
+                          u.is_online
+                            ? "Online now"
+                            : u.last_seen_at
+                              ? `Last seen ${new Date(u.last_seen_at).toLocaleString()}`
+                              : "Offline"
+                        }
+                        className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
+                          u.is_online
+                            ? "bg-emerald-500 ring-2 ring-emerald-200"
+                            : "bg-slate-300"
+                        }`}
+                      />
+                      <Link href={`/users/${u.id}`} className="hover:underline">
+                        {u.name}
+                      </Link>
+                    </div>
                   </td>
                   <td className="px-3 py-2 font-mono text-xs">{u.email}</td>
                   <td className="px-3 py-2 align-top">

@@ -57,9 +57,20 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'last_seen_at' => 'datetime',
             'is_active' => 'boolean',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * "Online now" — the user has been active within the last few minutes
+     * (see TrackUserActivity, which heartbeats last_seen_at on each request).
+     */
+    public function getIsOnlineAttribute(): bool
+    {
+        return $this->last_seen_at !== null
+            && $this->last_seen_at->diffInMinutes(now()) < 5;
     }
 
     public function activeCompany(): BelongsTo

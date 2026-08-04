@@ -15,6 +15,8 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'is_active' => $this->is_active,
             'last_login_at' => $this->last_login_at,
+            'last_seen_at' => $this->last_seen_at,
+            'is_online' => $this->is_online,
             'employee' => $this->whenLoaded('employee', fn () => $this->employee ? [
                 'id' => $this->employee->id,
                 'employee_no' => $this->employee->employee_no,
