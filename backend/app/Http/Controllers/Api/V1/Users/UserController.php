@@ -221,6 +221,125 @@ class UserController extends Controller
         ], 201);
     }
 
+    /**
+     * POST /users/bulk-provision
+     * Creates login accounts in bulk for the given active employees, all with the
+     * SAME shared password and must_change_password = true (forced change on first
+     * login). Employees log in with their employee number as username; a real email
+     * is used when present, otherwise a non-deliverable placeholder (email is a
+     * required, unique column but login also works by username).
+     */
+    public function bulkProvision(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->can('user.manage'), 403);
+
+        $data = $request->validate([
+            'password'       => ['required', 'string', 'min:6', 'max:100'],
+            'employee_ids'   => ['required', 'array', 'min:1'],
+            'employee_ids.*' => ['integer'],
+        ]);
+
+        $companyId = $request->user()->active_company_id;
+        $hash = Hash::make($data['password']);
+
+        // Only active employees in the active company that don't already have a login.
+        $employees = \App\Domain\HRIS\Models\Employee::query()
+            ->whereIn('id', $data['employee_ids'])
+            ->where('company_id', $companyId)
+            ->where('is_active', true)
+            ->whereNull('user_id')
+            ->get();
+
+        $companyCode = strtolower((string) optional($request->user()->activeCompany)->code ?: 'co'.$companyId);
+
+        setPermissionsTeamId($companyId);
+
+        $created = [];
+        $skipped = 0;
+        $errors = [];
+
+        foreach ($employees as $employee) {
+            if (! $employee->employee_no) {
+                $skipped++;
+                $errors[] = "{$employee->full_name}: no employee number";
+                continue;
+            }
+
+            try {
+                $username = $this->uniqueUsername($employee->employee_no, $companyCode);
+                $email = $this->loginEmail($employee, $companyCode);
+
+                $user = User::create([
+                    'name' => $employee->full_name,
+                    'username' => $username,
+                    'email' => $email,
+                    'password' => $hash,
+                    'is_active' => true,
+                    'must_change_password' => true,
+                    'active_company_id' => $companyId,
+                ]);
+
+                $user->companies()->syncWithoutDetaching([
+                    $companyId => ['is_default' => true],
+                ]);
+                $user->assignRole('employee');
+                $employee->forceFill(['user_id' => $user->id])->save();
+
+                $created[] = [
+                    'employee_no' => $employee->employee_no,
+                    'name' => $employee->full_name,
+                    'username' => $username,
+                ];
+            } catch (\Throwable $e) {
+                report($e);
+                $skipped++;
+                $errors[] = "{$employee->full_name}: could not create login";
+            }
+        }
+
+        return response()->json([
+            'message' => count($created).' login(s) created. Share the username + shared password; each user must change it on first sign-in.',
+            'created' => count($created),
+            'skipped' => $skipped,
+            'errors' => $errors,
+            'accounts' => $created,
+        ], 201);
+    }
+
+    /** employee_no as username, falling back to company-prefixed if already taken. */
+    private function uniqueUsername(string $employeeNo, string $companyCode): string
+    {
+        $base = trim($employeeNo);
+        if (! User::where('username', $base)->exists()) {
+            return $base;
+        }
+        $prefixed = "{$companyCode}-{$base}";
+        $candidate = $prefixed;
+        $i = 1;
+        while (User::where('username', $candidate)->exists()) {
+            $candidate = "{$prefixed}-".(++$i);
+        }
+
+        return $candidate;
+    }
+
+    /** Real employee email when unused, else a unique non-deliverable placeholder. */
+    private function loginEmail(\App\Domain\HRIS\Models\Employee $employee, string $companyCode): string
+    {
+        $real = $employee->email_company ?: $employee->email_personal;
+        if ($real && ! User::where('email', $real)->exists()) {
+            return $real;
+        }
+        $base = strtolower($employee->employee_no).'@'.$companyCode.'.noemail.local';
+        $candidate = $base;
+        $i = 1;
+        while (User::where('email', $candidate)->exists()) {
+            $candidate = strtolower($employee->employee_no).'-'.(++$i).'@'.$companyCode.'.noemail.local';
+        }
+
+        return $candidate;
+    }
+
     private function ensureSameCompany(Request $request, User $user): void
     {
         $companyId = $request->user()->active_company_id;

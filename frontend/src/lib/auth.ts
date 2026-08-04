@@ -6,6 +6,8 @@ export type Me = {
     name: string;
     email: string;
     is_active: boolean;
+    /** True while the account still has its shared/temp password — forces a change. */
+    must_change_password?: boolean;
     last_login_at: string | null;
     active_company: { id: number; code: string; legal_name: string } | null;
     original_company_id: number | null;

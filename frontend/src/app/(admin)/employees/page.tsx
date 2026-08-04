@@ -7,11 +7,13 @@ import { useRouter } from "next/navigation";
 import { getMe } from "@/lib/auth";
 import {
   listEmployees,
+  listInvitableEmployeeIds,
   getLookup,
   employeeExportUrl,
   type EmployeeListItem,
 } from "@/lib/employees";
 import { invitationsApi } from "@/lib/invitations";
+import { usersApi, type BulkProvisionResult } from "@/lib/users";
 import { getAdminStats } from "@/lib/dashboard";
 import { ImportEmployeesModal } from "@/components/employees/ImportEmployeesModal";
 import { AppButton, AppInput, PageHeader, StatusBadge, TableShell } from "@/components/ui";
@@ -65,6 +67,10 @@ export default function EmployeesPage() {
   // Bulk-select state
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkResult, setBulkResult] = useState<{ sent: number; skipped: number; errors: string[] } | null>(null);
+  const [selectingAll, setSelectingAll] = useState(false);
+  const [showCreateLogins, setShowCreateLogins] = useState(false);
+  const [provisionResult, setProvisionResult] = useState<BulkProvisionResult | null>(null);
+  const [sharedPassword, setSharedPassword] = useState("");
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -75,8 +81,10 @@ export default function EmployeesPage() {
     return () => clearTimeout(t);
   }, [empNo, name]);
 
-  // Clear selection when page / filters change
-  useEffect(() => { setSelected(new Set()); }, [debEmpNo, debName, departmentId, branchId, isConfidential, page]);
+  // Clear selection when the filter set changes (a different filter means a
+  // different result set). NOT on page change — selection persists across pages
+  // so "select all" and paging don't fight each other.
+  useEffect(() => { setSelected(new Set()); }, [debEmpNo, debName, departmentId, branchId, isConfidential]);
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const canManageUsers = me?.user.permissions?.includes("user.manage") ?? false;
@@ -143,12 +151,38 @@ export default function EmployeesPage() {
     });
   };
 
+  // Select every matching employee across ALL pages (only those still invitable),
+  // so the admin doesn't have to page through to select everyone.
+  const selectAllMatching = async () => {
+    setSelectingAll(true);
+    try {
+      const ids = await listInvitableEmployeeIds({
+        employeeNo: debEmpNo, name: debName, departmentId, branchId, isConfidential,
+      });
+      setSelected(new Set(ids));
+    } finally {
+      setSelectingAll(false);
+    }
+  };
+
   const bulkInvite = useMutation({
     mutationFn: () => invitationsApi.bulkSend(Array.from(selected)),
     onSuccess: (res) => {
       setBulkResult(res);
       setSelected(new Set());
       qc.invalidateQueries({ queryKey: ["employees"] });
+    },
+  });
+
+  const bulkProvision = useMutation({
+    mutationFn: () => usersApi.bulkProvision(sharedPassword, Array.from(selected)),
+    onSuccess: (res) => {
+      setProvisionResult(res);
+      setSelected(new Set());
+      setShowCreateLogins(false);
+      // Keep sharedPassword so the result screen can show it once; cleared on dismiss.
+      qc.invalidateQueries({ queryKey: ["employees"] });
+      qc.invalidateQueries({ queryKey: ["admin-stats"] });
     },
   });
 
@@ -463,17 +497,34 @@ export default function EmployeesPage() {
         </div>
       )}
 
-      {/* Bulk invite action bar */}
+      {/* Bulk action bar */}
       {canManageUsers && selected.size > 0 && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
-          <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-xl">
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-xl">
             <span className="text-sm font-medium text-slate-700">
               {selected.size} employee{selected.size !== 1 ? "s" : ""} selected
             </span>
+            {/* Select everyone matching the filter, across all pages */}
+            {data && selected.size < data.meta.total && (
+              <button
+                onClick={selectAllMatching}
+                disabled={selectingAll}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                {selectingAll ? "Selecting…" : `Select all matching (${data.meta.total})`}
+              </button>
+            )}
+            <div className="mx-1 h-6 w-px bg-slate-200" />
+            <button
+              onClick={() => { setProvisionResult(null); setShowCreateLogins(true); }}
+              className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+            >
+              Create logins
+            </button>
             <button
               onClick={() => { setBulkResult(null); bulkInvite.mutate(); }}
               disabled={bulkInvite.isPending}
-              className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
             >
               {bulkInvite.isPending ? "Sending…" : "Send invitations"}
             </button>
@@ -498,6 +549,28 @@ export default function EmployeesPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Create logins — shared password modal */}
+      {showCreateLogins && (
+        <CreateLoginsModal
+          count={selected.size}
+          password={sharedPassword}
+          setPassword={setSharedPassword}
+          pending={bulkProvision.isPending}
+          error={(bulkProvision.error as { response?: { data?: { message?: string } } } | null)?.response?.data?.message ?? null}
+          onConfirm={() => bulkProvision.mutate()}
+          onClose={() => { if (!bulkProvision.isPending) { setShowCreateLogins(false); } }}
+        />
+      )}
+
+      {/* Create logins — result */}
+      {provisionResult && (
+        <ProvisionResultModal
+          result={provisionResult}
+          password={sharedPassword}
+          onClose={() => { setProvisionResult(null); setSharedPassword(""); }}
+        />
       )}
 
       {showImport && (
@@ -658,6 +731,166 @@ function PreviewField({
         {value || "—"}
       </dd>
     </div>
+  );
+}
+
+// ── Create logins (bulk provision) ────────────────────────────────────────────
+
+function genPassword(): string {
+  // Memorable-ish, satisfies the 8–20 upper/lower/number/special policy.
+  const words = ["Meat", "Plus", "Work", "Team", "Safe", "Star", "Blue", "Gold"];
+  const w = words[Math.floor(Math.random() * words.length)];
+  const n = Math.floor(1000 + Math.random() * 9000);
+  return `${w}@${n}`;
+}
+
+function CreateLoginsModal({
+  count, password, setPassword, pending, error, onConfirm, onClose,
+}: {
+  count: number;
+  password: string;
+  setPassword: (v: string) => void;
+  pending: boolean;
+  error: string | null;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const [show, setShow] = useState(false);
+  const tooShort = password.length > 0 && password.length < 6;
+  const canSubmit = password.length >= 6 && !pending;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <h2 className="text-lg font-bold text-slate-900">Create login accounts</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          For <strong className="text-slate-700">{count}</strong> selected active employee{count !== 1 ? "s" : ""}.
+          Everyone gets the <strong>same temporary password</strong> below and must change it on first sign-in.
+          They log in with their <strong>employee number</strong> as username.
+        </p>
+
+        <div className="mt-4">
+          <label className={labelCls}>Shared temporary password</label>
+          <div className="relative">
+            <input
+              type={show ? "text" : "password"}
+              className={`${inputCls} pr-16`}
+              placeholder="At least 6 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoFocus
+            />
+            <button type="button" onClick={() => setShow((s) => !s)}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-xs font-medium text-slate-400 hover:text-slate-700">
+              {show ? "Hide" : "Show"}
+            </button>
+          </div>
+          <div className="mt-1.5 flex items-center justify-between">
+            <button type="button" onClick={() => { setPassword(genPassword()); setShow(true); }}
+              className="text-xs font-medium text-brand-600 hover:underline">
+              Generate one
+            </button>
+            {tooShort && <span className="text-xs text-red-500">Too short (min 6).</span>}
+          </div>
+        </div>
+
+        {error && (
+          <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">{error}</div>
+        )}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <AppButton variant="secondary" onClick={onClose} disabled={pending}>Cancel</AppButton>
+          <AppButton onClick={onConfirm} disabled={!canSubmit}>
+            {pending ? "Creating…" : `Create ${count} login${count !== 1 ? "s" : ""}`}
+          </AppButton>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ProvisionResultModal({
+  result, password, onClose,
+}: {
+  result: BulkProvisionResult;
+  password: string;
+  onClose: () => void;
+}) {
+  const downloadCsv = () => {
+    const header = "employee_no,name,username,password\n";
+    const body = result.accounts
+      .map((a) => `${a.employee_no},"${a.name.replace(/"/g, '""')}",${a.username},${password}`)
+      .join("\n");
+    const blob = new Blob([header + body], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "new-logins.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="border-b border-slate-100 p-6">
+          <h2 className="text-lg font-bold text-slate-900">
+            {result.created} login{result.created !== 1 ? "s" : ""} created
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {result.skipped > 0 && <>{result.skipped} skipped. </>}
+            Share these with the employees. Everyone signs in with the username below and the
+            shared password, then must set their own.
+          </p>
+          {password && (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+              Shared password: <span className="font-mono font-semibold">{password}</span>
+              <span className="ml-1 text-xs text-amber-600">(shown once — save the CSV)</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {result.accounts.length > 0 ? (
+            <table className="min-w-full text-sm">
+              <thead className="text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr><th className="pb-2 pr-4">Emp #</th><th className="pb-2 pr-4">Name</th><th className="pb-2">Username</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {result.accounts.map((a) => (
+                  <tr key={a.username}>
+                    <td className="py-1.5 pr-4 font-mono text-slate-500">{a.employee_no}</td>
+                    <td className="py-1.5 pr-4 text-slate-800">{a.name}</td>
+                    <td className="py-1.5 font-mono font-medium text-slate-900">{a.username}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="text-sm text-slate-500">No accounts were created.</p>
+          )}
+
+          {result.errors.length > 0 && (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Skipped</p>
+              <ul className="space-y-0.5 text-xs text-slate-500">
+                {result.errors.slice(0, 20).map((e, i) => <li key={i}>{e}</li>)}
+                {result.errors.length > 20 && <li>…and {result.errors.length - 20} more</li>}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-slate-100 p-4">
+          {result.accounts.length > 0 && (
+            <AppButton variant="secondary" onClick={downloadCsv}>Download CSV</AppButton>
+          )}
+          <AppButton onClick={onClose}>Done</AppButton>
+        </div>
+      </div>
+    </>
   );
 }
 

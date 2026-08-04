@@ -102,6 +102,22 @@ export async function listEmployees(params: {
   return data;
 }
 
+/**
+ * IDs of every employee matching the given filters that can still be given a
+ * login (no active account) — across ALL pages, so "select all" isn't limited
+ * to the visible page. One large page keeps it to a single request.
+ */
+export async function listInvitableEmployeeIds(params: {
+  employeeNo?: string;
+  name?: string;
+  departmentId?: number | "";
+  branchId?: number | "";
+  isConfidential?: boolean | "";
+} = {}): Promise<number[]> {
+  const res = await listEmployees({ ...params, page: 1, perPage: 5000 });
+  return res.data.filter((e) => e.login_status !== "active").map((e) => e.id);
+}
+
 export type ImportResult = {
   created: number;
   updated: number;

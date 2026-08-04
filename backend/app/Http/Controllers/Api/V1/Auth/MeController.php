@@ -34,6 +34,7 @@ class MeController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'is_active' => $user->is_active,
+                'must_change_password' => (bool) $user->must_change_password,
                 'last_login_at' => $user->last_login_at,
                 'active_company' => $user->activeCompany,
                 'original_company_id' => $user->original_company_id,

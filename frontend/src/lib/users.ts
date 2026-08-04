@@ -50,6 +50,14 @@ export type UpdateUserInput = Partial<{
   company_ids: number[];
 }>;
 
+export type BulkProvisionResult = {
+  message: string;
+  created: number;
+  skipped: number;
+  errors: string[];
+  accounts: { employee_no: string; name: string; username: string }[];
+};
+
 type Listed<T> = { data: T[] };
 
 export type RoleWithPermissions = { name: Role; permissions: string[] };
@@ -90,6 +98,21 @@ export const usersApi = {
     return data.data;
   },
   destroy: (id: number) => api.delete(`/api/v1/users/${id}`),
+  /**
+   * Bulk-create login accounts for active employees, all sharing one password and
+   * forced to change it on first sign-in. Employees log in with their employee
+   * number as username. Returns the created usernames so the admin can distribute.
+   */
+  bulkProvision: async (
+    password: string,
+    employeeIds: number[],
+  ): Promise<BulkProvisionResult> => {
+    const { data } = await api.post<BulkProvisionResult>("/api/v1/users/bulk-provision", {
+      password,
+      employee_ids: employeeIds,
+    });
+    return data;
+  },
   provisionForEmployee: async (
     employeeId: number,
   ): Promise<{ user: UserItem; temporary_password: string }> => {

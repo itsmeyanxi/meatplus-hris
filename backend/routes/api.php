@@ -314,6 +314,7 @@ Route::prefix('v1')->group(function () {
         // Approval workflows (Phase 2.1)
         // User management (Phase 2.3)
         Route::get('roles', [\App\Http\Controllers\Api\V1\Users\RoleController::class, 'index']);
+        Route::post('users/bulk-provision', [UserController::class, 'bulkProvision']);
         Route::apiResource('users', UserController::class);
         Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
         Route::patch('users/{user}/deactivate', [UserController::class, 'deactivate']);

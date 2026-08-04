@@ -24,7 +24,11 @@ class ChangePasswordController extends Controller
             ]);
         }
 
-        $request->user()->update(['password' => Hash::make($data['password'])]);
+        $request->user()->update([
+            'password' => Hash::make($data['password']),
+            // Clears the forced-change gate set by bulk provisioning.
+            'must_change_password' => false,
+        ]);
 
         return response()->json(['message' => 'Password changed successfully.']);
     }

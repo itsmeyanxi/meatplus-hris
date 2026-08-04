@@ -12,6 +12,7 @@ import { getCompanies } from "@/lib/companies";
 import { NotificationBell } from "@/components/NotificationBell";
 import { IdleTimeout } from "@/components/IdleTimeout";
 import { CommandPalette } from "@/components/CommandPalette";
+import { ForcePasswordChange } from "@/components/ForcePasswordChange";
 
 export type NavItem = {
   href: string;
@@ -208,6 +209,12 @@ export function AppShell({
     (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
   );
   const routeAllowed = !data || !currentItem || isAllowed(currentItem);
+
+  // Accounts created with a shared/temporary password must set their own before
+  // using the app. Gate the whole shell until they do.
+  if (data?.user.must_change_password) {
+    return <ForcePasswordChange />;
+  }
 
   const BackToModule = backLink ? (
     <Link
