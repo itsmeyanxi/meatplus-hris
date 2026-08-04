@@ -54,7 +54,7 @@ export function GeofenceManager({ kind }: { kind: "branch" | "agency" }) {
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         <strong>Tip:</strong> stand at the worksite and tap <em>Use my location</em> to capture
         the pin, or paste coordinates from Google Maps (right-click a spot → the first two numbers).
-        Radius defaults to <strong>250 m</strong> when left blank.
+        Radius defaults to <strong>100 m</strong> when left blank.
       </div>
 
       <TableShell>
@@ -164,8 +164,8 @@ function BranchRow({ branch }: { branch: BranchGeofence }) {
         <input className={inputCls} inputMode="decimal" placeholder="120.9842" value={lng} onChange={(e) => setLng(e.target.value)} />
       </td>
       <td className="px-4 py-3">
-        <input className={inputCls} inputMode="numeric" placeholder="250" value={radius} onChange={(e) => setRadius(e.target.value)} />
-        <label className={`${labelCls} mt-1 block`}>default 250</label>
+        <input className={inputCls} inputMode="numeric" placeholder="100" value={radius} onChange={(e) => setRadius(e.target.value)} />
+        <label className={`${labelCls} mt-1 block`}>default 100</label>
       </td>
       <td className="px-4 py-3">
         {branch.has_pin ? (

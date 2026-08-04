@@ -14,7 +14,7 @@ use App\Domain\Identity\Models\Branch;
 class GeofenceService
 {
     /** Default allowed radius (metres) when a branch has no explicit override. */
-    public const DEFAULT_RADIUS_M = 250;
+    public const DEFAULT_RADIUS_M = 100;
 
     /**
      * @return array{distance_m:int,radius_m:int,outside:bool,branch_name:string}|null
