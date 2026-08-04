@@ -35,7 +35,21 @@ class EmployeeScheduleController extends Controller
 
     public function store(EmployeeScheduleAssignmentRequest $request, Employee $employee): JsonResponse
     {
-        $assignment = $employee->scheduleAssignments()->create($request->validated());
+        $data = $request->validated();
+        $from = \Illuminate\Support\Carbon::parse($data['effective_from']);
+
+        // Only ONE schedule may be active at a time. Close (or drop) any currently
+        // open assignment before adding the new one, so schedules never overlap —
+        // otherwise the DTR engine has two "current" schedules to choose from.
+        foreach ($employee->scheduleAssignments()->whereNull('effective_to')->get() as $open) {
+            if ($open->effective_from && \Illuminate\Support\Carbon::parse($open->effective_from)->gte($from)) {
+                $open->delete(); // it started on/after the new one — it never took effect
+            } else {
+                $open->update(['effective_to' => $from->copy()->subDay()->toDateString()]);
+            }
+        }
+
+        $assignment = $employee->scheduleAssignments()->create($data);
         $assignment->load('workSchedule:id,code,name');
 
         return response()->json([
