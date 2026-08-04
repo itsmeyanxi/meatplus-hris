@@ -2,6 +2,6 @@
 
 import { GeofenceManager } from "@/components/attendance/GeofenceManager";
 
-export default function BranchGeofencePage() {
-  return <GeofenceManager kind="branch" />;
+export default function AgencyGeofencePage() {
+  return <GeofenceManager kind="agency" />;
 }

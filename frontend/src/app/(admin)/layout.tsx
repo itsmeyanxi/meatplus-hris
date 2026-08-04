@@ -306,10 +306,28 @@ const NAV: NavItem[] = [
     label: "Branch Geofence",
     group: "Maintenance",
     permissions: ["company.manage"],
+    // Kept as "Branch Geofence" everywhere — agencies have their own module below.
+    noTermSwap: true,
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 12m-2 0a2 2 0 104 0 2 2 0 10-4 0" />
+      </svg>
+    )
+  },
+  {
+    // Dedicated agency-worksite geofence — only companies whose "branches" are
+    // agencies (PASEI) have these, so it's hidden elsewhere.
+    href: "/agency-geofence",
+    label: "Agency Geofence",
+    group: "Maintenance",
+    permissions: ["company.manage"],
+    companyCodes: ["PASEI"],
+    noTermSwap: true,
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-3.13a4 4 0 10-4-4 4 4 0 004 4z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 13v3" />
       </svg>
     )
   },

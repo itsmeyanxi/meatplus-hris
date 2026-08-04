@@ -27,6 +27,12 @@ export type NavItem = {
   permissions?: string[];
   // …and only if the user is linked to an employee record (if true).
   requiresEmployee?: boolean;
+  // …and only when the active company's code is one of these (if set). Gates the
+  // item by tenant even for admins — e.g. agency-only tools shown for PASEI only.
+  companyCodes?: string[];
+  // Keep the label verbatim (skip the branch→agency term swap). Use for items
+  // that name a concept explicitly regardless of the active company's wording.
+  noTermSwap?: boolean;
   // Optional live count badge: "notifications" (unread) or "approvals" (pending to act on).
   badge?: "notifications" | "approvals";
 };
@@ -165,7 +171,12 @@ export function AppShell({
     return 0;
   };
 
+  const activeCompanyCode = data?.user.active_company?.code ?? null;
   const isAllowed = (item: NavItem) => {
+    // Company gate applies to everyone, including admins.
+    if (item.companyCodes && !(activeCompanyCode && item.companyCodes.includes(activeCompanyCode))) {
+      return false;
+    }
     if ((isItAdmin || isSuperAdmin) && !previewEntry) return true;
     const roleOk = !item.roles || item.roles.some((r) => userRoles.includes(r));
     const permOk =
@@ -178,6 +189,7 @@ export function AppShell({
   // Context-aware wording: PASEI's "branches" read as "agencies" in the nav.
   const branchTerm = branchTermFor(data?.user.active_company?.code);
   const navLabel = (label: string) => applyBranchTerm(label, branchTerm);
+  const itemLabel = (item: NavItem) => (item.noTermSwap ? item.label : navLabel(item.label));
 
   // Bucket the visible items into ordered sections by their `group`, keeping the
   // order in which groups first appear. Items with no group form a leading,
@@ -318,7 +330,7 @@ export function AppShell({
                       <Link
                         key={item.href}
                         href={item.href}
-                        title={isCollapsed ? navLabel(item.label) : undefined}
+                        title={isCollapsed ? itemLabel(item) : undefined}
                         className={
                           active
                             ? `flex items-center rounded-xl border border-brand-600 bg-brand-600 py-2 text-sm font-medium text-white shadow-sm transition-all ${
@@ -335,7 +347,7 @@ export function AppShell({
                             <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
                           )}
                         </span>
-                        {!isCollapsed && <span className="flex-1 truncate transition-opacity duration-200">{navLabel(item.label)}</span>}
+                        {!isCollapsed && <span className="flex-1 truncate transition-opacity duration-200">{itemLabel(item)}</span>}
                         {!isCollapsed && badgeFor(item) > 0 && (
                           <span className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white text-brand-700" : "bg-rose-500 text-white"}`}>
                             {badgeFor(item) > 99 ? "99+" : badgeFor(item)}
@@ -401,7 +413,7 @@ export function AppShell({
                         : "whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
                     }
                   >
-                    {navLabel(item.label)}
+                    {itemLabel(item)}
                   </Link>
                 );
               })}

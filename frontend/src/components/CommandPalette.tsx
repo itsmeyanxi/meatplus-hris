@@ -22,6 +22,7 @@ const PAGES: PageItem[] = [
   { label: "Reports", href: "/reports", group: "Go to" },
   { label: "Biometrics", href: "/devices", group: "Go to" },
   { label: "Branch Geofence", href: "/branch-geofence", group: "Go to" },
+  { label: "Agency Geofence", href: "/agency-geofence", group: "Go to" },
   { label: "Users", href: "/users", group: "Go to" },
   { label: "Settings", href: "/settings", group: "Go to" },
 ];
