@@ -34,6 +34,14 @@ class DtrComputer
     public const MAX_SHIFT_MINUTES = 16 * 60;
 
     /**
+     * Shortest a real shift can be from time-in to time-out. A scheduled shift lasts
+     * hours, so two punches only minutes apart are a double-tap at arrival — not a
+     * clock-out. Below this, the second punch is treated as a duplicate: the day
+     * keeps its time-in and is left open (no time-out) instead of a 1-minute "shift".
+     */
+    public const MIN_SHIFT_MINUTES = 30;
+
+    /**
      * Compute (or recompute) DailyTimeRecords for an employee across [from, to].
      * Returns the upserted DTR rows. Locked rows are skipped.
      */
@@ -338,6 +346,13 @@ class DtrComputer
                 fn ($l) => $l->logged_at->greaterThan($actualIn) && $l->logged_at->lessThanOrEqualTo($cutoff),
             );
             $actualOut = $withinLast?->logged_at;
+        }
+
+        // Reject a "time-out" that's really a duplicate tap at arrival: if the out is
+        // less than a real shift after the in, it's a mistake punch — drop it and
+        // leave the day open (the schedule expects a shift of hours, not minutes).
+        if ($actualIn && $actualOut && $actualIn->diffInMinutes($actualOut) < self::MIN_SHIFT_MINUTES) {
+            $actualOut = null;
         }
 
         // A single punch is ambiguous: count it as a departure when it falls nearer

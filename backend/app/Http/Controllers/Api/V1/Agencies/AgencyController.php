@@ -144,7 +144,10 @@ class AgencyController extends Controller
         $rows = $employees->map(function ($e) use ($byEmp) {
             $rec = $byEmp[$e->id] ?? null;
             $in = $rec['in'] ?? null;
-            $out = ($rec && ($rec['n'] ?? 0) > 1) ? $rec['out'] : null;
+            // A time-out only counts when it's a real gap after the time-in (30 min+).
+            // Two taps a few minutes apart are a double-tap at arrival, not a clock-out.
+            $out = ($rec && ($rec['n'] ?? 0) > 1 && $in && $rec['out']->diffInMinutes($in) >= 30)
+                ? $rec['out'] : null;
             $status = $in ? ($out ? 'complete' : 'no_out') : 'no_punch';
 
             return [
