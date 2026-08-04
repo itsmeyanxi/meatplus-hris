@@ -44,7 +44,7 @@ class PayrollComputer
         $comps = EmployeeCompensation::query()
             ->where('company_id', $run->company_id)
             ->where(fn ($q) => $q->whereNull('effective_from')->orWhereDate('effective_from', '<=', $run->period_end->toDateString()))
-            ->with('employee:id,first_name,last_name,is_active,is_confidential')
+            ->with('employee:id,first_name,last_name,is_active,is_confidential,date_hired,date_separated')
             ->orderBy('employee_id')
             ->orderByDesc('effective_from')
             ->orderByDesc('id')
@@ -70,7 +70,14 @@ class PayrollComputer
             $run->payslips()->delete();
 
             foreach ($comps as $comp) {
-                if (! $comp->employee || ! $comp->employee->is_active) {
+                $emp = $comp->employee;
+                // Don't pay: no employee, flagged inactive, already separated on/before
+                // this cutoff (resigned/terminated — final pay is a separate flow), or
+                // not yet hired as of the cutoff end.
+                if (! $emp
+                    || ! $emp->is_active
+                    || ($emp->date_separated && $emp->date_separated->lte($run->period_end))
+                    || ($emp->date_hired && $emp->date_hired->gt($run->period_end))) {
                     $skipped++;
                     continue;
                 }
