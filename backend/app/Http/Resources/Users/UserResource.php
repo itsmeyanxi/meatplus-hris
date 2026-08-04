@@ -33,13 +33,30 @@ class UserResource extends JsonResource
             'companies' => $this->whenLoaded('companies', fn () => $this->companies->map(fn ($c) => [
                 'id' => $c->id, 'code' => $c->code, 'legal_name' => $c->legal_name,
             ])->values()),
-            // The user's "home" company — used to group the Users list by company.
-            'primary_company' => $this->whenLoaded('activeCompany', fn () => $this->activeCompany ? [
-                'id' => $this->activeCompany->id,
-                'code' => $this->activeCompany->code,
-                'legal_name' => $this->activeCompany->legal_name,
-            ] : null),
+            // The user's "home" company — used to group the Users list. Prefer the
+            // linked employee's company (where they actually belong) over the active
+            // company, which for multi-company admins is just wherever they last
+            // switched. Falls back to the active company for direct (non-employee) users.
+            'primary_company' => $this->resolvePrimaryCompany(),
             'created_at' => $this->created_at,
         ];
+    }
+
+    /** Employee's company if linked, else the active company. Null if neither loaded. */
+    private function resolvePrimaryCompany(): ?array
+    {
+        $company = null;
+        if ($this->relationLoaded('employee') && $this->employee && $this->employee->relationLoaded('company')) {
+            $company = $this->employee->company;
+        }
+        if (! $company && $this->relationLoaded('activeCompany')) {
+            $company = $this->activeCompany;
+        }
+
+        return $company ? [
+            'id' => $company->id,
+            'code' => $company->code,
+            'legal_name' => $company->legal_name,
+        ] : null;
     }
 }

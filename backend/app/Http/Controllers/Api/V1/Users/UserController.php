@@ -27,9 +27,10 @@ class UserController extends Controller
 
         $q = User::query()
             ->with([
-                'employee:id,employee_no,first_name,last_name,user_id,position_id,department_id',
+                'employee:id,employee_no,first_name,last_name,user_id,position_id,department_id,company_id',
                 'employee.position:id,title',
                 'employee.department:id,name',
+                'employee.company:id,code,legal_name',
                 'companies:id,code,legal_name',
                 'activeCompany:id,code,legal_name',
             ])
