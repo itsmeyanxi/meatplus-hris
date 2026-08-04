@@ -13,7 +13,7 @@ import { COASection } from "@/components/coa/COASection";
 
 const PERM_CATEGORIES: Record<string, { label: string; cls: string }> = {
   leave:          { label: "Leave",          cls: "bg-brand-50 text-brand-700 border-brand-200" },
-  attendance:     { label: "Attendance",     cls: "bg-blue-50 text-blue-700 border-blue-200" },
+  attendance:     { label: "Attendance",     cls: "bg-sky-50 text-sky-700 border-sky-200" },
   payroll:        { label: "Payroll",        cls: "bg-violet-50 text-violet-700 border-violet-200" },
   compensation:   { label: "Compensation",   cls: "bg-purple-50 text-purple-700 border-purple-200" },
   employee:       { label: "Employee",       cls: "bg-amber-50 text-amber-700 border-amber-200" },

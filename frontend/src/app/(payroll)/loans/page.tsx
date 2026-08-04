@@ -15,7 +15,7 @@ const typeLabel = (v: string) => LOAN_TYPES.find((t) => t.value === v)?.label ??
 
 const TYPE_BADGE: Record<string, string> = {
   sss_salary: "bg-sky-50 text-sky-700 ring-sky-200",
-  sss_calamity: "bg-blue-50 text-blue-700 ring-blue-200",
+  sss_calamity: "bg-sky-50 text-sky-700 ring-sky-200",
   pagibig_mpl: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   pagibig_calamity: "bg-brand-50 text-brand-700 ring-brand-200",
   cash_advance: "bg-amber-50 text-amber-700 ring-amber-200",

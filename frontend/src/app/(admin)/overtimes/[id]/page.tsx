@@ -20,7 +20,7 @@ export default function OvertimeDetailPage() {
         { label: "Requested hours",   value: `${r.requested_hours}h` },
         { label: "Reason",            value: r.reason },
         ...(r.attachment_path
-          ? [{ label: "Attachment", value: <a href={overtimeApi.attachmentUrl(r.id)} target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Download attachment</a> }]
+          ? [{ label: "Attachment", value: <a href={overtimeApi.attachmentUrl(r.id)} target="_blank" rel="noreferrer" className="text-brand-600 underline hover:text-brand-800">Download attachment</a> }]
           : []),
       ]}
     />

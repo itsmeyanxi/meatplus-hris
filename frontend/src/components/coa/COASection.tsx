@@ -31,7 +31,7 @@ const STATUS_STYLE: Record<string, string> = {
   approved:    "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
   rejected:    "bg-red-50 text-red-700 ring-1 ring-red-200",
   cancelled:   "bg-slate-100 text-slate-500",
-  resubmitted: "bg-blue-50 text-blue-700 ring-1 ring-blue-200",
+  resubmitted: "bg-sky-50 text-sky-700 ring-1 ring-sky-200",
 };
 
 function StatusBadge({ status }: { status: string }) {

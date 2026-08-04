@@ -308,7 +308,7 @@ function FileUTForm({ employeeId, canManage, meData }: { employeeId: number; can
 
               {/* Undertime Details */}
               <div>
-                <p className="mb-3 text-sm font-semibold text-blue-700 border-b border-slate-200 pb-1">Undertime Details:</p>
+                <p className="mb-3 text-sm font-semibold text-brand-700 border-b border-slate-200 pb-1">Undertime Details:</p>
                 <div className="flex flex-wrap gap-4">
                   <div className="w-44">
                     <label className="mb-1 block text-xs font-medium text-slate-500">Early departure time</label>
@@ -370,7 +370,7 @@ function FileUTForm({ employeeId, canManage, meData }: { employeeId: number; can
             <button
               type="submit"
               disabled={create.isPending}
-              className="rounded-lg bg-blue-700 px-6 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+              className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
             >
               {create.isPending ? "Submitting…" : "Apply"}
             </button>
@@ -385,7 +385,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <span className="text-xs text-slate-500">{label}: </span>
-      <span className="text-xs font-semibold text-blue-700">{value}</span>
+      <span className="text-xs font-semibold text-brand-700">{value}</span>
     </div>
   );
 }

@@ -2004,8 +2004,8 @@ function LeaveSection({ leaveTypes, selected, onToggle, onOpening }: {
 }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-        <p className="text-xs text-blue-800">
+      <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+        <p className="text-xs text-sky-800">
           Leave balances belong to a saved employee, so the plans chosen here are assigned the
           moment the employee is registered. Usage appears afterwards under Leaves.
         </p>
