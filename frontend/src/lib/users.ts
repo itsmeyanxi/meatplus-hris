@@ -27,6 +27,8 @@ export type UserItem = {
   employee: { id: number; employee_no: string; full_name: string; position?: string | null } | null;
   suggested_role?: Role | null;
   roles: Role[];
+  /** Companies this user can access / switch between (multi-company HR staff). */
+  companies?: { id: number; code: string | null; legal_name: string }[];
 };
 
 export type StoreUserInput = {
@@ -41,6 +43,7 @@ export type UpdateUserInput = Partial<{
   email: string;
   is_active: boolean;
   roles: Role[];
+  company_ids: number[];
 }>;
 
 type Listed<T> = { data: T[] };

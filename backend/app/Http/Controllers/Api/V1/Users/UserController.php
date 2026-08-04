@@ -74,7 +74,7 @@ class UserController extends Controller
         abort_unless($request->user()->can('user.manage'), 403);
         $this->ensureSameCompany($request, $user);
 
-        return new UserResource($user->load('employee.position', 'employee.department'));
+        return new UserResource($user->load('employee.position', 'employee.department', 'companies'));
     }
 
     public function update(UpdateUserRequest $request, User $user): UserResource
@@ -84,6 +84,9 @@ class UserController extends Controller
         $data  = $request->validated();
         $roles = $data['roles'] ?? null;
         unset($data['roles']);
+
+        $companyIds = array_key_exists('company_ids', $data) ? $data['company_ids'] : null;
+        unset($data['company_ids']);
 
         if (! empty($data)) {
             $user->update($data);
@@ -95,7 +98,19 @@ class UserController extends Controller
             $user->syncRoles($roles);
         }
 
-        return new UserResource($user->fresh(['employee']));
+        // Set which companies this user can access/switch between. Keep the active
+        // company valid — if it was removed, drop into the first assigned company.
+        if ($companyIds !== null) {
+            $ids = array_values(array_unique(array_map('intval', $companyIds)));
+            if (! empty($ids)) {
+                $user->companies()->sync($ids);
+                if (! in_array($user->active_company_id, $ids, true)) {
+                    $user->forceFill(['active_company_id' => $ids[0]])->save();
+                }
+            }
+        }
+
+        return new UserResource($user->fresh(['employee', 'companies']));
     }
 
     public function resetPassword(Request $request, User $user): JsonResponse

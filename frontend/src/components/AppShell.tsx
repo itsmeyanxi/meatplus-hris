@@ -109,20 +109,26 @@ export function AppShell({
 
   // Original company is the home company locked in on first switch — can never return there.
   const originalCompanyId = data?.user.original_company_id ?? null;
-  // An IT account is either currently it_admin/super_admin or has previously switched away (has original_company_id).
-  const isItAccount = isItAdmin || isSuperAdmin || originalCompanyId !== null;
+  // Companies this user belongs to — a multi-company user (e.g. HR handling several
+  // companies) can switch between them even without being an it_admin.
+  const myCompanies = data?.user.companies ?? [];
+  const isMultiCompany = myCompanies.length > 1;
+  // An account gets the company switcher if it's it_admin/super_admin, has switched
+  // before, or simply belongs to more than one company.
+  const isItAccount = isItAdmin || isSuperAdmin || originalCompanyId !== null || isMultiCompany;
 
   const { data: companiesData } = useQuery({
     queryKey: ["companies-list"],
     queryFn: getCompanies,
-    enabled: isItAccount,
+    enabled: isItAdmin || isSuperAdmin, // admins pick from ALL companies
     staleTime: 60_000,
   });
 
-  // Exclude the home company from the switcher — once you leave, you can't go back.
-  // Show every company the account can reach, including the home company so it
-  // can be returned to.
-  const switchableCompanies = companiesData ?? [];
+  // Admins can switch into any company; everyone else only the ones they belong to.
+  // Normalised to a common { id, name } shape so both sources render the same.
+  const switchableCompanies: { id: number; name: string }[] = (isItAdmin || isSuperAdmin)
+    ? (companiesData ?? []).map((c) => ({ id: c.id, name: c.name }))
+    : myCompanies.map((c) => ({ id: c.id, name: c.legal_name }));
 
   const handleSwitchCompany = async (id: number) => {
     if (id === data?.user.active_company?.id) { setCompanyOpen(false); return; }

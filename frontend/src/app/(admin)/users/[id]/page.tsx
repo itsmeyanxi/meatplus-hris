@@ -7,6 +7,10 @@ import { useState } from "react";
 import { inputCls } from "@/components/employees/ChildList";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { ROLE_LABELS, usersApi, type Role, type UpdateUserInput } from "@/lib/users";
+import { getCompanies } from "@/lib/companies";
+
+// HR roles that may legitimately handle more than one company.
+const HR_ROLES: Role[] = ["hr_admin", "hr_officer", "hr_coordinator"];
 
 export default function UserDetailPage() {
   const params = useParams<{ id: string }>();
@@ -20,6 +24,7 @@ export default function UserDetailPage() {
     queryFn: () => usersApi.get(userId),
     enabled: !!userId,
   });
+  const { data: companies = [] } = useQuery({ queryKey: ["companies-list"], queryFn: getCompanies, staleTime: 60_000 });
 
   const [form, setForm] = useState<UpdateUserInput>({});
   const [tempPw, setTempPw] = useState<string | null>(null);
@@ -172,6 +177,41 @@ export default function UserDetailPage() {
             <p className="mt-1 text-xs text-red-600">At least one role is required.</p>
           )}
         </div>
+
+        {/* Companies — shown for HR staff who may handle more than one company. */}
+        {(form.roles ?? user.roles).some((r) => HR_ROLES.includes(r)) && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Companies this user can access</label>
+            <p className="mb-2 text-xs text-slate-400">Tick every company this HR user handles — they can switch between the ones selected here.</p>
+            <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              {companies.map((c) => {
+                const selected = form.company_ids ?? user.companies?.map((x) => x.id) ?? [];
+                const checked = selected.includes(c.id);
+                return (
+                  <label key={c.id} className={`flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition ${checked ? "bg-brand-600 text-white border-brand-600" : "bg-white text-slate-700 hover:bg-slate-100 border-slate-200"} border`}>
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={checked}
+                      onChange={() => {
+                        const cur = form.company_ids ?? user.companies?.map((x) => x.id) ?? [];
+                        setForm({ ...form, company_ids: checked ? cur.filter((id) => id !== c.id) : [...cur, c.id] });
+                      }}
+                    />
+                    <span className={`h-3.5 w-3.5 shrink-0 rounded border ${checked ? "border-white bg-white" : "border-slate-300 bg-white"} flex items-center justify-center`}>
+                      {checked && <svg className="h-2.5 w-2.5 text-slate-900" viewBox="0 0 12 12" fill="currentColor"><path d="M10 3L5 8.5 2 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+                    </span>
+                    {c.code ?? c.legal_name}
+                  </label>
+                );
+              })}
+            </div>
+            {(form.company_ids ?? user.companies?.map((x) => x.id) ?? []).length === 0 && (
+              <p className="mt-1 text-xs text-amber-600">Pick at least one company, or this user won&apos;t have access anywhere.</p>
+            )}
+          </div>
+        )}
+
         <div>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={form.is_active ?? user.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />

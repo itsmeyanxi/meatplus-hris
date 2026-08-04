@@ -20,6 +20,8 @@ class UpdateUserRequest extends FormRequest
             'name' => ['sometimes', 'string', 'max:255'],
             'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($userId)],
             'is_active' => ['sometimes', 'boolean'],
+            'company_ids'   => ['sometimes', 'array'],
+            'company_ids.*' => ['integer', Rule::exists('companies', 'id')],
             'roles'   => ['sometimes', 'array', 'min:1'],
             'roles.*' => ['string', Rule::in([
                 'admin', 'hr_admin', 'hr_officer', 'it_admin', 'it_staff', 'payroll_officer', 'dept_head', 'employee',

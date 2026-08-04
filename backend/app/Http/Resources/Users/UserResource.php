@@ -27,6 +27,10 @@ class UserResource extends JsonResource
                 ? app(\App\Domain\Identity\Services\RoleSuggester::class)->suggest($this->employee)
                 : null),
             'roles' => $this->getRoleNames(),
+            // Companies this user can access/switch between (multi-company HR staff).
+            'companies' => $this->whenLoaded('companies', fn () => $this->companies->map(fn ($c) => [
+                'id' => $c->id, 'code' => $c->code, 'legal_name' => $c->legal_name,
+            ])->values()),
             'created_at' => $this->created_at,
         ];
     }
