@@ -33,6 +33,8 @@ export type UserItem = {
   roles: Role[];
   /** Companies this user can access / switch between (multi-company HR staff). */
   companies?: { id: number; code: string | null; legal_name: string }[];
+  /** The user's "home" company — used to group the Users list. */
+  primary_company?: { id: number; code: string | null; legal_name: string } | null;
 };
 
 export type StoreUserInput = {
@@ -69,7 +71,7 @@ export async function getRoles(): Promise<RoleWithPermissions[]> {
 }
 
 export const usersApi = {
-  list: async (params: { q?: string; only_active?: boolean } = {}): Promise<UserItem[]> => {
+  list: async (params: { q?: string; only_active?: boolean; company_id?: number } = {}): Promise<UserItem[]> => {
     const { data } = await api.get<Listed<UserItem>>("/api/v1/users", { params });
     return data.data;
   },

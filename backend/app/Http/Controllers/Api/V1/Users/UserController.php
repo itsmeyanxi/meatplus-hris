@@ -19,11 +19,26 @@ class UserController extends Controller
     {
         abort_unless($request->user()->can('user.manage'), 403);
 
-        $companyId = $request->user()->active_company_id;
+        // Users the requester may see: anyone sharing at least one company with them.
+        // For admins (members of every company) that's the whole directory, which the
+        // Users page then groups by company. A `company_id` narrows to one company.
+        $accessibleCompanyIds = $request->user()->companies()->pluck('companies.id')->all();
+        $filterCompany = $request->integer('company_id') ?: null;
 
         $q = User::query()
-            ->with(['employee:id,employee_no,first_name,last_name,user_id,position_id,department_id', 'employee.position:id,title', 'employee.department:id,name'])
-            ->whereHas('companies', fn ($c) => $c->where('companies.id', $companyId))
+            ->with([
+                'employee:id,employee_no,first_name,last_name,user_id,position_id,department_id',
+                'employee.position:id,title',
+                'employee.department:id,name',
+                'companies:id,code,legal_name',
+                'activeCompany:id,code,legal_name',
+            ])
+            ->whereHas('companies', function ($c) use ($accessibleCompanyIds, $filterCompany) {
+                $c->whereIn('companies.id', $accessibleCompanyIds);
+                if ($filterCompany) {
+                    $c->where('companies.id', $filterCompany);
+                }
+            })
             ->orderBy('name');
 
         if ($search = $request->query('q')) {
@@ -38,7 +53,8 @@ class UserController extends Controller
             $q->where('is_active', true);
         }
 
-        return UserResource::collection($q->limit(500)->get());
+        // Higher cap now that the list can span every company (grouped client-side).
+        return UserResource::collection($q->limit(2000)->get());
     }
 
     public function store(StoreUserRequest $request): JsonResponse

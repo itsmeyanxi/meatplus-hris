@@ -33,6 +33,12 @@ class UserResource extends JsonResource
             'companies' => $this->whenLoaded('companies', fn () => $this->companies->map(fn ($c) => [
                 'id' => $c->id, 'code' => $c->code, 'legal_name' => $c->legal_name,
             ])->values()),
+            // The user's "home" company — used to group the Users list by company.
+            'primary_company' => $this->whenLoaded('activeCompany', fn () => $this->activeCompany ? [
+                'id' => $this->activeCompany->id,
+                'code' => $this->activeCompany->code,
+                'legal_name' => $this->activeCompany->legal_name,
+            ] : null),
             'created_at' => $this->created_at,
         ];
     }
