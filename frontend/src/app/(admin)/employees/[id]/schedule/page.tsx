@@ -11,6 +11,14 @@ import { SearchSelect } from "@/components/SearchSelect";
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+// A manually-entered weekly pattern (one entry per day of week, Sun–Sat).
+type CustomDay = { is_rest_day: boolean; time_in: string; time_out: string };
+const DEFAULT_WEEK: CustomDay[] = [0, 1, 2, 3, 4, 5, 6].map((dow) => ({
+  is_rest_day: dow === 0, // Sunday rest by default; adjust as needed
+  time_in: "08:00",
+  time_out: "17:00",
+}));
+
 const SCHED_TYPES = [
   { value: "regular", label: "Regular", hint: "punches", desc: "Must time in / out on scheduled days. Tracked for lates, undertime and absences." },
   { value: "flexible", label: "Flexible / Flexi-time", hint: "no late", desc: "Punches, but no late penalty — arrive anytime and complete the required hours. Still absent if there's no punch at all." },
@@ -98,6 +106,13 @@ export default function EmployeeSchedulePage() {
   const [adding, setAdding] = useState(false);
   const [schedSearch, setSchedSearch] = useState("");
 
+  // "existing" = pick a saved schedule · "custom" = enter the week by hand.
+  const [mode, setMode] = useState<"existing" | "custom">("existing");
+  const [customName, setCustomName] = useState("");
+  const [customDays, setCustomDays] = useState<CustomDay[]>(() => DEFAULT_WEEK.map((d) => ({ ...d })));
+  const setDay = (dow: number, patch: Partial<CustomDay>) =>
+    setCustomDays((ds) => ds.map((d, i) => (i === dow ? { ...d, ...patch } : d)));
+
   const selected: WorkSchedule | undefined = useMemo(
     () => schedules.find((s) => String(s.id) === wsId),
     [schedules, wsId],
@@ -118,6 +133,42 @@ export default function EmployeeSchedulePage() {
     mutationFn: (id: number) => employeeSchedulesApi.destroy(employeeId, id),
     onSuccess: () => { toast.success("Assignment removed."); invalidate(); },
     onError: () => toast.error("Couldn't remove."),
+  });
+
+  // Create a work schedule from the manually-entered week, then assign it.
+  const createAssign = useMutation({
+    mutationFn: async () => {
+      const days = customDays.map((d, dow) => {
+        let required = 0;
+        if (!d.is_rest_day && d.time_in && d.time_out) {
+          const [ih, im] = d.time_in.split(":").map(Number);
+          const [oh, om] = d.time_out.split(":").map(Number);
+          let mins = oh * 60 + om - (ih * 60 + im);
+          if (mins < 0) mins += 24 * 60; // shift crosses midnight
+          required = Math.max(0, Math.round(((mins - 60) / 60) * 10) / 10); // minus a 60-min break
+        }
+        return {
+          day_of_week: dow,
+          is_rest_day: d.is_rest_day,
+          time_in: d.is_rest_day ? null : d.time_in,
+          time_out: d.is_rest_day ? null : d.time_out,
+          break_minutes: d.is_rest_day ? 0 : 60,
+          required_hours: required,
+        };
+      });
+      const workdays = days.filter((d) => !d.is_rest_day).length;
+      const name = customName.trim() || `${emp?.first_name ?? "Employee"} ${emp?.last_name ?? ""} — custom`.trim();
+      const code = `CUSTOM-${employeeId}-${Date.now().toString(36)}`;
+      const sched = await workSchedulesApi.create({ code, name, weekly_workdays: workdays, is_active: true, days });
+      await employeeSchedulesApi.create(employeeId, { work_schedule_id: sched.id, effective_from: from });
+    },
+    onSuccess: () => {
+      toast.success("Custom schedule created and assigned.");
+      setAdding(false);
+      invalidate();
+      qc.invalidateQueries({ queryKey: ["work-schedules"] });
+    },
+    onError: () => toast.error("Couldn't create the custom schedule."),
   });
 
   return (
@@ -172,6 +223,15 @@ export default function EmployeeSchedulePage() {
         {/* Assign form — searchable list with a readable summary + mini week per option */}
         {adding && canManage && (
           <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+            {/* Pick a saved schedule, or enter one by hand */}
+            <div className="inline-flex rounded-lg border border-slate-200 p-0.5 text-xs font-semibold">
+              <button type="button" onClick={() => setMode("existing")}
+                className={`rounded-md px-3 py-1.5 transition ${mode === "existing" ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Pick existing</button>
+              <button type="button" onClick={() => setMode("custom")}
+                className={`rounded-md px-3 py-1.5 transition ${mode === "custom" ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Create custom</button>
+            </div>
+
+            {mode === "existing" && (
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-500">1 · Pick a work schedule</label>
               <div className="relative">
@@ -215,19 +275,63 @@ export default function EmployeeSchedulePage() {
                 })()}
               </div>
             </div>
+            )}
+
+            {mode === "custom" && (
+              <div className="space-y-2">
+                <label className="mb-1 block text-xs font-medium text-slate-500">1 · Enter the weekly pattern</label>
+                <input
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="Schedule name (optional)"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+                />
+                <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
+                  {customDays.map((d, dow) => (
+                    <div key={dow} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                      <span className="w-10 text-xs font-bold uppercase tracking-wide text-slate-500">{DOW[dow]}</span>
+                      <label className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+                        <input type="checkbox" checked={d.is_rest_day} onChange={(e) => setDay(dow, { is_rest_day: e.target.checked })} />
+                        Rest day
+                      </label>
+                      {!d.is_rest_day && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <input type="time" value={d.time_in} onChange={(e) => setDay(dow, { time_in: e.target.value })}
+                            className="rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-brand-500" />
+                          <span className="text-slate-400">to</span>
+                          <input type="time" value={d.time_out} onChange={(e) => setDay(dow, { time_out: e.target.value })}
+                            className="rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-brand-500" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-400">A 60-minute unpaid break is assumed on working days. This creates a schedule for this employee only.</p>
+              </div>
+            )}
 
             <div className="flex flex-wrap items-end gap-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-500">2 · Effective from</label>
                 <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
               </div>
-              <button
-                onClick={() => assign.mutate()}
-                disabled={!wsId || assign.isPending}
-                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-              >
-                {assign.isPending ? "Saving…" : "Assign schedule"}
-              </button>
+              {mode === "existing" ? (
+                <button
+                  onClick={() => assign.mutate()}
+                  disabled={!wsId || assign.isPending}
+                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {assign.isPending ? "Saving…" : "Assign schedule"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => createAssign.mutate()}
+                  disabled={createAssign.isPending}
+                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {createAssign.isPending ? "Creating…" : "Create & assign"}
+                </button>
+              )}
               <p className="text-xs text-slate-400">The new schedule applies from this date; the previous one is kept in history.</p>
             </div>
           </div>
