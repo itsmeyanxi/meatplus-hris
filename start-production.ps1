@@ -106,13 +106,14 @@ foreach ($i in 1..30) {
 }
 Write-Host ''; if ($ready) { Write-Host "Backend pool up ($backendWorkers worker(s), ports $backendPort..$($backendPort + $backendWorkers - 1))." } else { Write-Warning "Backend not answering - see $logDir\backend-$backendPort.err.log" }
 
-# --- Queue worker (background jobs: invitation emails, etc.) ---
-if (Get-CimInstance Win32_Process -Filter "Name='php.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*queue:work*' }) {
-    Write-Host "Queue worker already running - skipping."
+# --- Queue worker watchdog (keeps the worker alive: invitation/reset emails) ---
+# Launches queue-worker-keepalive.ps1 -Watch, which starts the worker and restarts
+# it within minutes if it ever dies — so queued mail always sends.
+if (Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*queue-worker-keepalive*-Watch*' }) {
+    Write-Host "Queue worker watchdog already running - skipping."
 } else {
-    Write-Host "Starting queue worker..."
-    Start-Process -FilePath 'powershell.exe' -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$(Join-Path $root 'start-queue.ps1')`"" `
-        -RedirectStandardOutput (Join-Path $logDir 'queue.log') -RedirectStandardError (Join-Path $logDir 'queue.err.log')
+    Write-Host "Starting queue worker watchdog..."
+    Start-Process -FilePath 'powershell.exe' -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$(Join-Path $root 'queue-worker-keepalive.ps1')`" -Watch"
 }
 
 # --- Frontend (Next.js compiled build) -> 127.0.0.1:3001 ---

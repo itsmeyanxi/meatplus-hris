@@ -33,8 +33,9 @@
               <p style="margin:0 0 8px;font-size:12px;color:#94a3b8;">
                 This link expires in <strong>72 hours</strong>. If you did not expect this email, you can safely ignore it.
               </p>
-              <p style="margin:0;font-size:11px;color:#cbd5e1;word-break:break-all;">
-                Or copy this link: {{ $inviteUrl }}
+              <p style="margin:0;font-size:12px;color:#64748b;line-height:1.6;word-break:break-all;">
+                Or open this link:<br>
+                <a href="{{ $inviteUrl }}" style="color:#2563eb;text-decoration:underline;font-weight:600;">{{ $inviteUrl }}</a>
               </p>
             </td>
           </tr>
