@@ -61,14 +61,39 @@ export default function LoansPage() {
   }, [loans]);
 
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState<LoanInput>({ employee_id: 0, type: "cash_advance", amortization: 0, principal: undefined, reference_no: "" });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingLabel, setEditingLabel] = useState("");
+  const emptyForm: LoanInput = { employee_id: 0, type: "cash_advance", amortization: 0, principal: undefined, reference_no: "", outstanding_balance: undefined, start_date: null };
+  const [form, setForm] = useState<LoanInput>(emptyForm);
 
-  const reset = () => { setForm({ employee_id: 0, type: "cash_advance", amortization: 0, principal: undefined, reference_no: "" }); setAdding(false); };
+  const reset = () => { setForm(emptyForm); setAdding(false); setEditingId(null); setEditingLabel(""); };
   const invalidate = () => qc.invalidateQueries({ queryKey: ["loans"] });
 
-  const create = useMutation({
-    mutationFn: () => loansApi.create(form),
-    onSuccess: () => { toast.success("Loan added."); reset(); invalidate(); },
+  const startEdit = (l: typeof loans[number]) => {
+    setForm({
+      employee_id: 0, // employee doesn't change when editing an existing loan
+      type: l.type,
+      amortization: Number(l.amortization),
+      principal: l.principal != null ? Number(l.principal) : undefined,
+      reference_no: l.reference_no ?? "",
+      outstanding_balance: Number(l.outstanding_balance),
+      start_date: l.start_date ?? null,
+    });
+    setEditingId(l.id);
+    setEditingLabel([l.employee?.name, l.employee?.employee_no].filter(Boolean).join(" · "));
+    setAdding(true);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const save = useMutation({
+    mutationFn: () => {
+      if (editingId) {
+        const { employee_id: _drop, ...body } = form; // don't reassign the employee on edit
+        return loansApi.update(editingId, body);
+      }
+      return loansApi.create(form);
+    },
+    onSuccess: () => { toast.success(editingId ? "Loan updated." : "Loan added."); reset(); invalidate(); },
     onError: (e: unknown) => {
       const err = e as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
       toast.error(err?.response?.data?.errors ? Object.values(err.response.data.errors).flat().join(" ") : err?.response?.data?.message ?? "Failed.");
@@ -83,7 +108,7 @@ export default function LoansPage() {
     onSuccess: () => { toast.success("Loan deleted."); invalidate(); },
   });
 
-  const canSubmit = form.employee_id > 0 && form.type && Number(form.amortization) > 0;
+  const canSubmit = (editingId !== null || form.employee_id > 0) && !!form.type && Number(form.amortization) > 0;
 
   return (
     <div className="space-y-5">
@@ -124,11 +149,15 @@ export default function LoansPage() {
       </div>
 
       {adding && canManage && (
-        <AppCard title="New loan / deduction">
+        <AppCard title={editingId ? "Edit loan / deduction" : "New loan / deduction"}>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <label className={labelCls}>Employee *</label>
-              <EmployeeSearchSelect className={inputCls} value={form.employee_id || ""} onChange={(id) => setForm({ ...form, employee_id: id === "" ? 0 : Number(id) })} placeholder="Search…" />
+              {editingId ? (
+                <div className={`${inputCls} flex items-center bg-slate-50 text-slate-600`}>{editingLabel || "—"}</div>
+              ) : (
+                <EmployeeSearchSelect className={inputCls} value={form.employee_id || ""} onChange={(id) => setForm({ ...form, employee_id: id === "" ? 0 : Number(id) })} placeholder="Search…" />
+              )}
             </div>
             <div>
               <label className={labelCls}>Type *</label>
@@ -146,10 +175,25 @@ export default function LoansPage() {
               <label className={labelCls}>Amortization / cutoff *</label>
               <input type="number" min="0" step="0.01" className={inputCls} value={form.amortization || ""} onChange={(e) => setForm({ ...form, amortization: Number(e.target.value) })} placeholder="0.00" />
             </div>
+            <div>
+              <label className={labelCls}>Outstanding balance</label>
+              <input type="number" min="0" step="0.01" className={inputCls} value={form.outstanding_balance ?? ""} onChange={(e) => setForm({ ...form, outstanding_balance: e.target.value === "" ? undefined : Number(e.target.value) })} placeholder={editingId ? "0.00" : "defaults to principal"} />
+            </div>
+            <div>
+              <label className={labelCls}>Start date</label>
+              <input type="date" className={inputCls} value={form.start_date ?? ""} onChange={(e) => setForm({ ...form, start_date: e.target.value || null })} />
+            </div>
           </div>
-          <p className="mt-2 text-xs text-slate-400">Outstanding balance defaults to the principal. It reduces automatically each time a payroll run that deducted it is posted.</p>
-          <div className="mt-3 flex justify-end">
-            <AppButton onClick={() => create.mutate()} disabled={!canSubmit || create.isPending}>{create.isPending ? "Saving…" : "Add loan"}</AppButton>
+          <p className="mt-2 text-xs text-slate-400">
+            {editingId
+              ? "Editing updates this loan directly. A balance of 0 marks it fully paid."
+              : "Outstanding balance defaults to the principal. It reduces automatically each time a payroll run that deducted it is posted."}
+          </p>
+          <div className="mt-3 flex justify-end gap-2">
+            <AppButton variant="secondary" onClick={reset}>Cancel</AppButton>
+            <AppButton onClick={() => save.mutate()} disabled={!canSubmit || save.isPending}>
+              {save.isPending ? "Saving…" : editingId ? "Save changes" : "Add loan"}
+            </AppButton>
           </div>
         </AppCard>
       )}
@@ -225,6 +269,7 @@ export default function LoansPage() {
                     {canManage && (
                       <td className="px-4 py-2.5 text-right">
                         <div className="flex justify-end gap-2">
+                          <button onClick={() => startEdit(l)} className="text-xs font-medium text-brand-600 hover:underline">Edit</button>
                           {outstanding > 0 && (
                             <button onClick={() => toggle.mutate({ id: l.id, is_active: !l.is_active })} className="text-xs font-medium text-slate-600 hover:underline">
                               {l.is_active ? "Pause" : "Resume"}

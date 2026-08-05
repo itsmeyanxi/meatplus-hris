@@ -85,12 +85,19 @@ class LoanImportService
                 try { $start = Carbon::parse($get('start_date'))->toDateString(); } catch (\Throwable) {}
             }
 
-            // Match an existing loan by employee + type + reference to refresh it.
+            // Match an existing loan by employee + type + reference to refresh it
+            // (rather than create a duplicate on re-upload). Reference is matched
+            // case/whitespace-insensitively so minor formatting differences between
+            // uploads don't slip through as a new loan.
             $existing = EmployeeLoan::query()
                 ->where('company_id', $companyId)
                 ->where('employee_id', $empId)
                 ->where('type', $type)
-                ->when($ref !== null, fn ($q) => $q->where('reference_no', $ref), fn ($q) => $q->whereNull('reference_no'))
+                ->when(
+                    $ref !== null,
+                    fn ($q) => $q->whereRaw('LOWER(TRIM(reference_no)) = ?', [mb_strtolower(trim($ref))]),
+                    fn ($q) => $q->whereNull('reference_no'),
+                )
                 ->first();
 
             if ($existing) {
