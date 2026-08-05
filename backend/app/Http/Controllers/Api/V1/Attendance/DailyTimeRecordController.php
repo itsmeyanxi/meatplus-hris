@@ -36,7 +36,7 @@ class DailyTimeRecordController extends Controller
             // their own per-agency board in the Agencies module. An explicit
             // employee_id still returns anyone (so a single agency worker can be opened).
             if (! $request->query('employee_id')) {
-                $q->whereHas('employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)));
+                $q->whereHas('employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)->orWhere('is_project_crew', true)));
             }
         } else {
             $employee = $user->employee;

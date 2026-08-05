@@ -34,7 +34,7 @@ class TimeLogController extends Controller
             } else {
                 // Agency workers are viewed in the Agencies module, not the organic
                 // time-logs list; an explicit employee_id still returns anyone.
-                $q->whereHas('employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)));
+                $q->whereHas('employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)->orWhere('is_project_crew', true)));
             }
         } else {
             $employee = $user->employee;

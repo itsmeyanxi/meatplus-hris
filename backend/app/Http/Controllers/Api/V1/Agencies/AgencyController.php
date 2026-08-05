@@ -24,6 +24,18 @@ class AgencyController extends Controller
         return config('app.timezone', 'Asia/Manila');
     }
 
+    /** The branch flag this module lists. Overridden by CrewController. */
+    protected function branchFlag(): string
+    {
+        return 'is_agency';
+    }
+
+    /** Whether to show ALL branches when the company has none of this flag. */
+    protected function fallbackToAllBranches(): bool
+    {
+        return true;
+    }
+
     /** GET /api/v1/agencies — one row per agency with headcount + today's attendance. */
     public function index(Request $request): JsonResponse
     {
@@ -39,8 +51,8 @@ class AgencyController extends Controller
 
         // Agencies when the company tags any (e.g. PASEI); otherwise fall back to
         // all branches so the page still works for ordinary branch-based companies.
-        $branches = $base()->where('is_agency', true)->get(['id', 'code', 'name']);
-        if ($branches->isEmpty()) {
+        $branches = $base()->where($this->branchFlag(), true)->get(['id', 'code', 'name']);
+        if ($branches->isEmpty() && $this->fallbackToAllBranches()) {
             $branches = $base()->get(['id', 'code', 'name']);
         }
 

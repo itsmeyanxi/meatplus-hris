@@ -242,6 +242,11 @@ Route::prefix('v1')->group(function () {
         Route::get('agencies', [\App\Http\Controllers\Api\V1\Agencies\AgencyController::class, 'index']);
         Route::get('agencies/{branch}/today', [\App\Http\Controllers\Api\V1\Agencies\AgencyController::class, 'today']);
         Route::post('agencies/{branch}/employees', [\App\Http\Controllers\Api\V1\Agencies\AgencyController::class, 'storeEmployee']);
+
+        // Project crews — internal project-based crews (PASEI), same board as agencies
+        Route::get('crews', [\App\Http\Controllers\Api\V1\Agencies\CrewController::class, 'index']);
+        Route::get('crews/{branch}/today', [\App\Http\Controllers\Api\V1\Agencies\CrewController::class, 'today']);
+        Route::post('crews/{branch}/employees', [\App\Http\Controllers\Api\V1\Agencies\CrewController::class, 'storeEmployee']);
         Route::get('reports/compensation', [ReportController::class, 'compensation']);
         Route::get('reports/ytd', [ReportController::class, 'ytd']);
         Route::get('reports/thirteenth-month', [ReportController::class, 'thirteenthMonth']);

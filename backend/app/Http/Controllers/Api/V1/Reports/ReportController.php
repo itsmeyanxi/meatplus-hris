@@ -51,7 +51,7 @@ class ReportController extends Controller
             // Keep agency workers out of the company's internal DTR — they have their
             // own per-agency report. An explicit employee_id still returns anyone.
             ->when(! $request->employee_id, fn ($q) => $q->whereHas(
-                'employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true))
+                'employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)->orWhere('is_project_crew', true))
             ))
             ->orderBy('work_date')
             ->orderBy('employee_id')
@@ -108,7 +108,7 @@ class ReportController extends Controller
             ->when($request->employee_id, fn ($q) => $q->where('employee_id', $request->employee_id))
             ->when($request->department_id, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
             // Organic staff only — agency workers are reported via the Agencies module.
-            ->when(! $request->employee_id, fn ($q) => $q->whereHas('employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true))))
+            ->when(! $request->employee_id, fn ($q) => $q->whereHas('employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)->orWhere('is_project_crew', true))))
             ->selectRaw('employee_id,
                 count(*) filter (where not is_rest_day) as scheduled_days,
                 count(*) filter (where actual_in is not null) as present_days,
@@ -491,7 +491,7 @@ class ReportController extends Controller
             ->with('employee:id,employee_no,first_name,last_name,department_id', 'employee.department:id,name')
             ->where('is_active', true)
             // Internal payroll only — exclude agency workers (reported per agency).
-            ->whereHas('employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)))
+            ->whereHas('employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)->orWhere('is_project_crew', true)))
             ->get();
 
         $headers = ['Employee No', 'Name', 'Department', 'Pay Type', 'Basic Monthly', 'Daily Rate', 'Hourly Rate', 'Allowance', 'Effective From'];

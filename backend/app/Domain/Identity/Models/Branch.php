@@ -17,7 +17,7 @@ class Branch extends Model
         'company_id', 'code', 'name',
         'address_line1', 'address_line2', 'city', 'province', 'postal_code', 'country',
         'latitude', 'longitude', 'geofence_radius_m',
-        'is_head_office', 'is_agency', 'is_active',
+        'is_head_office', 'is_agency', 'is_project_crew', 'is_active',
     ];
 
     protected function casts(): array
@@ -25,6 +25,7 @@ class Branch extends Model
         return [
             'is_head_office' => 'boolean',
             'is_agency' => 'boolean',
+            'is_project_crew' => 'boolean',
             'is_active' => 'boolean',
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',

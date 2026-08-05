@@ -75,7 +75,7 @@ class PayrollTimekeepingController extends Controller
         $employees = Employee::query()
             ->whereIn('id', $employeeIds)
             // Organic staff only — agency workers are reviewed in the Agencies module.
-            ->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true))
+            ->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)->orWhere('is_project_crew', true))
             ->with([
                 'department:id,name,head_employee_id',
                 'manager:id,first_name,last_name,email_company,email_personal,mobile',
