@@ -14,6 +14,9 @@ export async function getPendingSummary(): Promise<PendingSummary> {
 
 export type AdminStats = {
   headcount: number;
+  headcount_organic: number;
+  headcount_agency: number;
+  headcount_project_crew: number;
   no_access: number;
   pending_leaves: number;
   today_present: number;

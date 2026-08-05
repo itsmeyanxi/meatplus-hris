@@ -311,7 +311,7 @@ function AdminView({
     <>
       {/* Stats strip */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Total headcount"  value={adminStats?.headcount     ?? null} href="/employees?active=1" color="slate"   icon={<PeopleIcon />} />
+        <HeadcountCards adminStats={adminStats} />
         <StatCard label="No portal access" value={adminStats?.no_access      ?? null} href="/employees"         color="amber"   icon={<ShieldIcon />} />
         <StatCard label="Pending leaves"   value={adminStats?.pending_leaves ?? null} href="/leaves"            color="sky"     icon={<LeafIcon />} />
         <StatCard label="Present today"    value={adminStats?.today_present  ?? null} href="/attendance/dtr"    color="emerald" icon={<ClockIcon />} />
@@ -382,7 +382,7 @@ function HRView({ adminStats, perms, personal }: SharedProps & { personal: Perso
   return (
     <>
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Total headcount"  value={adminStats?.headcount     ?? null} href="/employees?active=1" color="slate"   icon={<PeopleIcon />} />
+        <HeadcountCards adminStats={adminStats} />
         <StatCard label="No portal access" value={adminStats?.no_access      ?? null} href="/employees"         color="amber"   icon={<ShieldIcon />} />
         <StatCard label="Pending leaves"   value={adminStats?.pending_leaves ?? null} href="/leaves"            color="sky"     icon={<LeafIcon />} />
         <StatCard label="Present today"    value={adminStats?.today_present  ?? null} href="/attendance/dtr"    color="emerald" icon={<ClockIcon />} />
@@ -450,7 +450,7 @@ function PayrollView({
   return (
     <>
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Total headcount" value={adminStats?.headcount    ?? null} href="/employees?active=1" color="slate"   icon={<PeopleIcon />} />
+        <HeadcountCards adminStats={adminStats} />
         <StatCard label="Present today"   value={adminStats?.today_present ?? null} href="/attendance/dtr"    color="emerald" icon={<ClockIcon />} />
         <StatCard label="Pending leaves"  value={adminStats?.pending_leaves ?? null} href="/leaves"           color="sky"     icon={<LeafIcon />} />
         <StatCard label="No portal access" value={adminStats?.no_access   ?? null} href="/employees"          color="amber"   icon={<ShieldIcon />} />
@@ -536,7 +536,7 @@ function ManagerView({ adminStats, perms, personal }: SharedProps & { personal: 
 
       {/* Team stats */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Total headcount" value={adminStats?.headcount     ?? null} href="/employees?active=1" color="slate"   icon={<PeopleIcon />} />
+        <HeadcountCards adminStats={adminStats} />
         <StatCard label="Present today"   value={adminStats?.today_present  ?? null} href="/attendance/dtr"    color="emerald" icon={<ClockIcon />} />
         <StatCard label="Pending leaves"  value={adminStats?.pending_leaves ?? null} href="/leaves"            color="sky"     icon={<LeafIcon />} />
         <StatCard label="No portal access" value={adminStats?.no_access    ?? null} href="/employees"          color="amber"   icon={<ShieldIcon />} />
@@ -643,7 +643,7 @@ function DeptAdminView({ adminStats, perms, personal }: SharedProps & { personal
   return (
     <>
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Total headcount"  value={adminStats?.headcount     ?? null} href="/employees?active=1" color="slate"   icon={<PeopleIcon />} />
+        <HeadcountCards adminStats={adminStats} />
         <StatCard label="No portal access" value={adminStats?.no_access      ?? null} href="/employees"         color="amber"   icon={<ShieldIcon />} />
         <StatCard label="Present today"    value={adminStats?.today_present  ?? null} href="/attendance/dtr"    color="emerald" icon={<ClockIcon />} />
         <StatCard label="Pending leaves"   value={adminStats?.pending_leaves ?? null} href="/leaves"            color="sky"     icon={<LeafIcon />} />
@@ -938,7 +938,28 @@ const COLOR_MAP = {
   amber:   { card: "bg-amber-50 border-amber-200",     num: "text-amber-800",   label: "text-amber-600" },
   sky:     { card: "bg-sky-50 border-sky-200",         num: "text-sky-800",     label: "text-sky-600" },
   emerald: { card: "bg-emerald-50 border-emerald-200", num: "text-emerald-800", label: "text-emerald-600" },
+  violet:  { card: "bg-violet-50 border-violet-200",   num: "text-violet-800",  label: "text-violet-600" },
 } as const;
+
+/**
+ * Headcount card(s). For a company with agency and/or project-crew workers (e.g.
+ * PASEI) it splits into Organic / Agency / Project-based; otherwise it shows a
+ * single Total headcount card.
+ */
+function HeadcountCards({ adminStats }: { adminStats?: AdminStats | null }) {
+  const agency = adminStats?.headcount_agency ?? 0;
+  const project = adminStats?.headcount_project_crew ?? 0;
+  if (agency === 0 && project === 0) {
+    return <StatCard label="Total headcount" value={adminStats?.headcount ?? null} href="/employees?active=1" color="slate" icon={<PeopleIcon />} />;
+  }
+  return (
+    <>
+      <StatCard label="Organic" value={adminStats?.headcount_organic ?? null} href="/employees?active=1" color="slate" icon={<PeopleIcon />} />
+      <StatCard label="Agency" value={agency} href="/agencies" color="sky" icon={<PeopleIcon />} />
+      <StatCard label="Project-based" value={project} href="/crews" color="violet" icon={<PeopleIcon />} />
+    </>
+  );
+}
 
 function StatCard({ label, value, href, color, icon }: {
   label: string; value: number | null; href: string; color: keyof typeof COLOR_MAP; icon?: React.ReactNode;

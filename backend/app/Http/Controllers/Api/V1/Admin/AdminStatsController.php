@@ -29,6 +29,13 @@ class AdminStatsController extends Controller
 
         $headcount = (clone $base)->count();
 
+        // Headcount split by workforce type: agency (is_agency branches), project
+        // crews (is_project_crew branches), and organic (everyone else). Lets the
+        // dashboard show the three separately for companies like PASEI.
+        $agencyCount = (clone $base)->whereHas('branch', fn ($b) => $b->where('is_agency', true))->count();
+        $projectCrewCount = (clone $base)->whereHas('branch', fn ($b) => $b->where('is_project_crew', true))->count();
+        $organicCount = $headcount - $agencyCount - $projectCrewCount;
+
         $noAccess = (clone $base)->whereNull('user_id')->count();
 
         $pendingLeaves = LeaveApplication::query()
@@ -68,6 +75,9 @@ class AdminStatsController extends Controller
 
         return response()->json([
             'headcount'               => $headcount,
+            'headcount_organic'       => $organicCount,
+            'headcount_agency'        => $agencyCount,
+            'headcount_project_crew'  => $projectCrewCount,
             'no_access'               => $noAccess,
             'pending_leaves'          => $pendingLeaves,
             'today_present'           => $todayPresent,
