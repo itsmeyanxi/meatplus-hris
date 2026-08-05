@@ -18,12 +18,15 @@ export function EmployeeSearchSelect({
   onChange,
   placeholder = "All employees",
   companyId,
+  scope,
   className = "",
 }: {
   value: number | "";
   onChange: (id: number | "", label?: string) => void;
   placeholder?: string;
   companyId?: number | "";
+  /** Which set to search: organic (default), agency, or all (both). */
+  scope?: "organic" | "agency" | "all";
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -68,8 +71,8 @@ export function EmployeeSearchSelect({
   }, []);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["employee-search", debounced, companyId],
-    queryFn: () => listEmployees({ q: debounced || undefined, companyId, perPage: 20 }),
+    queryKey: ["employee-search", debounced, companyId, scope],
+    queryFn: () => listEmployees({ q: debounced || undefined, companyId, scope, perPage: 20 }),
     enabled: open,
     staleTime: 30_000,
   });

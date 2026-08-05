@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getCrewToday, addCrewEmployee, type NewCrewEmployee } from "@/lib/crews";
+import { getCrewToday, addCrewEmployee, assignExistingToCrew, type NewCrewEmployee } from "@/lib/crews";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { PageHeader, AppButton, TableShell } from "@/components/ui";
 import { inputCls, labelCls } from "@/lib/form-classes";
 
@@ -51,7 +52,7 @@ export default function CrewBoardPage() {
         <Stat label="No punch" value={s?.no_punch} color="slate" />
       </div>
 
-      {adding && <AddWorkerForm crewId={crewId} onDone={() => { setAdding(false); qc.invalidateQueries({ queryKey: ["crew-today", crewId] }); }} />}
+      {adding && <AddPanel crewId={crewId} onDone={() => { setAdding(false); qc.invalidateQueries({ queryKey: ["crew-today", crewId] }); }} />}
 
       <TableShell>
         <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -112,7 +113,76 @@ function Stat({ label, value, color }: { label: string; value?: number; color: k
   );
 }
 
-function AddWorkerForm({ crewId, onDone }: { crewId: number; onDone: () => void }) {
+function AddPanel({ crewId, onDone }: { crewId: number; onDone: () => void }) {
+  const [mode, setMode] = useState<"existing" | "new">("existing");
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="mb-4 inline-flex rounded-lg border border-slate-200 p-0.5 text-sm">
+        <button
+          type="button"
+          onClick={() => setMode("existing")}
+          className={`rounded-md px-3 py-1.5 font-medium transition ${mode === "existing" ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+        >
+          Add existing worker
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("new")}
+          className={`rounded-md px-3 py-1.5 font-medium transition ${mode === "new" ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+        >
+          Create new worker
+        </button>
+      </div>
+      {mode === "existing" ? <AssignExistingForm crewId={crewId} onDone={onDone} /> : <NewWorkerFields crewId={crewId} onDone={onDone} />}
+    </div>
+  );
+}
+
+function AssignExistingForm({ crewId, onDone }: { crewId: number; onDone: () => void }) {
+  const [picked, setPicked] = useState<{ id: number; label: string }[]>([]);
+  const [selId, setSelId] = useState<number | "">("");
+
+  const mut = useMutation({
+    mutationFn: () => assignExistingToCrew(crewId, picked.map((p) => p.id)),
+    onSuccess: onDone,
+  });
+
+  const add = (id: number | "", label?: string) => {
+    if (id === "" || picked.some((p) => p.id === id)) return;
+    setPicked((p) => [...p, { id: Number(id), label: label ?? String(id) }]);
+    setSelId("");
+  };
+
+  return (
+    <div>
+      <p className="mb-2 text-sm font-semibold text-slate-800">Add already-registered PASEI workers to this crew</p>
+      <p className="mb-3 text-xs text-slate-500">Search any PASEI worker by name or employee number. Assigning moves them into this crew.</p>
+      <EmployeeSearchSelect value={selId} onChange={add} scope="all" placeholder="Search worker to add…" />
+
+      {picked.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {picked.map((p) => (
+            <span key={p.id} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 py-0.5 pl-2.5 pr-1.5 text-xs font-medium text-slate-700">
+              {p.label}
+              <button type="button" onClick={() => setPicked((x) => x.filter((y) => y.id !== p.id))}
+                className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-slate-200">×</button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {mut.isError && <p className="mt-2 text-xs text-red-600">Could not assign. Try again.</p>}
+
+      <div className="mt-3 flex justify-end">
+        <AppButton onClick={() => mut.mutate()} disabled={picked.length === 0 || mut.isPending}>
+          {mut.isPending ? "Assigning…" : `Assign ${picked.length || ""} to crew`}
+        </AppButton>
+      </div>
+    </div>
+  );
+}
+
+function NewWorkerFields({ crewId, onDone }: { crewId: number; onDone: () => void }) {
   const [form, setForm] = useState<NewCrewEmployee>({ employee_no: "", first_name: "", last_name: "" });
   const set = (k: keyof NewCrewEmployee) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -124,8 +194,8 @@ function AddWorkerForm({ crewId, onDone }: { crewId: number; onDone: () => void 
   const canSubmit = form.employee_no.trim() && form.first_name.trim() && form.last_name.trim();
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <h3 className="mb-3 text-sm font-semibold text-slate-800">Add a worker to this crew</h3>
+    <div>
+      <p className="mb-3 text-sm font-semibold text-slate-800">Create a brand-new worker in this crew</p>
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="block"><span className={labelCls}>Employee #</span>
           <input className={inputCls} value={form.employee_no} onChange={set("employee_no")} placeholder="e.g. 197" /></label>

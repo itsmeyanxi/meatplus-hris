@@ -84,6 +84,7 @@ export async function listEmployees(params: {
   page?: number;
   perPage?: number;
   onlyActive?: boolean;
+  scope?: "organic" | "agency" | "all";
 } = {}): Promise<PaginatedResponse<EmployeeListItem>> {
   const { data } = await api.get<PaginatedResponse<EmployeeListItem>>("/api/v1/employees", {
     params: {
@@ -97,6 +98,7 @@ export async function listEmployees(params: {
       page: params.page,
       per_page: params.perPage,
       only_active: params.onlyActive,
+      scope: params.scope || undefined,
     },
   });
   return data;

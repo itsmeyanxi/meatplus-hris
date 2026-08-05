@@ -51,3 +51,9 @@ export async function addCrewEmployee(branchId: number, payload: NewCrewEmployee
   const { data } = await api.post<{ id: number; message: string }>(`/api/v1/crews/${branchId}/employees`, payload);
   return data;
 }
+
+/** Move EXISTING employees into this crew (sets their branch to the crew). */
+export async function assignExistingToCrew(branchId: number, employeeIds: number[]): Promise<{ assigned: number; message: string }> {
+  const { data } = await api.post<{ assigned: number; message: string }>(`/api/v1/crews/${branchId}/assign`, { employee_ids: employeeIds });
+  return data;
+}

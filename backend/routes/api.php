@@ -247,6 +247,7 @@ Route::prefix('v1')->group(function () {
         Route::get('crews', [\App\Http\Controllers\Api\V1\Agencies\CrewController::class, 'index']);
         Route::get('crews/{branch}/today', [\App\Http\Controllers\Api\V1\Agencies\CrewController::class, 'today']);
         Route::post('crews/{branch}/employees', [\App\Http\Controllers\Api\V1\Agencies\CrewController::class, 'storeEmployee']);
+        Route::post('crews/{branch}/assign', [\App\Http\Controllers\Api\V1\Agencies\CrewController::class, 'assignExisting']);
         Route::get('reports/compensation', [ReportController::class, 'compensation']);
         Route::get('reports/ytd', [ReportController::class, 'ytd']);
         Route::get('reports/thirteenth-month', [ReportController::class, 'thirteenthMonth']);
