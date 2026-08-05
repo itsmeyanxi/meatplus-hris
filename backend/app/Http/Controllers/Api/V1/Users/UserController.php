@@ -27,10 +27,17 @@ class UserController extends Controller
 
         $q = User::query()
             ->with([
-                'employee:id,employee_no,first_name,last_name,user_id,position_id,department_id,company_id',
-                'employee.position:id,title',
-                'employee.department:id,name',
-                'employee.company:id,code,legal_name',
+                // Load the linked employee WITHOUT the company scope: a user's employee
+                // (and their real company) must resolve even when it lives in a company
+                // other than the viewer's active one — otherwise cross-company admins show
+                // no linked employee and get grouped under the wrong company.
+                'employee' => fn ($e) => $e->withoutGlobalScopes()
+                    ->select('id', 'employee_no', 'first_name', 'last_name', 'user_id', 'position_id', 'department_id', 'company_id')
+                    ->with([
+                        'position' => fn ($p) => $p->withoutGlobalScopes()->select('id', 'title'),
+                        'department' => fn ($d) => $d->withoutGlobalScopes()->select('id', 'name'),
+                        'company:id,code,legal_name',
+                    ]),
                 'companies:id,code,legal_name',
                 'activeCompany:id,code,legal_name',
             ])
@@ -91,7 +98,18 @@ class UserController extends Controller
         abort_unless($request->user()->can('user.manage'), 403);
         $this->ensureSameCompany($request, $user);
 
-        return new UserResource($user->load('employee.position', 'employee.department', 'companies'));
+        // Bypass the company scope so a cross-company user's linked employee still loads.
+        $user->load([
+            'employee' => fn ($e) => $e->withoutGlobalScopes()->with([
+                'position' => fn ($p) => $p->withoutGlobalScopes(),
+                'department' => fn ($d) => $d->withoutGlobalScopes(),
+                'company:id,code,legal_name',
+            ]),
+            'companies',
+            'activeCompany:id,code,legal_name',
+        ]);
+
+        return new UserResource($user);
     }
 
     public function update(UpdateUserRequest $request, User $user): UserResource
