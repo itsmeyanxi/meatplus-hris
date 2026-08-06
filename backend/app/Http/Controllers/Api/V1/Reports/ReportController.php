@@ -793,10 +793,9 @@ class ReportController extends Controller
         abort_unless($request->user()->can('payroll.view'), 403);
 
         $rows = Payslip::query()
-            ->with('employee:id,employee_no,first_name,last_name')
+            ->with(['employee:id,employee_no,first_name,last_name,department_id', 'employee.department:id,name'])
             ->with('run:id,name,period_start,period_end,pay_date')
             ->where('payroll_run_id', $payrollRunId)
-            ->orderBy('employee_id')
             ->get();
 
         abort_if($rows->isEmpty(), 404, 'Payroll run not found or has no payslips.');
@@ -804,47 +803,80 @@ class ReportController extends Controller
         $run = $rows->first()->run;
 
         $headers = [
-            'Employee No', 'Name',
+            'Employee No', 'Name', 'Department',
             'Days Worked', 'Days Absent', 'Late (min)', 'OT (min)',
             'Basic Pay', 'OT Pay', 'Night Diff', 'Holiday Pay', 'Rest Day Pay', 'Allowance', 'De Minimis', 'Gross Pay',
             'SSS', 'PhilHealth', 'Pag-IBIG', 'W/Tax',
             'Absence Deduction', 'Tardiness Deduction', 'Loans', 'Total Deductions',
             'Net Pay',
         ];
-        $data = [];
+        $total = count($headers);
+        $firstNum = 3; // columns 0-2 (No, Name, Department) are text; the rest sum.
+
+        // One row of values for a payslip.
+        $valuesOf = fn (Payslip $r): array => [
+            $r->employee?->employee_no ?? '',
+            trim(($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? '')),
+            $r->employee?->department?->name ?: 'Unassigned',
+            (float) $r->days_worked, (float) $r->days_absent, (int) $r->late_minutes, (int) $r->overtime_minutes,
+            (float) $r->basic_pay, (float) $r->overtime_pay, (float) $r->night_diff_pay, (float) $r->holiday_pay,
+            (float) $r->rest_day_pay, (float) $r->allowance, (float) $r->de_minimis, (float) $r->gross_pay,
+            (float) $r->sss, (float) $r->philhealth, (float) $r->pagibig, (float) $r->withholding_tax,
+            (float) $r->absences_deduction, (float) $r->tardiness_deduction, (float) $r->loans_deduction,
+            (float) $r->total_deductions, (float) $r->net_pay,
+        ];
+
+        // Group payslips by department (alphabetical), employees by name within.
+        $byDept = [];
         foreach ($rows as $r) {
-            $data[] = [
-                $r->employee?->employee_no ?? '',
-                ($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? ''),
-                (float) $r->days_worked,
-                (float) $r->days_absent,
-                (int) $r->late_minutes,
-                (int) $r->overtime_minutes,
-                (float) $r->basic_pay,
-                (float) $r->overtime_pay,
-                (float) $r->night_diff_pay,
-                (float) $r->holiday_pay,
-                (float) $r->rest_day_pay,
-                (float) $r->allowance,
-                (float) $r->de_minimis,
-                (float) $r->gross_pay,
-                (float) $r->sss,
-                (float) $r->philhealth,
-                (float) $r->pagibig,
-                (float) $r->withholding_tax,
-                (float) $r->absences_deduction,
-                (float) $r->tardiness_deduction,
-                (float) $r->loans_deduction,
-                (float) $r->total_deductions,
-                (float) $r->net_pay,
-            ];
+            $byDept[$r->employee?->department?->name ?: 'Unassigned'][] = $r;
         }
+        ksort($byDept);
+
+        $summedRow = function (string $label, array $sums) use ($total, $firstNum): array {
+            $row = array_fill(0, $total, '');
+            $row[0] = $label;
+            for ($c = $firstNum; $c < $total; $c++) {
+                $row[$c] = round($sums[$c] ?? 0, 2);
+            }
+
+            return $row;
+        };
+
+        $grand = array_fill($firstNum, $total - $firstNum, 0.0);
+        $data = [];
+        foreach ($byDept as $dept => $slips) {
+            usort($slips, fn ($a, $b) => strcmp((string) $a->employee?->last_name, (string) $b->employee?->last_name));
+
+            // Department header row.
+            $data[] = array_merge(["Department: {$dept}"], array_fill(1, $total - 1, ''));
+
+            $sub = array_fill($firstNum, $total - $firstNum, 0.0);
+            foreach ($slips as $r) {
+                $row = $valuesOf($r);
+                $data[] = $row;
+                for ($c = $firstNum; $c < $total; $c++) {
+                    $sub[$c] += (float) $row[$c];
+                    $grand[$c] += (float) $row[$c];
+                }
+            }
+            $data[] = $summedRow('Sub Total', $sub);
+        }
+        $data[] = $summedRow('GRAND TOTAL', $grand);
 
         $label = $run ? str_replace(' ', '_', $run->name) : $payrollRunId;
 
         return XlsxReport::download("payroll_{$label}.xlsx", $headers, $data, [
             'title' => 'Payroll Register'.($run ? ' — '.$run->name : ''),
             'subtitle' => $run ? "Period {$run->period_start} to {$run->period_end}" : 'Generated '.now()->format('M d, Y g:i A'),
+            'emphasize' => function (array $row) {
+                $first = (string) ($row[0] ?? '');
+                if (str_starts_with($first, 'Department:')) {
+                    return 'header';
+                }
+
+                return ($first === 'Sub Total' || $first === 'GRAND TOTAL') ? 'total' : null;
+            },
         ]);
     }
 

@@ -23,7 +23,8 @@ class XlsxReport
     /**
      * @param  string[]  $headers
      * @param  iterable<array<int, mixed>>  $rows  each row = array of cell values (order matches $headers)
-     * @param  array{title?: string, subtitle?: string, sheet?: string, widths?: array<int, float>}  $opts
+     * @param  array{title?: string, subtitle?: string, sheet?: string, widths?: array<int, float>, emphasize?: callable(array<int,mixed>): (?string)}  $opts
+     *                                                   emphasize returns 'header' or 'total' to style a section row (else null)
      */
     public static function download(string $filename, array $headers, iterable $rows, array $opts = []): BinaryFileResponse
     {
@@ -61,6 +62,10 @@ class XlsxReport
             ->withCellAlignment(CellAlignment::CENTER)
             ->withCellVerticalAlignment(CellVerticalAlignment::CENTER);
         $zebra = (new Style())->withBackgroundColor('F1F5F9');
+        // Section rows (e.g. a department header / subtotal in a grouped report).
+        $sectionStyle = (new Style())->withFontBold(true)->withBackgroundColor('E2E8F0');
+        $totalStyle = (new Style())->withFontBold(true)->withBackgroundColor('CBD5E1');
+        $emphasize = $opts['emphasize'] ?? null;
 
         // Row number the header lands on (title band takes 3 rows when present),
         // so we can freeze everything above the first data row.
@@ -79,9 +84,16 @@ class XlsxReport
         $i = 0;
         foreach ($rows as $r) {
             $vals = array_values((array) $r);
-            // Alternate a faint fill so the eye can track a row across wide reports.
-            $writer->addRow($i % 2 === 1 ? Row::fromValuesWithStyle($vals, $zebra) : Row::fromValues($vals));
-            $i++;
+            $emph = $emphasize ? $emphasize($vals) : null;
+            if ($emph === 'header') {
+                $writer->addRow(Row::fromValuesWithStyle($vals, $sectionStyle));
+            } elseif ($emph === 'total') {
+                $writer->addRow(Row::fromValuesWithStyle($vals, $totalStyle));
+            } else {
+                // Alternate a faint fill so the eye can track a row across wide reports.
+                $writer->addRow($i % 2 === 1 ? Row::fromValuesWithStyle($vals, $zebra) : Row::fromValues($vals));
+                $i++;
+            }
         }
 
         $writer->close();
