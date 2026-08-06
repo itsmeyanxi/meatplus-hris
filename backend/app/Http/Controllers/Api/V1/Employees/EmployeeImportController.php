@@ -108,19 +108,21 @@ class EmployeeImportController extends Controller
     {
         abort_unless($request->user()->can('employee.create'), 403);
 
-        // Column order: the biometric essentials up front, HR details after.
+        // Column order: the biometric essentials up front, HR details after,
+        // payroll classification (status + confidential) last.
         $headers = [
             'Employee ID', 'Biometric ID', 'Last Name', 'First Name', 'Middle Name',
             'Branch', 'Department', 'Position', 'Employment Type',
             'Gender', 'Civil Status', 'Date Hired', 'Birth Date', 'Email',
+            'Employee Status', 'Separation Date', 'Confidential',
         ];
         // Worked examples mirroring an agency biometric roster (Employee ID may
         // equal the device PIN; leave any unknown cell blank — blanks are ignored).
         $examples = [
-            ['5', '5', 'Suing', 'Jeric', '', 'EAA', '', '', '', 'Male', 'Single', '', '', ''],
-            ['6', '6', 'Jatulan', 'Justine', '', 'EAA', '', '', '', 'Female', 'Single', '', '', ''],
-            ['9', '9', 'Celedonio', 'Jayson', '', 'ATC', '', '', '', 'Male', 'Married', '', '', ''],
-            ['EMP-1001', '5', 'Dela Cruz', 'Juan', 'Santos', 'Head Office', 'Operations', 'Warehouse Staff', 'Regular', 'Male', 'Single', '2020-05-01', '1995-03-12', 'juan.delacruz@meatplus.ph'],
+            ['5', '5', 'Suing', 'Jeric', '', 'EAA', '', '', '', 'Male', 'Single', '', '', '', 'Active', '', 'No'],
+            ['6', '6', 'Jatulan', 'Justine', '', 'EAA', '', '', '', 'Female', 'Single', '', '', '', 'Active', '', 'No'],
+            ['9', '9', 'Celedonio', 'Jayson', '', 'ATC', '', '', '', 'Male', 'Married', '', '', '', 'Resigned', '2026-06-30', 'No'],
+            ['EMP-1001', '5', 'Dela Cruz', 'Juan', 'Santos', 'Head Office', 'Operations', 'Warehouse Staff', 'Regular', 'Male', 'Single', '2020-05-01', '1995-03-12', 'juan.delacruz@meatplus.ph', 'Active', '', 'Yes'],
         ];
 
         $guide = [
@@ -131,10 +133,11 @@ class EmployeeImportController extends Controller
             ['2. Save the file, then in the app go to Employees > Import, pick the company, and upload it.'],
             ['3. You may upload .xlsx or .csv. Column order does not matter — only the header names do.'],
             [''],
-            ['REQUIRED COLUMNS (must be filled for every row)'],
-            ['   • Employee ID   — the person\'s unique ID in this company. Reused ID = update, not a new person.'],
-            ['   • Last Name'],
-            ['   • First Name'],
+            ['REQUIRED COLUMNS'],
+            ['   • Employee ID   — always required. A reused ID updates that person; a new ID creates them.'],
+            ['   • Last Name, First Name — required only when CREATING a new employee.'],
+            ['     To UPDATE existing people, upload just Employee ID + the columns you want to change'],
+            ['     (e.g. Employee ID + Confidential). Names are not needed for updates.'],
             [''],
             ['FOR BIOMETRIC DATA (so device punches map to the right person)'],
             ['   • Biometric ID  — the User ID / PIN enrolled on the fingerprint or face device.'],

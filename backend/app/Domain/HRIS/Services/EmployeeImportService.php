@@ -99,11 +99,11 @@ class EmployeeImportService
         }
 
         $map = $this->mapHeader(array_shift($rows));
-        foreach (['employee_no', 'first_name', 'last_name'] as $required) {
-            if (! isset($map[$required])) {
-                return ['created' => 0, 'updated' => 0, 'skipped' => 0, 'total' => 0, 'warnings' => [],
-                    'errors' => [['row' => 1, 'message' => "Missing required column for: {$required} (check the header row)."]]];
-            }
+        // Only Employee ID is required in the header — names are needed per row only
+        // for NEW employees, so an ID-keyed update file (e.g. ID + Confidential) works.
+        if (! isset($map['employee_no'])) {
+            return ['created' => 0, 'updated' => 0, 'skipped' => 0, 'total' => 0, 'warnings' => [],
+                'errors' => [['row' => 1, 'message' => 'Missing required column for: Employee ID (check the header row).']]];
         }
 
         $created = 0;
@@ -127,8 +127,8 @@ class EmployeeImportService
             $first = $get('first_name');
             $last = $get('last_name');
 
-            if ($employeeNo === '' || $first === '' || $last === '') {
-                $errors[] = ['row' => $line, 'message' => 'Missing Employee ID, First Name, or Last Name.'];
+            if ($employeeNo === '') {
+                $errors[] = ['row' => $line, 'message' => 'Missing Employee ID.'];
 
                 continue;
             }
@@ -144,10 +144,30 @@ class EmployeeImportService
             }
 
             try {
+                $existing = Employee::query()
+                    ->where('company_id', $companyId)
+                    ->where('employee_no', $employeeNo)
+                    ->first();
+
+                // A NEW employee needs a name; an EXISTING one can be updated by
+                // Employee ID alone — so a short "ID + Confidential" (or any
+                // single-field) list updates people without re-supplying names.
+                if (! $existing && ($first === '' || $last === '')) {
+                    $errors[] = ['row' => $line, 'message' => "New employee \"{$employeeNo}\" needs First Name and Last Name."];
+
+                    continue;
+                }
+
                 // Fields supplied (non-empty) in this row. Empty cells are omitted
                 // so they never overwrite existing data — a partially-filled file
                 // safely backfills blanks without wiping anything.
-                $present = ['first_name' => $first, 'last_name' => $last];
+                $present = [];
+                if ($first !== '') {
+                    $present['first_name'] = $first;
+                }
+                if ($last !== '') {
+                    $present['last_name'] = $last;
+                }
                 if (($mid = $get('middle_name')) !== '') {
                     $present['middle_name'] = $mid;
                 }
@@ -208,11 +228,6 @@ class EmployeeImportService
                         $present['is_confidential'] = true;
                     }
                 }
-
-                $existing = Employee::query()
-                    ->where('company_id', $companyId)
-                    ->where('employee_no', $employeeNo)
-                    ->first();
 
                 if ($existing) {
                     $existing->fill($present);
