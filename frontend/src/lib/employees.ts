@@ -120,6 +120,27 @@ export async function listInvitableEmployeeIds(params: {
   return res.data.filter((e) => e.login_status !== "active").map((e) => e.id);
 }
 
+/** Every employee id matching the filters (across pages), regardless of login status. */
+export async function listEmployeeIds(params: {
+  employeeNo?: string;
+  name?: string;
+  departmentId?: number | "";
+  branchId?: number | "";
+  isConfidential?: boolean | "";
+} = {}): Promise<number[]> {
+  const res = await listEmployees({ ...params, page: 1, perPage: 5000 });
+  return res.data.map((e) => e.id);
+}
+
+/** Bulk-set the confidential flag (confidential vs non-confidential payroll group). */
+export async function bulkSetConfidentiality(employeeIds: number[], isConfidential: boolean): Promise<{ updated: number }> {
+  const { data } = await api.post<{ updated: number }>("/api/v1/employees/bulk-confidentiality", {
+    employee_ids: employeeIds,
+    is_confidential: isConfidential,
+  });
+  return data;
+}
+
 export type ImportResult = {
   created: number;
   updated: number;

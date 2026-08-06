@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getMe } from "@/lib/auth";
+import { toast } from "sonner";
 import {
   listEmployees,
-  listInvitableEmployeeIds,
+  listEmployeeIds,
+  bulkSetConfidentiality,
   getLookup,
   employeeExportUrl,
   type EmployeeListItem,
@@ -131,15 +133,16 @@ export default function EmployeesPage() {
 
   const rows = data?.data ?? [];
 
-  // Employees on this page that can still be invited (no active account yet)
-  const invitableIds = rows.filter((e) => e.login_status !== "active").map((e) => e.id);
-  const allInvitableSelected = invitableIds.length > 0 && invitableIds.every((id) => selected.has(id));
+  // Every employee on this page. Selection powers both bulk invites/logins (which
+  // skip anyone already active server-side) and bulk confidentiality.
+  const pageIds = rows.map((e) => e.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
 
   const toggleAll = () => {
-    if (allInvitableSelected) {
-      setSelected((s) => { const n = new Set(s); invitableIds.forEach((id) => n.delete(id)); return n; });
+    if (allPageSelected) {
+      setSelected((s) => { const n = new Set(s); pageIds.forEach((id) => n.delete(id)); return n; });
     } else {
-      setSelected((s) => new Set([...s, ...invitableIds]));
+      setSelected((s) => new Set([...s, ...pageIds]));
     }
   };
 
@@ -156,7 +159,7 @@ export default function EmployeesPage() {
   const selectAllMatching = async () => {
     setSelectingAll(true);
     try {
-      const ids = await listInvitableEmployeeIds({
+      const ids = await listEmployeeIds({
         employeeNo: debEmpNo, name: debName, departmentId, branchId, isConfidential,
       });
       setSelected(new Set(ids));
@@ -164,6 +167,15 @@ export default function EmployeesPage() {
       setSelectingAll(false);
     }
   };
+
+  const setConfidentiality = useMutation({
+    mutationFn: (isConfi: boolean) => bulkSetConfidentiality(Array.from(selected), isConfi),
+    onSuccess: (res, isConfi) => {
+      toast.success(`${res.updated} employee${res.updated !== 1 ? "s" : ""} marked ${isConfi ? "confidential" : "non-confidential"}.`);
+      setSelected(new Set());
+      qc.invalidateQueries({ queryKey: ["employees"] });
+    },
+  });
 
   const bulkInvite = useMutation({
     mutationFn: () => invitationsApi.bulkSend(Array.from(selected)),
@@ -397,10 +409,10 @@ export default function EmployeesPage() {
                 <th className="w-10 px-3 py-3">
                   <input
                     type="checkbox"
-                    checked={allInvitableSelected}
+                    checked={allPageSelected}
                     onChange={toggleAll}
                     className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
-                    title="Select all invitable employees on this page"
+                    title="Select all employees on this page"
                   />
                 </th>
               )}
@@ -443,7 +455,6 @@ export default function EmployeesPage() {
             )}
             {rows.map((emp) => {
               const isSelected = selected.has(emp.id);
-              const canSelect = emp.login_status !== "active";
               return (
                 <tr
                   key={emp.id}
@@ -459,9 +470,8 @@ export default function EmployeesPage() {
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          disabled={!canSelect}
                           onChange={() => toggleOne(emp.id)}
-                          className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 disabled:opacity-30"
+                          className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
                         />
                       </span>
                     </Td>
@@ -513,6 +523,27 @@ export default function EmployeesPage() {
               >
                 {selectingAll ? "Selecting…" : `Select all matching (${data.meta.total})`}
               </button>
+            )}
+            {canConfi && (
+              <>
+                <div className="mx-1 h-6 w-px bg-slate-200" />
+                <button
+                  onClick={() => setConfidentiality.mutate(true)}
+                  disabled={setConfidentiality.isPending}
+                  className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-60"
+                  title="Move selected into the Confidential payroll group"
+                >
+                  Mark confidential
+                </button>
+                <button
+                  onClick={() => setConfidentiality.mutate(false)}
+                  disabled={setConfidentiality.isPending}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                  title="Move selected into the Non-confidential payroll group"
+                >
+                  Mark non-confidential
+                </button>
+              </>
             )}
             <div className="mx-1 h-6 w-px bg-slate-200" />
             <button

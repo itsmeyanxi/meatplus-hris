@@ -116,6 +116,7 @@ Route::prefix('v1')->group(function () {
         Route::post('employees/import', [EmployeeImportController::class, 'store']);
         Route::get('employees/export', [EmployeeController::class, 'export']);
         Route::post('employees/bulk-invite', [InvitationController::class, 'bulkSend']);
+        Route::post('employees/bulk-confidentiality', [EmployeeController::class, 'bulkConfidentiality']);
         Route::apiResource('employees', EmployeeController::class);
         Route::apiResource('employees.dependents', DependentController::class)->scoped();
         Route::apiResource('employees.assets', EmployeeAssetController::class)

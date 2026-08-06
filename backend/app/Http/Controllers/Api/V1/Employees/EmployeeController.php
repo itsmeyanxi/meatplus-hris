@@ -32,6 +32,31 @@ class EmployeeController extends Controller
     }
 
     /**
+     * Bulk-set the confidential flag on many employees at once (drives the
+     * confidential vs non-confidential payroll split). Scoped to the active company.
+     */
+    public function bulkConfidentiality(Request $request): JsonResponse
+    {
+        // Changing the confidential classification is sensitive — same gate the
+        // single-employee update uses for is_confidential.
+        abort_unless($request->user()->can('employee.update') && $request->user()->can('employee.view.sensitive'), 403);
+
+        $data = $request->validate([
+            'employee_ids' => ['required', 'array', 'min:1'],
+            'employee_ids.*' => ['integer'],
+            'is_confidential' => ['required', 'boolean'],
+        ]);
+
+        $companyId = $request->user()->active_company_id;
+        $updated = Employee::query()
+            ->whereIn('id', $data['employee_ids'])
+            ->where('company_id', $companyId)
+            ->update(['is_confidential' => $data['is_confidential']]);
+
+        return response()->json(['updated' => $updated, 'is_confidential' => $data['is_confidential']]);
+    }
+
+    /**
      * Export the (filtered) employee list as a styled Excel workbook. Columns are
      * import-compatible so an export can be edited and re-imported.
      */
