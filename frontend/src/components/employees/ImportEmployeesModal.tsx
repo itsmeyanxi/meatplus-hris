@@ -21,7 +21,7 @@ export function ImportEmployeesModal({
   onDone,
 }: {
   companies: { id: number; name?: string }[];
-  mode: "organic" | "agency";
+  mode: "organic" | "agency" | "project_crew";
   /** Pin every imported row to this branch (per-agency bulk upload); no Branch column needed. */
   branchId?: number;
   branchName?: string;
@@ -29,13 +29,14 @@ export function ImportEmployeesModal({
   onDone: () => void;
 }) {
   const isAgency = mode === "agency";
+  const isProjectCrew = mode === "project_crew";
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [companyId, setCompanyId] = useState<number | "">("");
   const [result, setResult] = useState<ImportResult | null>(null);
 
   const upload = useMutation({
-    mutationFn: () => importEmployees(file!, companyId, isAgency, branchId),
+    mutationFn: () => importEmployees(file!, companyId, isAgency, branchId, isProjectCrew),
     onSuccess: (res) => {
       setResult(res);
       if (res.created > 0 || res.updated > 0) onDone();
@@ -45,14 +46,16 @@ export function ImportEmployeesModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="dialog" aria-modal>
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-        <h2 className="text-lg font-semibold text-slate-900">{isAgency ? "Import agency workers" : "Import employees"}</h2>
+        <h2 className="text-lg font-semibold text-slate-900">{isAgency ? "Import agency workers" : isProjectCrew ? "Import project crew" : "Import employees"}</h2>
         <p className="mt-1 text-sm text-slate-500">
           Upload a CSV or Excel (.xlsx / .xls) file. <strong>Required:</strong> Employee ID, Last Name, First Name.
           For biometric data, also fill <strong>Biometric ID</strong> (the device PIN, so punches map to the person).
           {branchId ? (
-            <> Every row is added to <strong>{branchName ?? "this agency"}</strong> — no Branch column needed.</>
+            <> Every row is added to <strong>{branchName ?? "this crew"}</strong> — no Branch column needed.</>
           ) : isAgency ? (
             <> Put the <strong>manpower agency</strong> (e.g. EAA, Golden 5, Stellar, ATC) in the <strong>Branch</strong> column — that is the agency they belong to, not a worksite.</>
+          ) : isProjectCrew ? (
+            <> Put the <strong>crew</strong> (e.g. BLAST, BASIC CREW, WAREHOUSE, JANITORIAL, ICE, CUTTER) in the <strong>Branch</strong> column — that is the project crew they belong to.</>
           ) : (
             <> Put the <strong>work location / site</strong> in the <strong>Branch</strong> column — a physical location, not an agency.</>
           )} Missing branches, departments, positions and employment types are created automatically. Existing employee
@@ -62,6 +65,11 @@ export function ImportEmployeesModal({
           <p className="mt-2 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
             These rows are imported as <strong>agency workers</strong> — their branches are flagged as agencies, so they
             appear in the Agencies module and stay out of the organic Employees list.
+          </p>
+        ) : isProjectCrew ? (
+          <p className="mt-2 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
+            These rows are imported as <strong>project crew</strong> — their branches are flagged as project crews, so they
+            appear in the Project Crews module and stay out of the organic Employees list.
           </p>
         ) : (
           <p className="mt-2 text-sm font-medium text-slate-700">
@@ -84,7 +92,7 @@ export function ImportEmployeesModal({
                   onChange={(v) => setCompanyId(v === "" ? "" : Number(v))}
                   placeholder="Current company"
                   options={[{ value: "", label: "Current company" }, ...companies.map((c) => ({ value: String(c.id), label: c.name ?? `Company ${c.id}` }))]} />
-                <p className="mt-1 text-xs text-slate-400">Pick the company these {isAgency ? "workers" : "employees"} belong to — no need to switch your active company.</p>
+                <p className="mt-1 text-xs text-slate-400">Pick the company these {isAgency || isProjectCrew ? "workers" : "employees"} belong to — no need to switch your active company.</p>
               </div>
             )}
             <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,text/csv"

@@ -162,7 +162,7 @@ export const payrollApi = {
   compute: async (id: number) => (await api.post(`/api/v1/payroll-runs/${id}/compute`)).data,
   approve: async (id: number) => (await api.post(`/api/v1/payroll-runs/${id}/approve`)).data,
   post: async (id: number) => (await api.post(`/api/v1/payroll-runs/${id}/post`)).data,
-  deleteRun: async (id: number) => (await api.delete(`/api/v1/payroll-runs/${id}`)).data,
+  deleteRun: async (id: number, reason: string) => (await api.delete(`/api/v1/payroll-runs/${id}`, { data: { reason } })).data,
 };
 
 // ── Payroll timekeeping review ──────────────────────────────────────────────

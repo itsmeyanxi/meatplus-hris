@@ -25,6 +25,9 @@ class EmployeeImportController extends Controller
             // they map to are flagged is_agency, so they appear in the Agencies
             // module and are kept out of the organic Employees list.
             'as_agency' => ['nullable', 'boolean'],
+            // Like as_agency, but flags branches is_project_crew so rows land in the
+            // Project Crews module (PASEI internal project-based crews).
+            'as_project_crew' => ['nullable', 'boolean'],
             // When set (per-agency bulk upload), every imported row is assigned to
             // this branch — the file needs no Branch column.
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
@@ -60,7 +63,7 @@ class EmployeeImportController extends Controller
             $forceBranchId = (int) $branch->id;
         }
 
-        $result = $service->import($path, $format, (int) $companyId, (bool) ($data['as_agency'] ?? false), $forceBranchId);
+        $result = $service->import($path, $format, (int) $companyId, (bool) ($data['as_agency'] ?? false), $forceBranchId, (bool) ($data['as_project_crew'] ?? false));
 
         return response()->json($result);
     }

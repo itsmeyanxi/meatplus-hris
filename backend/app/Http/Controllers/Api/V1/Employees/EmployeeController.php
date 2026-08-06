@@ -124,6 +124,8 @@ class EmployeeController extends Controller
             $scope = $request->query('scope', 'organic');
             if ($scope === 'agency') {
                 $query->whereHas('branch', fn ($b) => $b->where('is_agency', true));
+            } elseif ($scope === 'project_crew') {
+                $query->whereHas('branch', fn ($b) => $b->where('is_project_crew', true));
             } elseif ($scope !== 'all') {
                 $query->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)->orWhere('is_project_crew', true));
             }

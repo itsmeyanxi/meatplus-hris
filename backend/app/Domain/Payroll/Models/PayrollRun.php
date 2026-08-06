@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Contracts\Activity as ActivityContract;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -15,6 +16,9 @@ class PayrollRun extends Model
     use BelongsToCompany;
     use LogsActivity;
 
+    /** Set transiently before delete() so the audit log records WHY it was deleted. */
+    public ?string $deleteReason = null;
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -22,6 +26,28 @@ class PayrollRun extends Model
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('payroll');
+    }
+
+    /**
+     * Enrich the auto delete-log with the mandatory reason + a readable snapshot,
+     * so the audit trail shows who deleted which run and why.
+     */
+    public function tapActivity(ActivityContract $activity, string $eventName): void
+    {
+        if ($eventName !== 'deleted') {
+            return;
+        }
+        $props = $activity->properties ?? collect();
+        $activity->properties = $props->merge([
+            'reason' => $this->deleteReason,
+            'run' => [
+                'name' => $this->name,
+                'period' => optional($this->period_start)->toDateString().' → '.optional($this->period_end)->toDateString(),
+                'pay_date' => optional($this->pay_date)->toDateString(),
+                'status' => $this->status,
+            ],
+        ]);
+        $activity->description = "Deleted payroll run '{$this->name}'".($this->deleteReason ? " — reason: {$this->deleteReason}" : '');
     }
 
     protected $fillable = [

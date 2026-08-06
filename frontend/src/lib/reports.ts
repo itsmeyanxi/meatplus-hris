@@ -90,6 +90,8 @@ export async function downloadAgencyAttendance(params: {
   agencyName?: string;
   employeeId?: number;
   employeeName?: string;
+  /** Download-filename prefix; defaults to "agency" (pass e.g. "crew" for the crews board). */
+  filePrefix?: string;
 }) {
   const { data } = await api.get<Blob>("/api/v1/reports/agency-attendance", {
     params: {
@@ -106,7 +108,7 @@ export async function downloadAgencyAttendance(params: {
   const href = URL.createObjectURL(data);
   const a = document.createElement("a");
   a.href = href;
-  a.download = `agency_${slug}_attendance_${params.dateFrom}_to_${params.dateTo}.xlsx`;
+  a.download = `${params.filePrefix ?? "agency"}_${slug}_attendance_${params.dateFrom}_to_${params.dateTo}.xlsx`;
   a.click();
   URL.revokeObjectURL(href);
 }

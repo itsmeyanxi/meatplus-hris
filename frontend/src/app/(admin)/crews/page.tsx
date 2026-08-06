@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listCrews } from "@/lib/crews";
+import { employeeExportUrl } from "@/lib/employees";
+import { ImportEmployeesModal } from "@/components/employees/ImportEmployeesModal";
 import { PageHeader, AppInput } from "@/components/ui";
 
 /**
@@ -12,7 +14,9 @@ import { PageHeader, AppInput } from "@/components/ui";
  * opens the crew's live time-in/out board.
  */
 export default function CrewsPage() {
+  const qc = useQueryClient();
   const [q, setQ] = useState("");
+  const [showImport, setShowImport] = useState(false);
   const { data, isLoading } = useQuery({ queryKey: ["crews"], queryFn: listCrews });
   const crews = data?.data ?? [];
 
@@ -27,11 +31,38 @@ export default function CrewsPage() {
   const totalHead = useMemo(() => crews.reduce((s, b) => s + b.headcount, 0), [crews]);
   const totalPresent = useMemo(() => crews.reduce((s, b) => s + b.present_today, 0), [crews]);
 
+  const onExport = () => {
+    const a = document.createElement("a");
+    a.href = employeeExportUrl({ scope: "project_crew" });
+    a.download = "project_crew_workers.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="Project Crews"
         description={`${crews.length} crew${crews.length === 1 ? "" : "s"} · ${totalHead} workers · ${totalPresent} present today.`}
+        actions={
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setShowImport(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Import crews
+            </button>
+            <button type="button" onClick={onExport}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Export crews
+            </button>
+          </div>
+        }
       />
 
       <div className="max-w-sm">
@@ -86,6 +117,15 @@ export default function CrewsPage() {
             );
           })}
         </div>
+      )}
+
+      {showImport && (
+        <ImportEmployeesModal
+          mode="project_crew"
+          companies={[]}
+          onClose={() => setShowImport(false)}
+          onDone={() => qc.invalidateQueries({ queryKey: ["crews"] })}
+        />
       )}
     </div>
   );

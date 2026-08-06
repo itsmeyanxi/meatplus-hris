@@ -9,6 +9,7 @@ use App\Domain\HRIS\Models\EmploymentType;
 use App\Domain\HRIS\Models\Position;
 use App\Domain\Identity\Models\Branch;
 use App\Domain\Payroll\Models\EmployeeCompensation;
+use App\Domain\Payroll\Models\EmployeePayrollProfile;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
@@ -38,6 +39,10 @@ class EmployeeImportService
         'employment_type' => ['employment type', 'employment_type', 'emp type', 'type', 'employee type'],
         'date_hired' => ['date hired', 'date_hired', 'hire date', 'hired', 'date of hire'],
         'birth_date' => ['birth date', 'birth_date', 'date of birth', 'dob', 'birthday'],
+        // Employment status + separation, so resigned/terminated staff import as
+        // inactive (and are excluded from payroll) instead of active.
+        'employee_status' => ['employee status', 'employment status', 'status'],
+        'separation_date' => ['separation date', 'date separated', 'date resigned', 'resignation date', 'separated', 'date of separation'],
         // Biometric device PIN — matches the terminal's user ID so punches map.
         'biometric_user_id' => ['biometric id', 'biometric_user_id', 'biometric user id', 'device pin', 'device id', 'biometric', 'bio id'],
         // Government IDs (stored encrypted).
@@ -66,15 +71,19 @@ class EmployeeImportService
     /** When true, branches resolved during this import are flagged is_agency. */
     private bool $asAgency = false;
 
+    /** When true, branches resolved during this import are flagged is_project_crew. */
+    private bool $asProjectCrew = false;
+
     /** When set, every imported row is assigned to this branch (Branch column ignored). */
     private ?int $forceBranchId = null;
 
     /**
      * @return array{created:int, updated:int, skipped:int, total:int, errors:array<int,array{row:int,message:string}>, warnings:array<int,array{row:int,message:string}>}
      */
-    public function import(string $path, string $ext, int $companyId, bool $asAgency = false, ?int $forceBranchId = null): array
+    public function import(string $path, string $ext, int $companyId, bool $asAgency = false, ?int $forceBranchId = null, bool $asProjectCrew = false): array
     {
         $this->asAgency = $asAgency;
+        $this->asProjectCrew = $asProjectCrew;
         $this->forceBranchId = $forceBranchId;
         $rows = $this->readRows($path, $ext);
         if (count($rows) < 2) {
@@ -169,6 +178,20 @@ class EmployeeImportService
                     $present['birth_date'] = $born;
                 }
 
+                // Employment status: a "Resigned/Terminated/Separated" status (or a
+                // separation date) marks the employee INACTIVE — keeping resigned
+                // staff out of payroll — while an explicit active status reactivates.
+                $sepDate = $this->parseDate($get('separation_date'));
+                $statusRaw = strtolower(trim($get('employee_status')));
+                if ($statusRaw !== '' || $sepDate !== null) {
+                    $separated = $sepDate !== null
+                        || (bool) preg_match('/resign|separat|terminat|inactive|awol|dismiss|end.?of.?contract|ended|no longer/', $statusRaw);
+                    $present['is_active'] = ! $separated;
+                    if ($separated && $sepDate !== null) {
+                        $present['date_separated'] = $sepDate;
+                    }
+                }
+
                 $existing = Employee::query()
                     ->where('company_id', $companyId)
                     ->where('employee_no', $employeeNo)
@@ -245,17 +268,39 @@ class EmployeeImportService
             return $v === '' ? 0.0 : (float) $v;
         };
 
+        // De-minimis is a tax-exempt benefit that payroll reads from the payroll
+        // profile (halved per cutoff), NOT from the taxable allowance — so it is
+        // stored separately and kept out of allowance_monthly to avoid double
+        // counting. Upsert it even when a salary already exists, so re-importing a
+        // corrected file backfills de-minimis onto employees added earlier.
+        $deMinimis = $money($get('de_minimis'));
+        if ($deMinimis > 0) {
+            EmployeePayrollProfile::updateOrCreate(
+                ['employee_id' => $employee->id],
+                ['de_minimis' => $deMinimis],
+            );
+        }
+
+        // Non-de-minimis allowances (taxable-style) roll up into allowance_monthly.
+        $allowance = 0.0;
+        foreach (['transportation', 'meal', 'communication', 'travel', 'allowance_others'] as $a) {
+            $allowance += $money($get($a));
+        }
+
         $basic = $money($get('base_salary'));
         if ($basic <= 0) {
             return;
         }
-        if (EmployeeCompensation::withoutGlobalScopes()->where('employee_id', $employee->id)->where('is_active', true)->exists()) {
-            return; // don't add a second active salary
-        }
+        $existing = EmployeeCompensation::withoutGlobalScopes()
+            ->where('employee_id', $employee->id)->where('is_active', true)->first();
+        if ($existing) {
+            // Correct a previously lumped allowance (which had de-minimis folded in)
+            // without adding a second active salary.
+            if ((float) $existing->allowance_monthly !== $allowance) {
+                $existing->update(['allowance_monthly' => $allowance]);
+            }
 
-        $allowance = 0.0;
-        foreach (['de_minimis', 'transportation', 'meal', 'communication', 'travel', 'allowance_others'] as $a) {
-            $allowance += $money($get($a));
+            return;
         }
 
         EmployeeCompensation::create([
@@ -372,13 +417,18 @@ class EmployeeImportService
                 'code' => $this->uniqueCode(Branch::class, $companyId, $name, 20),
                 'name' => $name,
                 'is_agency' => $this->asAgency,
+                'is_project_crew' => $this->asProjectCrew,
                 'is_active' => true,
             ]);
 
-        // Importing as agency: make sure the (possibly pre-existing) branch is
-        // flagged so these workers land in the Agencies module, not the organic list.
+        // Importing as agency / project crew: make sure the (possibly pre-existing)
+        // branch is flagged so these workers land in the Agencies / Project Crews
+        // module, not the organic Employees list.
         if ($this->asAgency && ! $branch->is_agency) {
             $branch->forceFill(['is_agency' => true])->save();
+        }
+        if ($this->asProjectCrew && ! $branch->is_project_crew) {
+            $branch->forceFill(['is_project_crew' => true])->save();
         }
 
         return $this->branchCache[$key] = $branch->id;

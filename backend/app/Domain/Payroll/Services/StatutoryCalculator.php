@@ -30,7 +30,7 @@ class StatutoryCalculator
     private const PH_CEILING = 100000.0;
 
     // --- Pag-IBIG / HDMF ---
-    private const PAGIBIG_CAP = 5000.0;  // fund-salary cap (bump to 10,000 when circular takes effect)
+    private const PAGIBIG_CAP = 10000.0;  // Maximum Fund Salary per the 2024 HDMF circular (2% → max ₱200/mo)
     private const PAGIBIG_EE_LOW = 0.01; // ≤ ₱1,500 monthly
     private const PAGIBIG_EE_HIGH = 0.02;
     private const PAGIBIG_ER_RATE = 0.02;
@@ -77,7 +77,7 @@ class StatutoryCalculator
         return round($base * self::PH_RATE / 2, 2);
     }
 
-    /** Pag-IBIG employee share — 1% up to ₱1,500, else 2%, on a ₱5,000 cap (max ₱100). */
+    /** Pag-IBIG employee share — 1% up to ₱1,500, else 2%, on a ₱10,000 cap (max ₱200/mo). */
     public function pagibig(float $basicMonthly): float
     {
         $rate = $basicMonthly <= 1500 ? self::PAGIBIG_EE_LOW : self::PAGIBIG_EE_HIGH;

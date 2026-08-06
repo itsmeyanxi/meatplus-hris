@@ -25,7 +25,12 @@ class TimeLogRequestImportService
         // Event/punch-level format (one row per scan): a single timestamp + direction.
         'log_time' => ['logtime', 'log time', 'log_time', 'datetime', 'date time', 'punch time', 'timestamp', 'time stamp'],
         'direction' => ['inoutmode', 'in out mode', 'in/out', 'inout', 'direction', 'mode', 'log type', 'punch type'],
+        // Person's name, used as a fallback when the ID/PIN isn't mapped to anyone.
+        'full_name' => ['fullname', 'full name', 'name', 'employee name', 'employeename'],
     ];
+
+    /** Per-company name → employee-id index, built lazily for name-fallback matching. */
+    private array $nameIndex = [];
 
     /**
      * @return array{batch_id:string, created:int, errors:array<int,array{row:int,message:string}>, total:int}
@@ -82,7 +87,7 @@ class TimeLogRequestImportService
 
                 continue;
             }
-            $employeeId = $this->resolveEmployee($companyId, $empNo, $empCache);
+            $employeeId = $this->resolveEmployee($companyId, $empNo, $empCache, $get('full_name'));
             if (! $employeeId) {
                 $errors[] = ['row' => $line, 'message' => "No employee found for ID \"{$empNo}\" in this company."];
 
@@ -148,7 +153,7 @@ class TimeLogRequestImportService
 
                 continue;
             }
-            $employeeId = $this->resolveEmployee($companyId, $empNo, $empCache);
+            $employeeId = $this->resolveEmployee($companyId, $empNo, $empCache, $get('full_name'));
             if (! $employeeId) {
                 $errors[] = ['row' => $line, 'message' => "No employee found for ID \"{$empNo}\" in this company."];
 
@@ -193,21 +198,82 @@ class TimeLogRequestImportService
         return ['batch_id' => $batchId, 'created' => $created, 'total' => count($rows), 'errors' => $errors];
     }
 
-    /** Resolve an employee by employee_no, then by biometric_user_id, within the company. */
-    private function resolveEmployee(int $companyId, string $id, array &$cache): ?int
+    /**
+     * Resolve an employee within the company. Tries the device ID/PIN first
+     * (employee_no or biometric_user_id); when that misses and the sheet carries
+     * a name, falls back to matching that name. On a unique name match whose
+     * employee has no biometric ID yet, the numeric PIN is *learned* onto that
+     * employee so every future upload matches on the ID directly.
+     */
+    private function resolveEmployee(int $companyId, string $id, array &$cache, string $fullName = ''): ?int
     {
-        $key = strtolower($id);
+        $key = strtolower($id).'|'.strtolower(trim($fullName));
         if (array_key_exists($key, $cache)) {
             return $cache[$key];
         }
 
-        $emp = Employee::query()->where('company_id', $companyId)
-            ->where(function ($q) use ($id) {
-                $q->where('employee_no', $id)->orWhere('biometric_user_id', $id);
-            })
-            ->first(['id']);
+        $emp = null;
+        if ($id !== '') {
+            $emp = Employee::query()->where('company_id', $companyId)
+                ->where(function ($q) use ($id) {
+                    $q->where('employee_no', $id)->orWhere('biometric_user_id', $id);
+                })
+                ->first(['id', 'biometric_user_id']);
+        }
+
+        // Name fallback: only accept an unambiguous single match.
+        if (! $emp && trim($fullName) !== '') {
+            $wanted = $this->nameTokens($fullName);
+            if ($wanted) {
+                $hits = [];
+                foreach ($this->companyNameIndex($companyId) as $cand) {
+                    // All sheet-name tokens present in the employee's full name,
+                    // or the employee's core (first+last) fully present in the sheet name.
+                    if (! array_diff($wanted, $cand['full']) || ! array_diff($cand['core'], $wanted)) {
+                        $hits[$cand['id']] = $cand;
+                    }
+                }
+                if (count($hits) === 1) {
+                    $emp = (object) reset($hits);
+                    // Learn a numeric device PIN onto an employee that has none yet.
+                    if ($id !== '' && preg_match('/^\d+$/', $id) && empty($emp->biometric_user_id)) {
+                        Employee::query()->where('id', $emp->id)->update(['biometric_user_id' => $id]);
+                    }
+                }
+            }
+        }
 
         return $cache[$key] = $emp?->id;
+    }
+
+    /** Normalized, order-independent token set of a person's name. */
+    private function nameTokens(string $s): array
+    {
+        $s = mb_strtoupper(trim(preg_replace('/[^\p{L}\s]/u', ' ', $s)));
+        $t = array_values(array_unique(array_filter(preg_split('/\s+/u', $s))));
+        sort($t);
+
+        return $t;
+    }
+
+    /** @return array<int,array{id:int,biometric_user_id:?string,full:array<int,string>,core:array<int,string>}> */
+    private function companyNameIndex(int $companyId): array
+    {
+        if (isset($this->nameIndex[$companyId])) {
+            return $this->nameIndex[$companyId];
+        }
+        $list = [];
+        foreach (Employee::query()->where('company_id', $companyId)
+            ->get(['id', 'first_name', 'middle_name', 'last_name', 'biometric_user_id']) as $e) {
+            $list[] = [
+                'id' => $e->id,
+                'biometric_user_id' => $e->biometric_user_id,
+                'full' => $this->nameTokens("{$e->first_name} {$e->middle_name} {$e->last_name}"),
+                'core' => $this->nameTokens("{$e->first_name} {$e->last_name}"),
+            ];
+        }
+
+        return $this->nameIndex[$companyId] = $list;
     }
 
     /** @return array<int,array<int,string>> */

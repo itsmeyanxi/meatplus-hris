@@ -6,6 +6,7 @@ import { useState } from "react";
 import { PageHeader, AppButton, TableShell } from "@/components/ui";
 import { SearchSelect } from "@/components/SearchSelect";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
+import { DeleteRunModal } from "@/components/payroll/DeleteRunModal";
 import { inputCls, labelCls } from "@/lib/form-classes";
 import {
   payrollApi,
@@ -65,6 +66,7 @@ function RunsTab() {
   const router = useRouter();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [deletingRun, setDeletingRun] = useState<PayrollRun | null>(null);
 
   const { data: runs, isLoading } = useQuery({ queryKey: ["payroll-runs"], queryFn: payrollApi.listRuns });
 
@@ -86,7 +88,7 @@ function RunsTab() {
       </div>
 
       {isLoading ? (
-        <TableShell><TableSkeleton rows={3} cols={6} /></TableShell>
+        <TableShell><TableSkeleton rows={3} cols={7} /></TableShell>
       ) : !runs || runs.length === 0 ? (
         <EmptyState title="No payroll runs yet" message="Create a run for a cutoff, then compute it." action={<AppButton onClick={() => setShowForm(true)}>+ New run</AppButton>} />
       ) : (
@@ -100,6 +102,7 @@ function RunsTab() {
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Employees</th>
                 <th className="px-4 py-3 text-right">Total net</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -118,6 +121,18 @@ function RunsTab() {
                   <td className="px-4 py-3"><StatusChip status={r.status} /></td>
                   <td className="px-4 py-3 text-right tabular-nums">{r.payslip_count ?? 0}</td>
                   <td className="px-4 py-3 text-right font-medium tabular-nums">{peso(r.total_net)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setDeletingRun(r); }}
+                      className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -132,6 +147,17 @@ function RunsTab() {
             qc.invalidateQueries({ queryKey: ["payroll-runs"] });
             setShowForm(false);
             router.push(`/payroll/${run.id}`);
+          }}
+        />
+      )}
+
+      {deletingRun && (
+        <DeleteRunModal
+          run={deletingRun}
+          onClose={() => setDeletingRun(null)}
+          onDeleted={() => {
+            qc.invalidateQueries({ queryKey: ["payroll-runs"] });
+            setDeletingRun(null);
           }}
         />
       )}

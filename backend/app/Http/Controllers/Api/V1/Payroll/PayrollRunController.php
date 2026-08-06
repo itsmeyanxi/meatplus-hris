@@ -92,10 +92,14 @@ class PayrollRunController extends Controller
     {
         abort_unless($request->user()->can('payroll.run'), 403);
 
-        if ($payrollRun->status === 'posted') {
-            throw ValidationException::withMessages(['status' => 'A posted payroll run cannot be deleted.']);
-        }
+        // A reason is mandatory — deleting a run (its payslips cascade with it) is
+        // significant, so we require justification and record it on the audit trail
+        // together with who performed it (the auto delete-log's causer).
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:500'],
+        ]);
 
+        $payrollRun->deleteReason = trim($data['reason']);
         $payrollRun->delete();
 
         return response()->json(['message' => 'Payroll run deleted.']);

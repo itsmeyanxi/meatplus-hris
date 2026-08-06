@@ -131,11 +131,12 @@ export type ImportResult = {
   warnings?: { row: number; message: string }[];
 };
 
-export async function importEmployees(file: File, companyId?: number | "", asAgency = false, branchId?: number): Promise<ImportResult> {
+export async function importEmployees(file: File, companyId?: number | "", asAgency = false, branchId?: number, asProjectCrew = false): Promise<ImportResult> {
   const fd = new FormData();
   fd.append("file", file);
   if (companyId) fd.append("company_id", String(companyId));
   if (asAgency) fd.append("as_agency", "1");
+  if (asProjectCrew) fd.append("as_project_crew", "1");
   if (branchId) fd.append("branch_id", String(branchId));
   const { data } = await api.post<ImportResult>("/api/v1/employees/import", fd);
   return data;
@@ -145,7 +146,7 @@ export const employeeImportTemplateUrl = "/api/v1/employees/import/template";
 
 /** URL for the filtered CSV export (download via a plain link — uses the session cookie). */
 export function employeeExportUrl(
-  params: { employeeNo?: string; name?: string; departmentId?: number | ""; companyId?: number | ""; scope?: "organic" | "agency" | "all" } = {},
+  params: { employeeNo?: string; name?: string; departmentId?: number | ""; companyId?: number | ""; scope?: "organic" | "agency" | "project_crew" | "all" } = {},
 ): string {
   const qs = new URLSearchParams();
   if (params.employeeNo) qs.set("employee_no", params.employeeNo);

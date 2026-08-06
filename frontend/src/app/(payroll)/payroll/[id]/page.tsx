@@ -11,6 +11,7 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import { payrollApi, peso, bankFileUrl, type RunStatus } from "@/lib/payroll";
 import { downloadPayrollReport } from "@/lib/reports";
 import { RunAdjustments } from "@/components/payroll/RunAdjustments";
+import { DeleteRunModal } from "@/components/payroll/DeleteRunModal";
 
 const STATUS_STYLES: Record<RunStatus, string> = {
   draft: "bg-slate-100 text-slate-600",
@@ -26,6 +27,7 @@ export default function PayrollRunPage() {
   const qc = useQueryClient();
   const { confirm, dialog } = useConfirm();
   const [isExporting, setIsExporting] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
 
   const { data: run, isLoading } = useQuery({
     queryKey: ["payroll-run", id],
@@ -44,10 +46,6 @@ export default function PayrollRunPage() {
   });
   const approve = useMutation({ mutationFn: () => payrollApi.approve(id), onSuccess: () => { toast.success("Run approved."); refresh(); } });
   const post = useMutation({ mutationFn: () => payrollApi.post(id), onSuccess: () => { toast.success("Run posted."); refresh(); } });
-  const del = useMutation({
-    mutationFn: () => payrollApi.deleteRun(id),
-    onSuccess: () => { toast.success("Run deleted."); qc.invalidateQueries({ queryKey: ["payroll-runs"] }); router.push("/payroll"); },
-  });
 
   const handleExport = async () => {
     if (!run) return;
@@ -66,11 +64,18 @@ export default function PayrollRunPage() {
     (a, s) => ({ gross: a.gross + Number(s.gross_pay), ded: a.ded + Number(s.total_deductions), net: a.net + Number(s.net_pay) }),
     { gross: 0, ded: 0, net: 0 },
   );
-  const busy = compute.isPending || approve.isPending || post.isPending || del.isPending;
+  const busy = compute.isPending || approve.isPending || post.isPending;
 
   return (
     <div className="space-y-6">
       {dialog}
+      {showDelete && (
+        <DeleteRunModal
+          run={run}
+          onClose={() => setShowDelete(false)}
+          onDeleted={() => { setShowDelete(false); qc.invalidateQueries({ queryKey: ["payroll-runs"] }); router.push("/payroll"); }}
+        />
+      )}
       <Link href="/payroll" className="text-sm text-slate-500 hover:text-slate-900">← Back to payroll</Link>
 
       <PageHeader
@@ -111,17 +116,9 @@ export default function PayrollRunPage() {
             {run.status === "approved" && (
               <AppButton onClick={() => post.mutate()} disabled={busy}>Post</AppButton>
             )}
-            {run.status !== "posted" && (
-              <AppButton
-                variant="secondary"
-                disabled={busy}
-                onClick={async () => {
-                  if (await confirm({ title: "Delete run?", message: `${run.name} and its payslips will be removed.`, confirmLabel: "Delete", danger: true })) del.mutate();
-                }}
-              >
-                Delete
-              </AppButton>
-            )}
+            <AppButton variant="secondary" disabled={busy} onClick={() => setShowDelete(true)}>
+              Delete
+            </AppButton>
           </div>
         }
       />

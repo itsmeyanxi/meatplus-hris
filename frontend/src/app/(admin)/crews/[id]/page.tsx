@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCrewToday, addCrewEmployee, assignExistingToCrew, type NewCrewEmployee } from "@/lib/crews";
+import { downloadAgencyAttendance } from "@/lib/reports";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
-import { PageHeader, AppButton, TableShell } from "@/components/ui";
+import { PageHeader, AppButton, AppInput, TableShell } from "@/components/ui";
 import { inputCls, labelCls } from "@/lib/form-classes";
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -14,6 +15,15 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   no_out: { label: "No time-out", cls: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
   no_punch: { label: "No punch", cls: "bg-slate-100 text-slate-500 ring-1 ring-slate-200" },
 };
+
+function firstOfMonth(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+function today(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export default function CrewBoardPage() {
   const params = useParams();
@@ -29,6 +39,24 @@ export default function CrewBoardPage() {
   });
 
   const s = data?.summary;
+
+  // Attendance export — same branch-based report the Agencies board uses.
+  const [dateFrom, setDateFrom] = useState(firstOfMonth());
+  const [dateTo, setDateTo] = useState(today());
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const exportAttendance = async () => {
+    setErr(null);
+    setBusy(true);
+    try {
+      await downloadAgencyAttendance({ branchId: crewId, dateFrom, dateTo, agencyName: data?.agency.name, filePrefix: "crew" });
+    } catch {
+      setErr("Could not generate the report. Check the dates and try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -53,6 +81,24 @@ export default function CrewBoardPage() {
       </div>
 
       {adding && <AddPanel crewId={crewId} onDone={() => { setAdding(false); qc.invalidateQueries({ queryKey: ["crew-today", crewId] }); }} />}
+
+      {/* Attendance export — pick a date range and download the crew's report (Excel). */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="block">
+            <span className={labelCls}>From</span>
+            <AppInput type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </label>
+          <label className="block">
+            <span className={labelCls}>To</span>
+            <AppInput type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </label>
+          <AppButton onClick={exportAttendance} disabled={busy}>
+            {busy ? "Generating…" : "Export attendance (Excel)"}
+          </AppButton>
+        </div>
+        {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
+      </div>
 
       <TableShell>
         <table className="min-w-full divide-y divide-slate-200 text-sm">

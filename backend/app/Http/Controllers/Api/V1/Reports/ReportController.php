@@ -11,6 +11,8 @@ use App\Domain\HRIS\Models\EmployeeGovernmentId;
 use App\Domain\Identity\Models\Branch;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Leave\Models\LeaveApplication;
+use App\Domain\Leave\Models\LeaveBalance;
+use App\Domain\Leave\Models\LeaveType;
 use App\Domain\Payroll\Models\EmployeeCompensation;
 use App\Domain\Payroll\Models\Payslip;
 use App\Domain\Payroll\Services\StatutoryCalculator;
@@ -670,22 +672,68 @@ class ReportController extends Controller
             ->orderBy('date_from', 'desc')
             ->get();
 
+        // Preload each employee's leave-credit balances (keyed employee|type|year).
+        $empIds = $rows->pluck('employee_id')->filter()->unique()->all();
+        $balances = [];
+        foreach (LeaveBalance::query()->whereIn('employee_id', $empIds)->get() as $b) {
+            $balances[$b->employee_id.'|'.$b->leave_type_id.'|'.$b->year] = $b;
+        }
+
+        // Every credit-tracked leave type in the company becomes its own
+        // "remaining" column, so each row shows the employee's remaining credits
+        // across ALL leave types (not just the one on that row).
+        $companyId = $request->user()->active_company_id;
+        $creditTypes = LeaveType::query()
+            ->where('company_id', $companyId)
+            ->where('is_paid', true)
+            ->where('default_credits_per_year', '>', 0)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        // Columns mirror a Sprout LeaveReport (Employee, type, filed/from/to dates,
+        // paid vs unpaid days, reason, status, approved date), then the credit
+        // balances: "Remaining Balance" for THIS leave's type, followed by a
+        // per-type column for every credit-tracked leave type.
         $headers = [
-            'Employee No', 'Name', 'Leave Type',
-            'Start Date', 'End Date', 'Days', 'Status', 'Remarks',
+            'Employee No', 'Name', 'Leave Type', 'Date Filed', 'Date From', 'Date To',
+            'With Pay Days', 'Without Pay Days', 'Reason', 'Status', 'Approved Date', 'Remaining Balance',
         ];
+        foreach ($creditTypes as $t) {
+            $headers[] = $t->name.' (remaining)';
+        }
+        $headers[] = 'Remarks';
+
+        $asDate = fn ($v) => $v ? \Illuminate\Support\Carbon::parse($v)->toDateString() : '';
+
         $data = [];
         foreach ($rows as $r) {
-            $data[] = [
+            $year = $r->date_from?->year;
+            $ownBal = $balances["{$r->employee_id}|{$r->leave_type_id}|{$year}"] ?? null;
+            // Fall back to the total when a row predates the paid/unpaid split.
+            $withPay = $r->with_pay_days !== null ? (float) $r->with_pay_days : (float) $r->days_count;
+            $withoutPay = $r->without_pay_days !== null ? (float) $r->without_pay_days : 0.0;
+
+            $row = [
                 $r->employee?->employee_no ?? '',
-                ($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? ''),
+                trim(($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? '')),
                 $r->leaveType?->name ?? '',
+                $asDate($r->submitted_at),
                 $r->date_from?->toDateString() ?? '',
                 $r->date_to?->toDateString() ?? '',
-                $r->days_count !== null ? (float) $r->days_count : '',
+                $withPay,
+                $withoutPay,
+                $r->reason ?? '',
                 $r->status,
-                $r->decision_remarks ?? '',
+                $asDate($r->decided_at),
+                $ownBal ? round((float) $ownBal->current_balance, 2) : '',
             ];
+            // Remaining credits per leave type for this employee (this leave's year).
+            foreach ($creditTypes as $t) {
+                $bal = $balances["{$r->employee_id}|{$t->id}|{$year}"] ?? null;
+                $row[] = $bal ? round((float) $bal->current_balance, 2) : '';
+            }
+            $row[] = $r->decision_remarks ?? '';
+            $data[] = $row;
         }
 
         $suffix = $request->date_from ? "_{$request->date_from}_to_{$request->date_to}" : '';
