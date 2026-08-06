@@ -13,6 +13,7 @@ export type EmployeeListItem = {
   email_personal: string | null;
   date_hired: string | null;
   is_active: boolean;
+  is_confidential?: boolean | null;
   login_status: "active" | "invited" | "none";
   department?: { id: number; name: string };
   branch?: { id: number; name: string };

@@ -240,7 +240,7 @@ export default function EmployeesPage() {
     window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
   }, [departmentId, branchId, isConfidential, debName, page]);
 
-  const COLS = 13; // checkbox + Company + 10 data cols + access
+  const COLS = 13 + (canConfi ? 1 : 0); // checkbox + Company + 10 data cols + access (+ confidential)
 
   return (
     <div className="relative space-y-4">
@@ -427,6 +427,7 @@ export default function EmployeesPage() {
               <Th>Type</Th>
               <Th>Hired</Th>
               <Th>Status</Th>
+              {canConfi && <Th>Confidential</Th>}
               <Th>Access</Th>
             </tr>
           </thead>
@@ -489,6 +490,15 @@ export default function EmployeesPage() {
                   <Td>
                     <StatusBadge active={emp.is_active}>{emp.is_active ? "Active" : "Inactive"}</StatusBadge>
                   </Td>
+                  {canConfi && (
+                    <Td>
+                      {emp.is_confidential ? (
+                        <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Confidential</span>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">Non-confi</span>
+                      )}
+                    </Td>
+                  )}
                   <Td><AccessBadge status={emp.login_status} /></Td>
                 </tr>
               );

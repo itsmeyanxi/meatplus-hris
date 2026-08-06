@@ -22,6 +22,9 @@ class EmployeeListResource extends JsonResource
             'email_personal' => $this->email_personal,
             'date_hired' => $this->date_hired?->toDateString(),
             'is_active' => $this->is_active,
+            // Confidential classification is sensitive — only surfaced to users who
+            // may see/change it, so the list can show a badge for them.
+            'is_confidential' => $request->user()?->can('employee.view.sensitive') ? (bool) $this->is_confidential : null,
             'login_status' => $this->user_id
                 ? 'active'
                 : ($this->has_pending_invitation ? 'invited' : 'none'),
