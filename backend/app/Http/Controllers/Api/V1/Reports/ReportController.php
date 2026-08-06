@@ -796,7 +796,7 @@ class ReportController extends Controller
 
         $rows = Payslip::query()
             ->with([
-                'employee:id,employee_no,first_name,middle_name,last_name,gender,date_hired,is_active,department_id,position_id,employment_type_id',
+                'employee:id,employee_no,first_name,middle_name,last_name,gender,date_hired,is_active,is_confidential,department_id,position_id,employment_type_id',
                 'employee.department:id,name', 'employee.position:id,title', 'employee.employmentType:id,name',
             ])
             ->with('run:id,name,company_id,period_start,period_end,pay_date')
@@ -932,12 +932,15 @@ class ReportController extends Controller
             ];
         };
 
-        // Group payslips by department (alphabetical), employees by name within.
-        $byDept = [];
+        // Never mix confidential and non-confidential staff: group by pay group
+        // FIRST, then by department (alphabetical), then employees by name.
+        $byGroup = ['Non-confidential' => [], 'Confidential' => []];
         foreach ($rows as $r) {
-            $byDept[$r->employee?->department?->name ?: 'Unassigned'][] = $r;
+            $g = $r->employee?->is_confidential ? 'Confidential' : 'Non-confidential';
+            $byGroup[$g][$r->employee?->department?->name ?: 'Unassigned'][] = $r;
         }
-        ksort($byDept);
+        $byGroup = array_filter($byGroup, fn ($d) => ! empty($d));
+        $splitGroups = count($byGroup) > 1; // only band by group when a run holds both
 
         $summedRow = function (string $label, array $sums) use ($total, $textCols): array {
             $row = array_fill(0, $total, '');
@@ -953,23 +956,35 @@ class ReportController extends Controller
 
         $grand = array_fill(0, $total, 0.0);
         $data = [];
-        foreach ($byDept as $dept => $slips) {
-            usort($slips, fn ($a, $b) => strcmp((string) $a->employee?->last_name, (string) $b->employee?->last_name));
+        foreach ($byGroup as $groupName => $depts) {
+            ksort($depts);
+            if ($splitGroups) {
+                $data[] = array_merge(["══ {$groupName} employees ══"], array_fill(1, $total - 1, ''));
+            }
 
-            $data[] = array_merge(["Department: {$dept}"], array_fill(1, $total - 1, ''));
+            $groupSum = array_fill(0, $total, 0.0);
+            foreach ($depts as $dept => $slips) {
+                usort($slips, fn ($a, $b) => strcmp((string) $a->employee?->last_name, (string) $b->employee?->last_name));
 
-            $sub = array_fill(0, $total, 0.0);
-            foreach ($slips as $r) {
-                $row = $valuesOf($r);
-                $data[] = $row;
-                for ($c = 10; $c < $total; $c++) {
-                    if (! in_array($c, $textCols, true) && is_numeric($row[$c])) {
-                        $sub[$c] += (float) $row[$c];
-                        $grand[$c] += (float) $row[$c];
+                $data[] = array_merge(["Department: {$dept}"], array_fill(1, $total - 1, ''));
+
+                $sub = array_fill(0, $total, 0.0);
+                foreach ($slips as $r) {
+                    $row = $valuesOf($r);
+                    $data[] = $row;
+                    for ($c = 10; $c < $total; $c++) {
+                        if (! in_array($c, $textCols, true) && is_numeric($row[$c])) {
+                            $sub[$c] += (float) $row[$c];
+                            $groupSum[$c] += (float) $row[$c];
+                            $grand[$c] += (float) $row[$c];
+                        }
                     }
                 }
+                $data[] = $summedRow('Sub Total', $sub);
             }
-            $data[] = $summedRow('Sub Total', $sub);
+            if ($splitGroups) {
+                $data[] = $summedRow("{$groupName} Total", $groupSum);
+            }
         }
         $data[] = $summedRow('GRAND TOTAL', $grand);
 
@@ -983,11 +998,11 @@ class ReportController extends Controller
             'subtitle' => 'Payroll Period: Payroll for '.$run->period_start->format('n/j/Y').' - '.$run->period_end->format('n/j/Y'),
             'emphasize' => function (array $row) {
                 $first = (string) ($row[0] ?? '');
-                if (str_starts_with($first, 'Department:')) {
+                if (str_starts_with($first, 'Department:') || str_starts_with($first, '══')) {
                     return 'header';
                 }
 
-                return ($first === 'Sub Total' || $first === 'GRAND TOTAL') ? 'total' : null;
+                return ($first === 'GRAND TOTAL' || str_ends_with($first, ' Total')) ? 'total' : null;
             },
         ]);
     }
