@@ -63,7 +63,15 @@ class EmployeeImportController extends Controller
             $forceBranchId = (int) $branch->id;
         }
 
-        $result = $service->import($path, $format, (int) $companyId, (bool) ($data['as_agency'] ?? false), $forceBranchId, (bool) ($data['as_project_crew'] ?? false));
+        $result = $service->import(
+            $path,
+            $format,
+            (int) $companyId,
+            (bool) ($data['as_agency'] ?? false),
+            $forceBranchId,
+            (bool) ($data['as_project_crew'] ?? false),
+            $user->can('employee.view.sensitive'),
+        );
 
         return response()->json($result);
     }
@@ -136,13 +144,17 @@ class EmployeeImportController extends Controller
             [''],
             ['OPTIONAL COLUMNS (leave blank if unknown — a blank never erases existing data)'],
             ['   • Middle Name, Department, Position, Employment Type, Gender, Civil Status, Date Hired, Birth Date, Email'],
+            ['   • Employee Status — "Resigned"/"Separated" (with a Separation Date) marks the person INACTIVE'],
+            ['                       so they drop out of payroll; any other status keeps them active.'],
+            ['   • Confidential   — Yes / No. Moves the person into the confidential vs non-confidential payroll'],
+            ['                       group. Applied only if your account may edit confidential classification.'],
             [''],
             ['RULES & TIPS'],
             ['   • Dates: use YYYY-MM-DD (e.g. 2026-07-29).'],
             ['   • Gender: Male / Female.   Civil Status: Single / Married / Widowed / Separated.'],
             ['   • Department, Position, Employment Type and Branch are created on the fly if the name is new.'],
             ['   • Re-uploading the same file is safe: existing IDs are updated, blank cells are left untouched.'],
-            ['   • The importer also accepts SSS, TIN, PhilHealth, Pag-IBIG and Base Salary columns if you add them.'],
+            ['   • The importer also accepts SSS, TIN, PhilHealth, Pag-IBIG, Base Salary and De Minimis columns.'],
         ];
 
         $path = tempnam(sys_get_temp_dir(), 'emptpl_').'.xlsx';

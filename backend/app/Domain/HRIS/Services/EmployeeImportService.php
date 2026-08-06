@@ -43,6 +43,9 @@ class EmployeeImportService
         // inactive (and are excluded from payroll) instead of active.
         'employee_status' => ['employee status', 'employment status', 'status'],
         'separation_date' => ['separation date', 'date separated', 'date resigned', 'resignation date', 'separated', 'date of separation'],
+        // Confidential payroll classification (only applied when the uploader has
+        // the sensitive permission).
+        'is_confidential' => ['confidential', 'is confidential', 'confidentiality', 'payroll group', 'pay group', 'confidential?'],
         // Biometric device PIN — matches the terminal's user ID so punches map.
         'biometric_user_id' => ['biometric id', 'biometric_user_id', 'biometric user id', 'device pin', 'device id', 'biometric', 'bio id'],
         // Government IDs (stored encrypted).
@@ -74,16 +77,20 @@ class EmployeeImportService
     /** When true, branches resolved during this import are flagged is_project_crew. */
     private bool $asProjectCrew = false;
 
+    /** When true, a "Confidential" column may set the sensitive is_confidential flag. */
+    private bool $allowConfidential = false;
+
     /** When set, every imported row is assigned to this branch (Branch column ignored). */
     private ?int $forceBranchId = null;
 
     /**
      * @return array{created:int, updated:int, skipped:int, total:int, errors:array<int,array{row:int,message:string}>, warnings:array<int,array{row:int,message:string}>}
      */
-    public function import(string $path, string $ext, int $companyId, bool $asAgency = false, ?int $forceBranchId = null, bool $asProjectCrew = false): array
+    public function import(string $path, string $ext, int $companyId, bool $asAgency = false, ?int $forceBranchId = null, bool $asProjectCrew = false, bool $allowConfidential = false): array
     {
         $this->asAgency = $asAgency;
         $this->asProjectCrew = $asProjectCrew;
+        $this->allowConfidential = $allowConfidential;
         $this->forceBranchId = $forceBranchId;
         $rows = $this->readRows($path, $ext);
         if (count($rows) < 2) {
@@ -189,6 +196,16 @@ class EmployeeImportService
                     $present['is_active'] = ! $separated;
                     if ($separated && $sepDate !== null) {
                         $present['date_separated'] = $sepDate;
+                    }
+                }
+
+                // Confidential classification (sensitive) — set only when the
+                // uploader is permitted and the cell has a clear yes/no value.
+                if ($this->allowConfidential && ($cv = strtolower(trim($get('is_confidential')))) !== '') {
+                    if (str_starts_with($cv, 'non') || in_array($cv, ['0', 'no', 'n', 'false', 'regular', 'normal'], true)) {
+                        $present['is_confidential'] = false;
+                    } elseif (str_starts_with($cv, 'confi') || in_array($cv, ['1', 'yes', 'y', 'true'], true)) {
+                        $present['is_confidential'] = true;
                     }
                 }
 
