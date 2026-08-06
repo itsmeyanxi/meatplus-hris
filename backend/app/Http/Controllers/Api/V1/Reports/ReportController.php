@@ -13,7 +13,9 @@ use App\Domain\Identity\Models\Company;
 use App\Domain\Leave\Models\LeaveApplication;
 use App\Domain\Leave\Models\LeaveBalance;
 use App\Domain\Leave\Models\LeaveType;
+use App\Domain\HRIS\Models\EmployeeBankAccount;
 use App\Domain\Payroll\Models\EmployeeCompensation;
+use App\Domain\Payroll\Models\EmployeePayrollProfile;
 use App\Domain\Payroll\Models\Payslip;
 use App\Domain\Payroll\Services\StatutoryCalculator;
 use App\Http\Controllers\Controller;
@@ -793,38 +795,142 @@ class ReportController extends Controller
         abort_unless($request->user()->can('payroll.view'), 403);
 
         $rows = Payslip::query()
-            ->with(['employee:id,employee_no,first_name,last_name,department_id', 'employee.department:id,name'])
-            ->with('run:id,name,period_start,period_end,pay_date')
+            ->with([
+                'employee:id,employee_no,first_name,middle_name,last_name,gender,date_hired,is_active,department_id,position_id,employment_type_id',
+                'employee.department:id,name', 'employee.position:id,title', 'employee.employmentType:id,name',
+            ])
+            ->with('run:id,name,company_id,period_start,period_end,pay_date')
             ->where('payroll_run_id', $payrollRunId)
             ->get();
 
         abort_if($rows->isEmpty(), 404, 'Payroll run not found or has no payslips.');
 
         $run = $rows->first()->run;
+        $companyId = $run->company_id;
+        $empIds = $rows->pluck('employee_id')->unique()->all();
 
+        // Supplementary per-employee data the register needs beyond the payslip.
+        $comp = EmployeeCompensation::withoutGlobalScopes()->whereIn('employee_id', $empIds)
+            ->where('is_active', true)->get()->keyBy('employee_id');
+        $prof = EmployeePayrollProfile::whereIn('employee_id', $empIds)->get()->keyBy('employee_id');
+        $bank = EmployeeBankAccount::query()->whereIn('employee_id', $empIds)
+            ->orderByDesc('is_primary')->get()->groupBy('employee_id')->map->first();
+        // Year-to-date tax + net across this company's runs up to this period.
+        $ytd = DB::table('payslips as p')->join('payroll_runs as r', 'r.id', '=', 'p.payroll_run_id')
+            ->where('p.company_id', $companyId)->whereIn('p.employee_id', $empIds)
+            ->whereYear('r.period_end', $run->period_end->year)
+            ->whereDate('r.period_end', '<=', $run->period_end->toDateString())
+            ->groupBy('p.employee_id')
+            ->select('p.employee_id', DB::raw('SUM(p.withholding_tax) tax'), DB::raw('SUM(p.net_pay) net'))
+            ->get()->keyBy('employee_id');
+        $statutory = app(StatutoryCalculator::class);
+
+        $hhmm = fn (int $min) => sprintf('%02d:%02d', intdiv(max(0, $min), 60), max(0, $min) % 60);
+
+        // Columns mirror the Sprout PayrollSummary "Payroll Register" 1:1.
         $headers = [
-            'Employee No', 'Name', 'Department',
-            'Days Worked', 'Days Absent', 'Late (min)', 'OT (min)',
-            'Basic Pay', 'OT Pay', 'Night Diff', 'Holiday Pay', 'Rest Day Pay', 'Allowance', 'De Minimis', 'Gross Pay',
-            'SSS', 'PhilHealth', 'Pag-IBIG', 'W/Tax',
-            'Absence Deduction', 'Tardiness Deduction', 'Loans', 'Total Deductions',
-            'Net Pay',
+            'Employee ID*', 'Fullname', 'Position', 'Department', 'Date Hired', 'Employment Status',
+            'Bank Account Number', 'Cost Center', 'Gender', 'Work Days Per Year',
+            'Basic Monthly Salary', 'Monthly De Minimis Benefits', 'Total Monthly Salary', 'Basic Salary (Semi-Monthly)',
+            'Gross/Day', 'Basic/Hr (8 hours)', 'De Minimis Benefits (Semi-Monthly)',
+            'BASIC ADJUSTMENT', 'Communication Allowance', 'Overtime Adjustment', 'Representation',
+            'Ord-ND', 'Ord-ND(hh:mm)', 'Ord-OT', 'Ord-OT(hh:mm)', 'RD', 'RD(hh:mm)', 'OT Total', 'Total Salary',
+            'Days Absent', 'Total Absent Deduction', 'Deminimis Deduction', 'Allowance Absent Deduction',
+            'Discretionary Deduction', 'Minutes Late', 'Total Late Deduction',
+            'Withholding Tax', 'SSS', 'SSS MPF', 'Philhealth', 'HDMF',
+            'Employee Cash Advances (LESS)', 'HDMF Calamity Loan (LESS)', 'HDMF Salary Loan (LESS)', 'Motorcycle Loan (LESS)',
+            'PHILHEALTH EMPLOYEE (LESS)', 'RFE Others (LESS)', 'SSS Calamity Loan (LESS)', 'SSS Salary Loan (LESS)',
+            'Deductions Total', 'Net Pay', 'Tax YTD', 'Net YTD', 'Taxable Gross',
+            'SSSER', 'SSS MPFER', 'SSSEC', 'PHER', 'HDMFER', 'HDMF Additional',
         ];
         $total = count($headers);
-        $firstNum = 3; // columns 0-2 (No, Name, Department) are text; the rest sum.
+        // Text columns that are never summed in the subtotal/grand-total rows.
+        $textCols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 22, 24, 26];
 
-        // One row of values for a payslip.
-        $valuesOf = fn (Payslip $r): array => [
-            $r->employee?->employee_no ?? '',
-            trim(($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? '')),
-            $r->employee?->department?->name ?: 'Unassigned',
-            (float) $r->days_worked, (float) $r->days_absent, (int) $r->late_minutes, (int) $r->overtime_minutes,
-            (float) $r->basic_pay, (float) $r->overtime_pay, (float) $r->night_diff_pay, (float) $r->holiday_pay,
-            (float) $r->rest_day_pay, (float) $r->allowance, (float) $r->de_minimis, (float) $r->gross_pay,
-            (float) $r->sss, (float) $r->philhealth, (float) $r->pagibig, (float) $r->withholding_tax,
-            (float) $r->absences_deduction, (float) $r->tardiness_deduction, (float) $r->loans_deduction,
-            (float) $r->total_deductions, (float) $r->net_pay,
-        ];
+        $valuesOf = function (Payslip $r) use ($comp, $prof, $bank, $ytd, $statutory, $hhmm): array {
+            $e = $r->employee;
+            $c = $comp->get($r->employee_id);
+            $p = $prof->get($r->employee_id);
+            $b = $bank->get($r->employee_id);
+            $y = $ytd->get($r->employee_id);
+
+            $basicMonthly = (float) ($c->basic_monthly ?? ($r->basic_pay * 2));
+            $deMinMonthly = (float) ($p->de_minimis ?? ($r->de_minimis * 2));
+            $workDays = (int) ($p->work_days_per_year ?? 313) ?: 313;
+            $grossDay = round($basicMonthly * 12 / $workDays, 2);
+            $er = $statutory->monthlyEmployerContributions($basicMonthly);
+
+            // Loan amortizations broken out by type from the payslip breakdown.
+            $ln = ['cash_advance' => 0.0, 'sss_salary' => 0.0, 'sss_calamity' => 0.0, 'pagibig_mpl' => 0.0, 'pagibig_calamity' => 0.0, 'other' => 0.0];
+            foreach ((array) ($r->breakdown['loans'] ?? []) as $l) {
+                $t = $l['type'] ?? 'other';
+                $ln[$t] = ($ln[$t] ?? 0) + (float) ($l['amount'] ?? 0);
+            }
+            $rfeOther = ($ln['other'] ?? 0) + array_sum(array_diff_key($ln, array_flip(['cash_advance', 'sss_salary', 'sss_calamity', 'pagibig_mpl', 'pagibig_calamity', 'other'])));
+
+            return [
+                $e?->employee_no ?? '',
+                trim(($e?->last_name ?? '').', '.trim(($e?->first_name ?? '').' '.($e?->middle_name ?? ''))),
+                $e?->position?->title ?? '',
+                $e?->department?->name ?: 'Unassigned',
+                $e?->date_hired?->format('m/d/Y') ?? '',
+                $e?->employmentType?->name ?: ($e?->is_active ? 'Active' : 'Resigned'),
+                (string) ($b?->account_number ?? ''),
+                (string) ($p->cost_center ?? ''),
+                $e?->gender ?? '',
+                $workDays,
+                $basicMonthly,
+                $deMinMonthly,
+                round($basicMonthly + $deMinMonthly, 2),
+                round($basicMonthly / 2, 2),
+                $grossDay,
+                round($grossDay / 8, 2),
+                round($deMinMonthly / 2, 2),
+                0.0,                              // BASIC ADJUSTMENT (not tracked)
+                0.0,                              // Communication Allowance (not broken out)
+                0.0,                              // Overtime Adjustment (not tracked)
+                (float) $r->allowance,            // Representation ← system's lump allowance
+                (float) $r->night_diff_pay,       // Ord-ND
+                $hhmm((int) $r->night_diff_minutes),
+                (float) $r->overtime_pay,         // Ord-OT
+                $hhmm((int) $r->overtime_minutes),
+                (float) $r->rest_day_pay,         // RD
+                '00:00',                          // RD(hh:mm) (rest-day minutes not tracked)
+                round((float) $r->night_diff_pay + (float) $r->overtime_pay + (float) $r->rest_day_pay, 2),
+                (float) $r->gross_pay,            // Total Salary
+                (float) $r->days_absent,
+                (float) $r->absences_deduction,
+                0.0,                              // Deminimis Deduction (not tracked)
+                0.0,                              // Allowance Absent Deduction (not tracked)
+                (float) $r->other_deductions,     // Discretionary Deduction
+                (int) $r->late_minutes,
+                (float) $r->tardiness_deduction,
+                (float) $r->withholding_tax,
+                (float) $r->sss,
+                0.0,                              // SSS MPF (not split from SSS)
+                (float) $r->philhealth,
+                (float) $r->pagibig,              // HDMF
+                round($ln['cash_advance'], 2),
+                round($ln['pagibig_calamity'], 2),
+                round($ln['pagibig_mpl'], 2),
+                0.0,                              // Motorcycle Loan (no matching type)
+                0.0,                              // PHILHEALTH EMPLOYEE (LESS)
+                round($rfeOther, 2),              // RFE Others (company/other loans)
+                round($ln['sss_calamity'], 2),
+                round($ln['sss_salary'], 2),
+                (float) $r->total_deductions,
+                (float) $r->net_pay,
+                (float) ($y->tax ?? $r->withholding_tax),
+                (float) ($y->net ?? $r->net_pay),
+                round((float) $r->gross_pay - (float) $r->de_minimis, 2),  // Taxable Gross (de-minimis exempt)
+                round(($er['sss'] ?? 0) / 2, 2),  // SSSER (semi-monthly)
+                0.0,                              // SSS MPFER
+                0.0,                              // SSSEC
+                round(($er['philhealth'] ?? 0) / 2, 2),  // PHER
+                round(($er['pagibig'] ?? 0) / 2, 2),     // HDMFER
+                0.0,                              // HDMF Additional
+            ];
+        };
 
         // Group payslips by department (alphabetical), employees by name within.
         $byDept = [];
@@ -833,31 +939,34 @@ class ReportController extends Controller
         }
         ksort($byDept);
 
-        $summedRow = function (string $label, array $sums) use ($total, $firstNum): array {
+        $summedRow = function (string $label, array $sums) use ($total, $textCols): array {
             $row = array_fill(0, $total, '');
             $row[0] = $label;
-            for ($c = $firstNum; $c < $total; $c++) {
-                $row[$c] = round($sums[$c] ?? 0, 2);
+            for ($c = 10; $c < $total; $c++) {
+                if (! in_array($c, $textCols, true)) {
+                    $row[$c] = round($sums[$c] ?? 0, 2);
+                }
             }
 
             return $row;
         };
 
-        $grand = array_fill($firstNum, $total - $firstNum, 0.0);
+        $grand = array_fill(0, $total, 0.0);
         $data = [];
         foreach ($byDept as $dept => $slips) {
             usort($slips, fn ($a, $b) => strcmp((string) $a->employee?->last_name, (string) $b->employee?->last_name));
 
-            // Department header row.
             $data[] = array_merge(["Department: {$dept}"], array_fill(1, $total - 1, ''));
 
-            $sub = array_fill($firstNum, $total - $firstNum, 0.0);
+            $sub = array_fill(0, $total, 0.0);
             foreach ($slips as $r) {
                 $row = $valuesOf($r);
                 $data[] = $row;
-                for ($c = $firstNum; $c < $total; $c++) {
-                    $sub[$c] += (float) $row[$c];
-                    $grand[$c] += (float) $row[$c];
+                for ($c = 10; $c < $total; $c++) {
+                    if (! in_array($c, $textCols, true) && is_numeric($row[$c])) {
+                        $sub[$c] += (float) $row[$c];
+                        $grand[$c] += (float) $row[$c];
+                    }
                 }
             }
             $data[] = $summedRow('Sub Total', $sub);
@@ -865,10 +974,13 @@ class ReportController extends Controller
         $data[] = $summedRow('GRAND TOTAL', $grand);
 
         $label = $run ? str_replace(' ', '_', $run->name) : $payrollRunId;
+        $companyName = optional(\App\Domain\Identity\Models\Company::withoutGlobalScopes()->find($companyId))->trade_name
+            ?? optional(\App\Domain\Identity\Models\Company::withoutGlobalScopes()->find($companyId))->legal_name
+            ?? 'Company';
 
         return XlsxReport::download("payroll_{$label}.xlsx", $headers, $data, [
-            'title' => 'Payroll Register'.($run ? ' — '.$run->name : ''),
-            'subtitle' => $run ? "Period {$run->period_start} to {$run->period_end}" : 'Generated '.now()->format('M d, Y g:i A'),
+            'title' => 'Company Name: '.$companyName,
+            'subtitle' => 'Payroll Period: Payroll for '.$run->period_start->format('n/j/Y').' - '.$run->period_end->format('n/j/Y'),
             'emphasize' => function (array $row) {
                 $first = (string) ($row[0] ?? '');
                 if (str_starts_with($first, 'Department:')) {
