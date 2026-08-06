@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PageHeader, AppButton, TableShell } from "@/components/ui";
-import { SearchSelect } from "@/components/SearchSelect";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { DeleteRunModal } from "@/components/payroll/DeleteRunModal";
 import { inputCls, labelCls } from "@/lib/form-classes";
@@ -62,35 +61,59 @@ function MiniStat({ label, value, highlight }: { label: string; value: string; h
   );
 }
 
+type PayGroup = "non_confidential" | "confidential";
+const GROUP_LABEL: Record<PayGroup, string> = { non_confidential: "Non-confidential", confidential: "Confidential" };
+/** Confidential is kept strictly separate; everything else (incl. any legacy "all" runs) is Non-confidential. */
+const inGroup = (r: PayrollRun, g: PayGroup) => (g === "confidential" ? r.pay_group === "confidential" : r.pay_group !== "confidential");
+
 function RunsTab() {
   const router = useRouter();
   const qc = useQueryClient();
+  const [group, setGroup] = useState<PayGroup>("non_confidential");
   const [showForm, setShowForm] = useState(false);
   const [deletingRun, setDeletingRun] = useState<PayrollRun | null>(null);
 
   const { data: runs, isLoading } = useQuery({ queryKey: ["payroll-runs"], queryFn: payrollApi.listRuns });
 
-  const list = runs ?? [];
+  const all = runs ?? [];
+  const list = all.filter((r) => inGroup(r, group));
   const postedRuns = list.filter((r) => r.status === "posted");
   const netPaid = postedRuns.reduce((a, r) => a + Number(r.total_net || 0), 0);
 
   return (
     <div className="space-y-4">
+      {/* Payroll is run separately per employee group — pick which one to work on. */}
+      <div className="flex w-fit items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+        {(["non_confidential", "confidential"] as PayGroup[]).map((g) => (
+          <button
+            key={g}
+            type="button"
+            onClick={() => setGroup(g)}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${group === g ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+          >
+            {GROUP_LABEL[g]}
+            <span className={`ml-2 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${group === g ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-600"}`}>
+              {all.filter((r) => inGroup(r, g)).length}
+            </span>
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
         <div className="grid flex-1 grid-cols-3 gap-3">
-          <MiniStat label="Total runs" value={String(list.length)} />
+          <MiniStat label={`${GROUP_LABEL[group]} runs`} value={String(list.length)} />
           <MiniStat label="Posted" value={String(postedRuns.length)} />
           <MiniStat label="Net paid (posted)" value={peso(netPaid)} highlight />
         </div>
         <div className="flex sm:items-end">
-          <AppButton onClick={() => setShowForm(true)}>+ New run</AppButton>
+          <AppButton onClick={() => setShowForm(true)}>+ New {group === "confidential" ? "confidential" : "non-confidential"} run</AppButton>
         </div>
       </div>
 
       {isLoading ? (
         <TableShell><TableSkeleton rows={3} cols={7} /></TableShell>
-      ) : !runs || runs.length === 0 ? (
-        <EmptyState title="No payroll runs yet" message="Create a run for a cutoff, then compute it." action={<AppButton onClick={() => setShowForm(true)}>+ New run</AppButton>} />
+      ) : list.length === 0 ? (
+        <EmptyState title={`No ${GROUP_LABEL[group].toLowerCase()} runs yet`} message="Create a run for a cutoff, then compute it." action={<AppButton onClick={() => setShowForm(true)}>+ New run</AppButton>} />
       ) : (
         <TableShell>
           <table className="w-full text-sm">
@@ -106,7 +129,7 @@ function RunsTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {runs.map((r) => (
+              {list.map((r) => (
                 <tr key={r.id} onClick={() => router.push(`/payroll/${r.id}`)} className="cursor-pointer hover:bg-slate-50">
                   <td className="px-4 py-3 font-medium text-slate-800">
                     {r.name}
@@ -142,6 +165,7 @@ function RunsTab() {
 
       {showForm && (
         <NewRunModal
+          payGroup={group}
           onClose={() => setShowForm(false)}
           onCreated={(run) => {
             qc.invalidateQueries({ queryKey: ["payroll-runs"] });
@@ -165,12 +189,12 @@ function RunsTab() {
   );
 }
 
-function NewRunModal({ onClose, onCreated }: { onClose: () => void; onCreated: (r: PayrollRun) => void }) {
-  const [form, setForm] = useState<NewRunInput>({ name: "", pay_group: "", period_start: "", period_end: "", pay_date: "" });
+function NewRunModal({ payGroup, onClose, onCreated }: { payGroup: PayGroup; onClose: () => void; onCreated: (r: PayrollRun) => void }) {
+  const [form, setForm] = useState<NewRunInput>({ name: "", pay_group: payGroup, period_start: "", period_end: "", pay_date: "" });
   const set = <K extends keyof NewRunInput>(k: K, v: NewRunInput[K]) => setForm({ ...form, [k]: v });
 
   const create = useMutation({
-    mutationFn: () => payrollApi.createRun({ ...form, pay_group: form.pay_group || undefined }),
+    mutationFn: () => payrollApi.createRun({ ...form, pay_group: payGroup }),
     meta: { successMessage: "Payroll run created." },
     onSuccess: onCreated,
   });
@@ -178,7 +202,7 @@ function NewRunModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="dialog" aria-modal>
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-        <h2 className="text-lg font-semibold text-slate-900">New payroll run</h2>
+        <h2 className="text-lg font-semibold text-slate-900">New {GROUP_LABEL[payGroup].toLowerCase()} run</h2>
         <form className="mt-4 space-y-4" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
           <div>
             <label className={labelCls}>Run name</label>
@@ -186,17 +210,14 @@ function NewRunModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           </div>
           <div>
             <label className={labelCls}>Employee group</label>
-            <SearchSelect
-              className={inputCls}
-              value={form.pay_group ?? ""}
-              onChange={(v) => set("pay_group", v as NewRunInput["pay_group"])}
-              placeholder="All employees"
-              options={[
-                { value: "", label: "All employees" },
-                { value: "non_confidential", label: "Non-confidential only" },
-                { value: "confidential", label: "Confidential only" },
-              ]}
-            />
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${payGroup === "confidential" ? "bg-amber-100 text-amber-800" : "bg-slate-200 text-slate-700"}`}>
+                {GROUP_LABEL[payGroup]}
+              </span>
+              <span className="text-slate-500">
+                This run covers <strong className="text-slate-700">{payGroup === "confidential" ? "confidential" : "non-confidential"}</strong> employees only.
+              </span>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
