@@ -12,6 +12,7 @@ import { getMe } from "@/lib/auth";
 const TABS: { slug: string; label: string; sensitive?: boolean }[] = [
   { slug: "", label: "Overview" },
   { slug: "attendance", label: "Attendance" },
+  { slug: "leave-credits", label: "Leave credits" },
   { slug: "schedule", label: "Schedule" },
   { slug: "dependents", label: "Dependents" },
   { slug: "emergency-contacts", label: "Emergency contacts" },

@@ -79,13 +79,17 @@ class LeaveBalanceController extends Controller
             $employeeIds = [(int) $eid];
         }
 
-        // Materialize a balance row for every (employee × active leave type) so the UI shows zero-balance entries too
+        // Materialize a balance row for every (employee × active leave type) so the UI shows zero-balance entries too.
+        // Skip gender-restricted types that don't match the employee (e.g. Maternity for a male).
         if ($employeeIds) {
             $types = LeaveType::query()->where('is_active', true)->get();
             foreach ($employeeIds as $eid) {
                 $employee = \App\Domain\HRIS\Models\Employee::find($eid);
                 if (! $employee) continue;
                 foreach ($types as $t) {
+                    if ($t->gender_restriction && strtolower($t->gender_restriction) !== strtolower((string) $employee->gender)) {
+                        continue;
+                    }
                     $service->ensureBalance($employee, $t, $year);
                 }
             }
