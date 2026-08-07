@@ -37,6 +37,7 @@ class ShiftAdjustmentController extends Controller
         $data = $request->validate([
             'work_date' => ['required', 'date'],
             'is_rest_day' => ['sometimes', 'boolean'],
+            'is_half_day' => ['sometimes', 'boolean'],
             'time_in' => ['nullable', 'date_format:H:i'],
             'time_out' => ['nullable', 'date_format:H:i', 'after:time_in'],
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
@@ -44,6 +45,7 @@ class ShiftAdjustmentController extends Controller
         ]);
 
         $isRest = (bool) ($data['is_rest_day'] ?? false);
+        $isHalf = ! $isRest && (bool) ($data['is_half_day'] ?? false);
         if (! $isRest && (empty($data['time_in']) || empty($data['time_out']))) {
             throw ValidationException::withMessages([
                 'time_in' => 'A work shift needs both a time in and a time out (or mark it a rest day).',
@@ -55,9 +57,11 @@ class ShiftAdjustmentController extends Controller
             [
                 'company_id' => $employee->company_id,
                 'is_rest_day' => $isRest,
+                'is_half_day' => $isHalf,
+                // A half-day shift usually has no unpaid lunch break.
                 'time_in' => $isRest ? null : $data['time_in'],
                 'time_out' => $isRest ? null : $data['time_out'],
-                'break_minutes' => $data['break_minutes'] ?? 60,
+                'break_minutes' => $isHalf ? ($data['break_minutes'] ?? 0) : ($data['break_minutes'] ?? 60),
                 'reason' => $data['reason'] ?? null,
                 'created_by_user_id' => $request->user()->id,
             ],

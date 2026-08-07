@@ -499,6 +499,9 @@ class DtrComputer
             'actual_in' => $actualIn,
             'actual_out' => $actualOut,
             'hours_worked' => $hoursWorked,
+            // Portion of a workday this record pays: 0.5 for an official half-day
+            // (HR half-day shift adjustment), otherwise a full 1.0.
+            'day_fraction' => ($isAdjusted && $adjustment->is_half_day) ? 0.5 : 1.0,
             'late_minutes' => $lateMinutes,
             'undertime_minutes' => $undertimeMinutes,
             'overtime_minutes' => $overtimeMinutes,

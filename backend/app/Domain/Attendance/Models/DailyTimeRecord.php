@@ -14,7 +14,7 @@ class DailyTimeRecord extends Model
     protected $fillable = [
         'company_id', 'employee_id', 'work_date',
         'scheduled_in', 'scheduled_out', 'actual_in', 'actual_out',
-        'hours_worked', 'late_minutes', 'undertime_minutes',
+        'hours_worked', 'day_fraction', 'late_minutes', 'undertime_minutes',
         'overtime_minutes', 'night_diff_minutes',
         'holiday_type', 'is_rest_day', 'is_absent', 'is_on_leave', 'is_adjusted',
         'leave_application_id', 'status', 'remarks',
@@ -27,6 +27,7 @@ class DailyTimeRecord extends Model
             'actual_in' => 'datetime',
             'actual_out' => 'datetime',
             'hours_worked' => 'decimal:2',
+            'day_fraction' => 'decimal:2',
             'is_rest_day' => 'boolean',
             'is_absent' => 'boolean',
             'is_on_leave' => 'boolean',

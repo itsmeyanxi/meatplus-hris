@@ -13,7 +13,7 @@ class ShiftAdjustment extends Model
 
     protected $fillable = [
         'company_id', 'employee_id', 'work_date',
-        'is_rest_day', 'time_in', 'time_out', 'break_minutes',
+        'is_rest_day', 'is_half_day', 'time_in', 'time_out', 'break_minutes',
         'reason', 'created_by_user_id',
     ];
 
@@ -22,6 +22,7 @@ class ShiftAdjustment extends Model
         return [
             'work_date' => 'date',
             'is_rest_day' => 'boolean',
+            'is_half_day' => 'boolean',
         ];
     }
 

@@ -245,7 +245,8 @@ class PayrollComputer
             if ($d->is_absent) {
                 $daysAbsent++;
             } elseif (! $d->is_rest_day && ((float) $d->hours_worked > 0 || $d->actual_in || $d->is_on_leave || $d->holiday_type)) {
-                $daysWorked++;
+                // Pay by the day's fraction — an official half-day pays 0.5.
+                $daysWorked += (float) ($d->day_fraction ?? 1.0);
             }
             $lateMinutes += (int) $d->late_minutes;
             $otMinutes += (int) $d->overtime_minutes;

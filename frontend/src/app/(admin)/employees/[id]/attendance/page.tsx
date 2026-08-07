@@ -78,6 +78,8 @@ export default function EmployeeAttendanceTab() {
   const [adjForm, setAdjForm] = useState({
     work_date: "",
     is_rest_day: false,
+    is_half_day: false,
+    half_session: "am" as "am" | "pm",
     time_in: "",
     time_out: "",
     reason: "",
@@ -87,18 +89,23 @@ export default function EmployeeAttendanceTab() {
     qc.invalidateQueries({ queryKey: dtrKey });
   };
   const adjust = useMutation({
-    mutationFn: () =>
-      shiftAdjustmentsApi.create(employeeId, {
+    mutationFn: () => {
+      const half = adjForm.is_half_day && !adjForm.is_rest_day;
+      // An official half-day uses a fixed AM (08:00–12:00) or PM (13:00–17:00) window.
+      const [ti, to] = half ? (adjForm.half_session === "pm" ? ["13:00", "17:00"] : ["08:00", "12:00"]) : [adjForm.time_in, adjForm.time_out];
+      return shiftAdjustmentsApi.create(employeeId, {
         work_date: adjForm.work_date,
         is_rest_day: adjForm.is_rest_day,
-        time_in: adjForm.is_rest_day ? null : adjForm.time_in,
-        time_out: adjForm.is_rest_day ? null : adjForm.time_out,
+        is_half_day: half,
+        time_in: adjForm.is_rest_day ? null : ti,
+        time_out: adjForm.is_rest_day ? null : to,
         reason: adjForm.reason || null,
-      }),
+      });
+    },
     onSuccess: () => {
       adjustDone();
       setIsAdjusting(false);
-      setAdjForm({ work_date: "", is_rest_day: false, time_in: "", time_out: "", reason: "" });
+      setAdjForm({ work_date: "", is_rest_day: false, is_half_day: false, half_session: "am", time_in: "", time_out: "", reason: "" });
     },
   });
   const removeAdj = useMutation({
@@ -214,21 +221,46 @@ export default function EmployeeAttendanceTab() {
               onChange={(e) => setAdjForm({ ...adjForm, work_date: e.target.value })}
               required
             />
-            <label className="flex items-center gap-2 text-sm text-slate-600">
-              <input
-                type="checkbox"
-                checked={adjForm.is_rest_day}
-                onChange={(e) => setAdjForm({ ...adjForm, is_rest_day: e.target.checked })}
-              />
-              Rest day
-            </label>
+            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={adjForm.is_rest_day}
+                  onChange={(e) => setAdjForm({ ...adjForm, is_rest_day: e.target.checked, is_half_day: false })}
+                />
+                Rest day
+              </label>
+              {!adjForm.is_rest_day && (
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={adjForm.is_half_day}
+                    onChange={(e) => setAdjForm({ ...adjForm, is_half_day: e.target.checked })}
+                  />
+                  Official half-day <span className="text-xs text-slate-400">(paid ½)</span>
+                </label>
+              )}
+            </div>
             <input
               className={inputCls}
               placeholder="Reason (optional)"
               value={adjForm.reason}
               onChange={(e) => setAdjForm({ ...adjForm, reason: e.target.value })}
             />
-            {!adjForm.is_rest_day && (
+            {!adjForm.is_rest_day && adjForm.is_half_day && (
+              <label className="flex items-center gap-2 text-sm text-slate-600 sm:col-span-2">
+                Session:
+                <select
+                  className={inputCls}
+                  value={adjForm.half_session}
+                  onChange={(e) => setAdjForm({ ...adjForm, half_session: e.target.value as "am" | "pm" })}
+                >
+                  <option value="am">Morning (08:00–12:00)</option>
+                  <option value="pm">Afternoon (13:00–17:00)</option>
+                </select>
+              </label>
+            )}
+            {!adjForm.is_rest_day && !adjForm.is_half_day && (
               <>
                 <input
                   type="time"
@@ -272,6 +304,9 @@ export default function EmployeeAttendanceTab() {
                   <span className="text-slate-600">
                     {a.is_rest_day ? "Rest day" : `${a.time_in?.slice(0, 5)}–${a.time_out?.slice(0, 5)}`}
                   </span>
+                  {a.is_half_day && (
+                    <span className="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Half-day (paid ½)</span>
+                  )}
                   {a.reason && <span className="text-slate-400"> · {a.reason}</span>}
                 </span>
                 <button

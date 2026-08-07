@@ -423,6 +423,7 @@ export type ShiftAdjustment = {
   employee_id: number;
   work_date: string;
   is_rest_day: boolean;
+  is_half_day: boolean;
   time_in: string | null;
   time_out: string | null;
   break_minutes: number;
@@ -432,6 +433,7 @@ export type ShiftAdjustment = {
 export type ShiftAdjustmentInput = {
   work_date: string;
   is_rest_day?: boolean;
+  is_half_day?: boolean;
   time_in?: string | null;
   time_out?: string | null;
   break_minutes?: number;
