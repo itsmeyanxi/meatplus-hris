@@ -835,7 +835,7 @@ class ReportController extends Controller
             'Gross/Day', 'Basic/Hr (8 hours)', 'De Minimis Benefits (Semi-Monthly)',
             'BASIC ADJUSTMENT', 'Communication Allowance', 'Overtime Adjustment', 'Representation',
             'Ord-ND', 'Ord-ND(hh:mm)', 'Ord-OT', 'Ord-OT(hh:mm)', 'RD', 'RD(hh:mm)', 'OT Total', 'Total Salary',
-            'Days Absent', 'Total Absent Deduction', 'Deminimis Deduction', 'Allowance Absent Deduction',
+            'Days Worked', 'Days Absent', 'Total Absent Deduction', 'Deminimis Deduction', 'Allowance Absent Deduction',
             'Discretionary Deduction', 'Minutes Late', 'Total Late Deduction',
             'Withholding Tax', 'SSS', 'SSS MPF', 'Philhealth', 'HDMF',
             'Employee Cash Advances (LESS)', 'HDMF Calamity Loan (LESS)', 'HDMF Salary Loan (LESS)', 'Motorcycle Loan (LESS)',
@@ -898,6 +898,7 @@ class ReportController extends Controller
                 '00:00',                          // RD(hh:mm) (rest-day minutes not tracked)
                 round((float) $r->night_diff_pay + (float) $r->overtime_pay + (float) $r->rest_day_pay, 2),
                 (float) $r->gross_pay,            // Total Salary
+                (float) $r->days_worked,          // Days Worked (0.5 for an official half-day)
                 (float) $r->days_absent,
                 (float) $r->absences_deduction,
                 0.0,                              // Deminimis Deduction (not tracked)
