@@ -492,6 +492,17 @@ class DtrComputer
         // contractual staff are never absent.
         $isAbsent = $hasSchedule && ! $hasAnyLogs && ! $isRestDay && ! $holiday && ! $leavePaid && ! $excused && ! $punchExempt;
 
+        // Portion of the day payable via basic pay. An official half-day shift
+        // adjustment pays 0.5; an UNPAID half-day leave pays only the worked half
+        // (0.5). A PAID half-day leave stays 1.0 — the paid leave half + worked
+        // half make a full day, with 0.5 drawn from leave credits.
+        $dayFraction = 1.0;
+        if ($isAdjusted && $adjustment->is_half_day) {
+            $dayFraction = 0.5;
+        } elseif ($onLeave && ! empty($leave->half_day) && ! $leavePaid) {
+            $dayFraction = 0.5;
+        }
+
         return [
             'company_id' => $employee->company_id,
             'scheduled_in' => $scheduledIn,
@@ -499,9 +510,7 @@ class DtrComputer
             'actual_in' => $actualIn,
             'actual_out' => $actualOut,
             'hours_worked' => $hoursWorked,
-            // Portion of a workday this record pays: 0.5 for an official half-day
-            // (HR half-day shift adjustment), otherwise a full 1.0.
-            'day_fraction' => ($isAdjusted && $adjustment->is_half_day) ? 0.5 : 1.0,
+            'day_fraction' => $dayFraction,
             'late_minutes' => $lateMinutes,
             'undertime_minutes' => $undertimeMinutes,
             'overtime_minutes' => $overtimeMinutes,

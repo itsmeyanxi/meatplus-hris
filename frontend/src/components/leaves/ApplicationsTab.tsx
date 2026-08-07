@@ -161,6 +161,21 @@ export function ApplicationsTab() {
               <input type="date" className={inputCls} value={form.date_to} onChange={(e) => setForm({ ...form, date_to: e.target.value })} required />
             </div>
             <div className="sm:col-span-2">
+              <label className={labelCls}>Duration</label>
+              <select
+                className={inputCls}
+                value={form.half_day ?? ""}
+                onChange={(e) => setForm({ ...form, half_day: (e.target.value || null) as "am" | "pm" | null })}
+              >
+                <option value="">Full day</option>
+                <option value="am">Half day — Morning (AM)</option>
+                <option value="pm">Half day — Afternoon (PM)</option>
+              </select>
+              {form.half_day && (
+                <p className="mt-1 text-xs text-slate-500">Counts as <strong>0.5 day</strong> — the employee works the other half.</p>
+              )}
+            </div>
+            <div className="sm:col-span-2">
               <label className={labelCls}>Reason *</label>
               <textarea className={`${inputCls} resize-y`} placeholder="Reason for the leave…" rows={2} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} required />
             </div>
