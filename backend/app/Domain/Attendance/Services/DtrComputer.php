@@ -473,9 +473,13 @@ class DtrComputer
         $leavePaid = $onLeave && (bool) ($leave->leaveType?->is_paid ?? true);
 
         // Certificate of Attendance or Official Business certifies presence: the day
-        // is excused (not absent) and, with no punch, credited the scheduled hours.
+        // is excused (not absent) and credited the scheduled hours whenever the
+        // punches didn't already yield a worked total. Previously this only applied
+        // with NO punches at all, so an OB day with a lone out-punch (or in-punch)
+        // — which pairs to no complete shift and computes 0 hours — showed just the
+        // stray "out" and credited nothing, hiding the OB.
         $excused = (bool) ($coa || $ob);
-        if ($excused && ! $hasAnyLogs && $requiredHours > 0) {
+        if ($excused && $requiredHours > 0 && $hoursWorked <= 0) {
             $hoursWorked = $requiredHours;
         }
 
