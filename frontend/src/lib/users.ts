@@ -2,6 +2,7 @@ import { api } from "./api";
 
 export type Role =
   | "admin"
+  | "hr_confi"
   | "hr_admin"
   | "hr_officer"
   | "it_admin"
@@ -128,6 +129,7 @@ export const usersApi = {
 
 export const ROLE_LABELS: Record<Role, string> = {
   admin: "Admin (Super Admin — all companies)",
+  hr_confi: "HR Confi (confidential data)",
   hr_admin: "HR Admin",
   hr_officer: "HR Officer",
   it_admin: "IT Admin",

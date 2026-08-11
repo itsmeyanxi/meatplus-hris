@@ -43,24 +43,47 @@ class PermissionsSeeder extends Seeder
             Permission::findOrCreate($name, 'web');
         }
 
+        // Confidential-employee data (their pay + bank accounts) is gated by ONE
+        // permission, held EXCLUSIVELY by the hr_confi role. Every other role —
+        // including the whole admin tier and super_admin — is stripped of it, so
+        // confidential records are visible only to a user carrying hr_confi.
+        $sensitive = 'employee.view.sensitive';
+        $nonSensitive = array_values(array_diff($permissions, [$sensitive]));
+
         // Company-level admin: full HR / payroll / attendance / leave operations
         // within their OWN company, but WITHOUT the group-wide powers — no company
         // management, no role assignment, and no destructive employee deletes. Unlike
         // super_admin they do NOT bypass the company scope (one company at a time).
+        // Confidential data is intentionally excluded (hr_confi only).
         $companyAdmin = array_values(array_diff($permissions, [
-            'company.manage', 'role.manage', 'employee.delete',
+            'company.manage', 'role.manage', 'employee.delete', $sensitive,
         ]));
 
         $rolePermissions = [
             // super_admin = the single most powerful role, top of the admin hierarchy.
             // Holds every permission AND bypasses the company scope (see
             // User::isSuperAdmin / CompanyScope), so it sees every company's data at
-            // once with no limitation.
-            'super_admin' => $permissions,
+            // once. The ONE exception is confidential-employee data, reserved for
+            // hr_confi — super_admin must also carry hr_confi to see it.
+            'super_admin' => $nonSensitive,
             // admin = company-level administrator (see $companyAdmin above).
             'admin' => $companyAdmin,
-            'hr_admin' => [
+            // hr_confi = full HR-admin operations PLUS the SOLE access to confidential
+            // employees' data (employee.view.sensitive). This is the only role that
+            // can see confidential pay/bank records; assign it deliberately.
+            'hr_confi' => [
                 'employee.view', 'employee.create', 'employee.update', 'employee.view.sensitive',
+                'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',
+                'leave.view', 'leave.file', 'leave.approve.any', 'leave.manage_types',
+                'compensation.view',
+                'user.manage', 'role.manage', 'audit.view',
+                'access_request.view', 'access_request.approve.hr',
+                'device.manage',
+            ],
+            // hr_admin = the same senior-HR operations as hr_confi but WITHOUT
+            // confidential-data access (that is hr_confi's alone).
+            'hr_admin' => [
+                'employee.view', 'employee.create', 'employee.update',
                 'attendance.view', 'attendance.view.any', 'attendance.manage', 'attendance.correct',
                 'leave.view', 'leave.file', 'leave.approve.any', 'leave.manage_types',
                 'compensation.view',
@@ -82,8 +105,9 @@ class PermissionsSeeder extends Seeder
             ],
             // it_admin = IT administrator within ONE company: full access to every
             // function of the system, but scoped to their active company (does NOT
-            // bypass the company scope like super_admin does).
-            'it_admin' => $permissions,
+            // bypass the company scope like super_admin does). Confidential-employee
+            // data is excluded (hr_confi only).
+            'it_admin' => $nonSensitive,
             // Regular IT employee: day-to-day tech support — manage biometric
             // devices, help users with their accounts (invite / reset / provision),
             // view attendance to troubleshoot, and handle IT access requests. NO

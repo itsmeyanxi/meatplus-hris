@@ -24,7 +24,7 @@ class UpdateUserRequest extends FormRequest
             'company_ids.*' => ['integer', Rule::exists('companies', 'id')],
             'roles'   => ['sometimes', 'array', 'min:1'],
             'roles.*' => ['string', Rule::in([
-                'admin', 'hr_admin', 'hr_officer', 'it_admin', 'it_staff', 'payroll_officer', 'dept_head', 'employee',
+                'admin', 'hr_confi', 'hr_admin', 'hr_officer', 'it_admin', 'it_staff', 'payroll_officer', 'dept_head', 'employee',
                 'supervisor', 'team_lead', 'dept_admin', 'transport_access',
                 'sales_employee', 'timekeeper', 'hr_coordinator', 'garahe_teamlead',
             ]), AdminRoleGuard::rule($this->user())],

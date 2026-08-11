@@ -16,7 +16,7 @@ use App\Models\User;
 final class AdminRoleGuard
 {
     /** Roles that may only be granted by someone who already holds them. */
-    private const GUARDED = ['admin', 'it_admin', 'hr_admin'];
+    private const GUARDED = ['admin', 'it_admin', 'hr_admin', 'hr_confi'];
 
     public static function rule(?User $actor): \Closure
     {
