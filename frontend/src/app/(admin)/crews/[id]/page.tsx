@@ -88,7 +88,9 @@ export default function CrewBoardPage() {
             {data?.employees.map((e) => (
               <tr key={e.id} className="hover:bg-slate-50">
                 <td className="px-3 py-2 font-mono text-xs text-slate-900">{e.employee_no}</td>
-                <td className="px-3 py-2 font-medium text-slate-900">{e.name}</td>
+                <td className="px-3 py-2 font-medium text-slate-900">
+                  <Link href={`/employees/${e.id}`} className="text-slate-900 hover:text-brand-700 hover:underline">{e.name}</Link>
+                </td>
                 <td className="px-3 py-2 font-mono text-xs text-slate-500">{e.biometric_id ?? "—"}</td>
                 <td className="px-3 py-2 tabular-nums">{e.time_in ?? "—"}</td>
                 <td className="px-3 py-2 tabular-nums">{e.time_out ?? "—"}</td>
