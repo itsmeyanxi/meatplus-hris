@@ -9,6 +9,8 @@ class PayslipResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $sssParts = $this->sssParts();
+
         return [
             'id' => $this->id,
             'payroll_run_id' => $this->payroll_run_id,
@@ -31,6 +33,8 @@ class PayslipResource extends JsonResource
             'loans_deduction' => $this->loans_deduction,
             'gross_pay' => $this->gross_pay,
             'sss' => $this->sss,
+            'sss_regular' => $sssParts['regular'],
+            'sss_wisp' => $sssParts['wisp'],
             'philhealth' => $this->philhealth,
             'pagibig' => $this->pagibig,
             'withholding_tax' => $this->withholding_tax,

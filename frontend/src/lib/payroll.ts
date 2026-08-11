@@ -34,6 +34,8 @@ export type Payslip = {
   de_minimis?: string | number;
   gross_pay: string | number;
   sss: string | number;
+  sss_regular?: string | number;
+  sss_wisp?: string | number;
   philhealth: string | number;
   pagibig: string | number;
   withholding_tax: string | number;

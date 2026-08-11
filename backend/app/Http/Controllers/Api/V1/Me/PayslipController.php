@@ -104,7 +104,12 @@ class PayslipController extends Controller
                 $deductions[] = ['label' => $adj['label'] ?? 'Adjustment', 'amount' => (float) ($adj['amount'] ?? 0)];
             }
         }
-        $deductions[] = ['label' => 'SSS', 'amount' => (float) $p->sss];
+        // SSS splits into the Regular SS fund and the MPF/WISP fund (RA 11199).
+        $sssParts = $p->sssParts();
+        $deductions[] = ['label' => 'SSS', 'amount' => $sssParts['regular']];
+        if ($sssParts['wisp'] > 0.001) {
+            $deductions[] = ['label' => 'SSS MPF (WISP)', 'amount' => $sssParts['wisp']];
+        }
         $deductions[] = ['label' => 'PHILHEALTH', 'amount' => (float) $p->philhealth];
         $deductions[] = ['label' => 'HDMF', 'amount' => (float) $p->pagibig];
         $deductions[] = ['label' => 'TAX', 'amount' => (float) $p->withholding_tax];

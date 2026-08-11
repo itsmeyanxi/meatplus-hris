@@ -100,7 +100,10 @@ export default function PayslipDetailPage() {
 
         {/* Deductions */}
         <AppCard title="Deductions">
-          <LineRow label="SSS" value={peso(slip.sss)} muted />
+          <LineRow label="SSS (Regular)" value={peso(slip.sss_regular ?? slip.sss)} muted />
+          {Number(slip.sss_wisp ?? 0) > 0 && (
+            <LineRow label="SSS MPF (WISP)" value={peso(slip.sss_wisp ?? 0)} muted />
+          )}
           <LineRow label="PhilHealth" value={peso(slip.philhealth)} muted />
           <LineRow label="Pag-IBIG" value={peso(slip.pagibig)} muted />
           <LineRow label="Withholding Tax" value={peso(slip.withholding_tax)} muted />

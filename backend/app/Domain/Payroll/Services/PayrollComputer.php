@@ -308,6 +308,12 @@ class PayrollComputer
         $philhealth = round($contrib['philhealth'] / 2, 2);
         $pagibig = round($contrib['pagibig'] / 2, 2);
 
+        // SSS splits (RA 11199) into Regular SS + MPF/WISP; store the per-cutoff
+        // halves so the payslip/register can show both funds. regular + wisp === sss.
+        $sssParts = $this->statutory->sssBreakdown($basicMonthly);
+        $sssRegular = round(($sssParts['regular_ee'] ?? 0) / 2, 2);
+        $sssWisp = round($sss - $sssRegular, 2);
+
         $taxableMonthly = max(0, $basicMonthly - ($contrib['sss'] + $contrib['philhealth'] + $contrib['pagibig']));
         $tax = round($this->statutory->monthlyTax($taxableMonthly) / 2, 2);
 
@@ -324,9 +330,11 @@ class PayrollComputer
 
         // Itemized detail for transparency + the post() loan draw-down.
         $breakdown = array_filter([
+            'sss_regular' => $sss > 0 ? $sssRegular : null,
+            'sss_wisp' => $sss > 0 ? $sssWisp : null,
             'loans' => $loanBreakdown ?: null,
             'adjustments' => $adjustmentBreakdown ?: null,
-        ]);
+        ], fn ($v) => $v !== null);
 
         return Payslip::create([
             'payroll_run_id' => $run->id,

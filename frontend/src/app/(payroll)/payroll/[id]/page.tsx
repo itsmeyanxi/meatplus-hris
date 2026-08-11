@@ -152,7 +152,7 @@ export default function PayrollRunPage() {
                   <th className="px-3 py-3 text-right">Days</th>
                   <th className="px-3 py-3 text-right">De Minimis</th>
                   <th className="px-3 py-3 text-right">Gross</th>
-                  <th className="px-3 py-3 text-right">SSS</th>
+                  <th className="px-3 py-3 text-right">SSS<span className="block text-[10px] font-normal normal-case text-slate-400">Reg · MPF/WISP</span></th>
                   <th className="px-3 py-3 text-right">PhilHealth</th>
                   <th className="px-3 py-3 text-right">Pag-IBIG</th>
                   <th className="px-3 py-3 text-right">Tax</th>
@@ -175,7 +175,12 @@ export default function PayrollRunPage() {
                     <td className="px-3 py-2.5 text-right tabular-nums">{Number(s.days_worked)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{peso(s.de_minimis ?? 0)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{peso(s.gross_pay)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{peso(s.sss)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">
+                      {peso(s.sss_regular ?? s.sss)}
+                      {Number(s.sss_wisp ?? 0) > 0 && (
+                        <div className="text-[11px] text-slate-400">+{peso(s.sss_wisp ?? 0)} WISP</div>
+                      )}
+                    </td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{peso(s.philhealth)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{peso(s.pagibig)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{peso(s.withholding_tax)}</td>
