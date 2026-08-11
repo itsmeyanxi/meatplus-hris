@@ -889,9 +889,19 @@ class ReportController extends Controller
         foreach ($rows as $r) {
             $year = $r->date_from?->year;
             $ownBal = $balances["{$r->employee_id}|{$r->leave_type_id}|{$year}"] ?? null;
-            // Fall back to the total when a row predates the paid/unpaid split.
-            $withPay = $r->with_pay_days !== null ? (float) $r->with_pay_days : (float) $r->days_count;
-            $withoutPay = $r->without_pay_days !== null ? (float) $r->without_pay_days : 0.0;
+            // An explicit import split (Sprout) wins. Otherwise split by the
+            // application's paid/unpaid flag: unpaid puts the days in Without-Pay,
+            // paid (or a legacy row with no flag) in With-Pay.
+            if ($r->with_pay_days !== null || $r->without_pay_days !== null) {
+                $withPay = (float) ($r->with_pay_days ?? 0);
+                $withoutPay = (float) ($r->without_pay_days ?? 0);
+            } elseif ($r->is_paid === false) {
+                $withPay = 0.0;
+                $withoutPay = (float) $r->days_count;
+            } else {
+                $withPay = (float) $r->days_count;
+                $withoutPay = 0.0;
+            }
 
             $row = [
                 $r->employee?->employee_no ?? '',

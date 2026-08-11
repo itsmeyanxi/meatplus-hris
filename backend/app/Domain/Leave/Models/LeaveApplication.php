@@ -28,7 +28,7 @@ class LeaveApplication extends Model
 
     protected $fillable = [
         'company_id', 'employee_id', 'leave_type_id',
-        'date_from', 'date_to', 'days_count', 'half_day',
+        'date_from', 'date_to', 'days_count', 'half_day', 'is_paid',
         'reason', 'attachment_path',
         'status', 'approved_by_user_id', 'decided_at', 'decision_remarks',
         'filed_by_user_id', 'submitted_at',
@@ -40,6 +40,7 @@ class LeaveApplication extends Model
             'date_from' => 'date',
             'date_to' => 'date',
             'days_count' => 'decimal:2',
+            'is_paid' => 'boolean',
             'decided_at' => 'datetime',
             'submitted_at' => 'datetime',
         ];

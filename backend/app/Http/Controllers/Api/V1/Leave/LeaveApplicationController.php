@@ -150,6 +150,12 @@ class LeaveApplicationController extends Controller
         $employee = Employee::findOrFail($data['employee_id']);
         $type = LeaveType::findOrFail($data['leave_type_id']);
 
+        // Paid vs unpaid label: honour an explicit choice, else default to the
+        // leave type's is_paid. (Label only — DTR pay & credits are type-driven.)
+        $data['is_paid'] = $request->has('is_paid')
+            ? $request->boolean('is_paid')
+            : (bool) $type->is_paid;
+
         // Gender restriction
         if ($type->gender_restriction && $type->gender_restriction !== $employee->gender) {
             throw ValidationException::withMessages([

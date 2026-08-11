@@ -29,6 +29,9 @@ class StoreLeaveApplicationRequest extends FormRequest
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
             'half_day'   => ['nullable', 'string', 'in:am,pm'],
+            // Paid ("paid leave") vs unpaid ("just leave"). Optional — defaults to
+            // the leave type's is_paid in the controller when omitted.
+            'is_paid'    => ['nullable', 'boolean'],
             'reason'     => ['required', 'string', 'max:1000'],
             'attachment' => ['nullable', 'file', 'max:5120', 'mimes:jpg,jpeg,png,pdf,doc,docx'],
         ];

@@ -26,6 +26,7 @@ class LeaveApplicationResource extends JsonResource
             'date_to' => $this->date_to?->toDateString(),
             'days_count' => $this->days_count,
             'half_day' => $this->half_day,
+            'is_paid' => $this->is_paid,
             'reason' => $this->reason,
             'attachment_path' => $this->attachment_path,
             'status' => $this->status,

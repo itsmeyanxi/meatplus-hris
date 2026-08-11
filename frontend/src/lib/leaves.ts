@@ -35,6 +35,7 @@ export type LeaveApplication = {
   date_to: string;
   days_count: number;
   half_day: "am" | "pm" | null;
+  is_paid: boolean | null;
   reason: string;
   attachment_path: string | null;
   status: LeaveStatus;
@@ -61,6 +62,7 @@ export type LeaveAppInput = {
   date_from: string;
   date_to: string;
   half_day?: "am" | "pm" | null;
+  is_paid?: boolean;
   reason: string;
   attachment?: File | null;
 };
@@ -123,6 +125,7 @@ export const leaveAppsApi = {
     fd.append("date_from", body.date_from);
     fd.append("date_to", body.date_to);
     if (body.half_day) fd.append("half_day", body.half_day);
+    if (body.is_paid != null) fd.append("is_paid", body.is_paid ? "1" : "0");
     fd.append("reason", body.reason);
     if (body.attachment) fd.append("attachment", body.attachment);
     const { data } = await api.post<{ data: LeaveApplication }>("/api/v1/leave-applications", fd, {

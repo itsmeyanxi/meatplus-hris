@@ -113,6 +113,19 @@ export default function LeaveDetailPage() {
             <Detail label="To">{data.date_to}</Detail>
             <Detail label="Days">{data.days_count}</Detail>
             <Detail label="Half day">{data.half_day ? data.half_day.toUpperCase() : "—"}</Detail>
+            <Detail label="Pay">
+              {data.is_paid == null ? (
+                "—"
+              ) : (
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                    data.is_paid ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
+                  }`}
+                >
+                  {data.is_paid ? "Paid leave" : "Unpaid — just leave"}
+                </span>
+              )}
+            </Detail>
           </div>
           <Detail label="Reason">
             <p className="whitespace-pre-wrap text-slate-700">{data.reason || "—"}</p>

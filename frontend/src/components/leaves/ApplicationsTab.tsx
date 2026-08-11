@@ -147,10 +147,32 @@ export function ApplicationsTab() {
               <SearchSelect
                 className={inputCls}
                 value={form.leave_type_id || ""}
-                onChange={(v) => setForm({ ...form, leave_type_id: Number(v) })}
+                onChange={(v) => {
+                  const t = types.find((x) => x.id === Number(v));
+                  // Default the paid/unpaid choice from the selected type; the
+                  // user can still flip it below.
+                  setForm({ ...form, leave_type_id: Number(v), is_paid: t ? t.is_paid : form.is_paid });
+                }}
                 placeholder="Select type…"
                 options={types.map((t) => ({ value: String(t.id), label: `${t.code} — ${t.name}` }))}
               />
+            </div>
+            <div>
+              <label className={labelCls}>Pay</label>
+              <select
+                className={inputCls}
+                value={form.is_paid === false ? "unpaid" : "paid"}
+                onChange={(e) => setForm({ ...form, is_paid: e.target.value === "paid" })}
+              >
+                <option value="paid">Paid leave</option>
+                <option value="unpaid">Unpaid — just leave</option>
+              </select>
+              <p className="mt-1 text-xs text-slate-500">
+                {form.is_paid === false
+                  ? "Filed as leave without pay."
+                  : "Filed as a paid leave"}
+                {selectedType ? ` · ${selectedType.code} default: ${selectedType.is_paid ? "Paid" : "Unpaid"}` : ""}
+              </p>
             </div>
             <div>
               <label className={labelCls}>From *</label>
@@ -314,7 +336,18 @@ export function ApplicationsTab() {
                       <div className="font-mono text-xs text-slate-400">{r.employee?.employee_no}</div>
                     </td>
                   )}
-                  <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.leave_type.code}</td>
+                  <td className="px-4 py-3 text-xs text-slate-600">
+                    <span className="font-mono">{r.leave_type.code}</span>
+                    {r.is_paid != null && (
+                      <span
+                        className={`ml-2 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                          r.is_paid ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        {r.is_paid ? "Paid" : "Unpaid"}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.date_from} → {r.date_to}</td>
                   <td className="px-4 py-3 font-medium text-slate-800">{r.days_count}</td>
                   <td className="max-w-xs px-4 py-3 text-slate-600">{r.reason}</td>
