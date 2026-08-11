@@ -619,6 +619,44 @@ class ReportController extends Controller
             ]);
         }
 
+        // SSS gets the full R3 breakdown: Regular SS + MPF/WISP + EC, each split EE/ER.
+        if ($type === 'sss') {
+            $headers = [
+                $govLabel, 'Employee No', 'Name', 'Monthly Basic', 'MSC',
+                'Reg SS EE', 'Reg SS ER', 'MPF/WISP EE', 'MPF/WISP ER', 'EC (ER)',
+                'Employee Share', 'Employer Share', 'Total',
+            ];
+            $data = [];
+            $tot = array_fill(0, 8, 0.0); // msc, regEe, regEr, wispEe, wispEr, ec, eeTot, erTot
+            foreach ($employees as $e) {
+                $monthly = $this->monthlyBasic($comps->get($e->id));
+                $b = $calc->sssBreakdown($monthly);
+                $data[] = [
+                    $govs->get($e->id)?->{$govField} ?? '',
+                    $e->employee_no,
+                    $e->last_name.', '.$e->first_name,
+                    round($monthly, 2),
+                    round($b['msc'], 2),
+                    $b['regular_ee'], $b['regular_er'], $b['wisp_ee'], $b['wisp_er'], $b['ec'],
+                    $b['ee_total'], $b['er_total'],
+                    round($b['ee_total'] + $b['er_total'], 2),
+                ];
+                foreach (['msc', 'regular_ee', 'regular_er', 'wisp_ee', 'wisp_er', 'ec', 'ee_total', 'er_total'] as $i => $k) {
+                    $tot[$i] += $b[$k];
+                }
+            }
+            $data[] = [
+                '', '', 'TOTAL', '', round($tot[0], 2),
+                round($tot[1], 2), round($tot[2], 2), round($tot[3], 2), round($tot[4], 2), round($tot[5], 2),
+                round($tot[6], 2), round($tot[7], 2), round($tot[6] + $tot[7], 2),
+            ];
+
+            return XlsxReport::download("remittance_sss_r3_{$year}_{$month}.xlsx", $headers, $data, [
+                'title' => "SSS R3 Remittance (Regular SS + MPF/WISP + EC) · {$period}",
+                'emphasize' => fn ($row) => ($row[2] ?? '') === 'TOTAL' ? 'total' : null,
+            ]);
+        }
+
         $headers = [$govLabel, 'Employee No', 'Name', 'Monthly Basic', 'Employee Share', 'Employer Share', 'Total'];
         $data = [];
         foreach ($employees as $e) {

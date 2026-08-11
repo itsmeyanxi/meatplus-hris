@@ -135,7 +135,10 @@ export async function downloadYtd(year: number) {
 }
 
 export function downloadRemittance(type: "sss" | "philhealth" | "pagibig" | "tax", year: number, month: number) {
-  const name = type === "tax" ? `bir_1601c_${year}_${month}` : `remittance_${type}_${year}_${month}`;
+  const name =
+    type === "tax" ? `bir_1601c_${year}_${month}`
+    : type === "sss" ? `remittance_sss_r3_${year}_${month}`
+    : `remittance_${type}_${year}_${month}`;
   return downloadFile("/api/v1/reports/remittance", { type, year, month }, `${name}.xlsx`);
 }
 

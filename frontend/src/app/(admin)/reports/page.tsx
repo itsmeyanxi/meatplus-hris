@@ -221,7 +221,7 @@ function RemittanceCard() {
     try { await downloadRemittance(type, year, month); } catch { setError("Failed to download."); } finally { setLoading(false); }
   };
   return (
-    <ReportCard title="Statutory Remittance" description="Monthly SSS / PhilHealth / Pag-IBIG (employee + employer share) or BIR 1601-C withholding tax.">
+    <ReportCard title="Statutory Remittance" description="Monthly SSS / PhilHealth / Pag-IBIG (employee + employer share) or BIR 1601-C withholding tax. The SSS (R3) sheet breaks each contribution into Regular SS, MPF/WISP, and the employer EC premium.">
       <div className="flex flex-wrap gap-2">
         <label className="block"><span className="text-xs text-slate-500">Report</span>
           <SearchSelect value={type} onChange={(v) => setType(v as typeof type)} className={fieldCls}

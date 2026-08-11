@@ -8,6 +8,12 @@ namespace App\Domain\Payroll\Services;
  * Values reflect the tables in force for 2025 (which carry into 2026 unless the
  * agencies issue new circulars):
  *   • SSS  — RA 11199 15% total rate (employee share 5%), MSC ₱5,000–₱35,000.
+ *            The contribution splits into two funds: the Regular SS (on the MSC up
+ *            to ₱20,000) and the Mandatory Provident Fund / WISP (on the MSC band
+ *            ₱20,000–₱35,000). Both are 5% employee / 10% employer. The employer
+ *            also pays the EC (Employees' Compensation) premium: ₱10 for MSC below
+ *            ₱15,000, else ₱30. The employee's total deduction is unchanged (5% of
+ *            the full MSC) — the split only matters for the R3 remittance report.
  *   • PhilHealth — 5% premium (employee share 2.5%), floor ₱10,000, ceiling ₱100,000.
  *   • Pag-IBIG (HDMF) — 1% employee below ₱1,500, else 2%, on a ₱5,000 fund-salary cap.
  *   • Withholding tax — BIR TRAIN monthly graduated table (effective 2023 onward).
@@ -23,6 +29,13 @@ class StatutoryCalculator
     private const SSS_MSC_MAX = 35000.0;
     private const SSS_EE_RATE = 0.05;   // employee share of the 15% total
     private const SSS_ER_RATE = 0.10;   // employer share
+    // The Regular SS fund is capped at a ₱20,000 MSC; the MSC band above that
+    // (₱20,000–₱35,000) funds the Mandatory Provident Fund (MPF / WISP) instead.
+    private const SSS_REGULAR_MSC_MAX = 20000.0;
+    // EC (Employees' Compensation) — employer-only: ₱10 for MSC below ₱15,000, else ₱30.
+    private const SSS_EC_MSC_THRESHOLD = 15000.0;
+    private const SSS_EC_LOW = 10.0;
+    private const SSS_EC_HIGH = 30.0;
 
     // --- PhilHealth (2024–2025, premium frozen at 5%) ---
     private const PH_RATE = 0.05;        // total premium
@@ -45,11 +58,15 @@ class StatutoryCalculator
         ];
     }
 
-    /** Monthly employer-share contributions (for SSS R3 / RF1 / MCRF remittance). */
+    /**
+     * Monthly employer-share contributions (for SSS R3 / RF1 / MCRF remittance).
+     * 'sss' is the 10% SS+WISP employer share; 'sss_ec' is the separate EC premium.
+     */
     public function monthlyEmployerContributions(float $basicMonthly): array
     {
         return [
             'sss' => round($this->sssMsc($basicMonthly) * self::SSS_ER_RATE, 2),
+            'sss_ec' => $this->sssEc($basicMonthly),
             'philhealth' => $this->philhealth($basicMonthly), // 5% premium split evenly
             'pagibig' => round(min($basicMonthly, self::PAGIBIG_CAP) * self::PAGIBIG_ER_RATE, 2),
         ];
@@ -59,6 +76,45 @@ class StatutoryCalculator
     public function sss(float $basicMonthly): float
     {
         return round($this->sssMsc($basicMonthly) * self::SSS_EE_RATE, 2);
+    }
+
+    /**
+     * Full SSS contribution split into the Regular SS and MPF/WISP funds, plus the
+     * employer EC premium — the shape the SSS R3 (e-R3) remittance expects.
+     *
+     * regular_ee + wisp_ee == sss() (the payslip deduction is unchanged);
+     * er_total == regular_er + wisp_er + ec.
+     */
+    public function sssBreakdown(float $basicMonthly): array
+    {
+        $msc = $this->sssMsc($basicMonthly);
+        $regularMsc = min($msc, self::SSS_REGULAR_MSC_MAX);
+        $wispMsc = max(0.0, $msc - self::SSS_REGULAR_MSC_MAX);
+
+        $regularEe = round($regularMsc * self::SSS_EE_RATE, 2);
+        $regularEr = round($regularMsc * self::SSS_ER_RATE, 2);
+        $wispEe = round($wispMsc * self::SSS_EE_RATE, 2);
+        $wispEr = round($wispMsc * self::SSS_ER_RATE, 2);
+        $ec = $this->sssEc($basicMonthly);
+
+        return [
+            'msc' => $msc,
+            'regular_ee' => $regularEe,
+            'regular_er' => $regularEr,
+            'wisp_ee' => $wispEe,
+            'wisp_er' => $wispEr,
+            'ec' => $ec,
+            'ee_total' => round($regularEe + $wispEe, 2),
+            'er_total' => round($regularEr + $wispEr + $ec, 2),
+        ];
+    }
+
+    /** Employer EC (Employees' Compensation) premium for the given salary. */
+    public function sssEc(float $basicMonthly): float
+    {
+        return $this->sssMsc($basicMonthly) < self::SSS_EC_MSC_THRESHOLD
+            ? self::SSS_EC_LOW
+            : self::SSS_EC_HIGH;
     }
 
     /** The Monthly Salary Credit: salary clamped to the MSC range, in ₱500 brackets. */
