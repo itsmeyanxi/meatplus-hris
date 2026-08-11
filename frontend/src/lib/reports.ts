@@ -22,7 +22,7 @@ export function downloadDtrReport(params: { date_from: string; date_to: string; 
     date_to: params.date_to,
     employee_id: params.employee_id || undefined,
     department_id: params.department_id || undefined,
-  }, `dtr_${params.date_from}_to_${params.date_to}.xlsx`);
+  }, `timekeeping_${params.date_from}_to_${params.date_to}.xlsx`);
 }
 
 export function downloadLeaveReport(params: {

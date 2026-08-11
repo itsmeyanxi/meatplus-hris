@@ -424,7 +424,7 @@ function DtrReportCard() {
   };
 
   return (
-    <ReportCard title="DTR Report" description="Daily time records for all employees within a date range.">
+    <ReportCard title="Timekeeping Worksheet" description="Per-employee-per-day timekeeping in the Pacific template — punches + hours pre-filled, salary computed, grouped by department.">
       <div className="flex gap-2 flex-wrap">
         <label className="block">
           <span className="text-xs text-slate-500">From</span>

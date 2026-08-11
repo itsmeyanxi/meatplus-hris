@@ -33,6 +33,21 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class ReportController extends Controller
 {
     /** GET /api/v1/reports/dtr?date_from=&date_to=&employee_id=&department_id= */
+    /**
+     * The 39-column "MANUAL TIMEKEEPING" worksheet layout (Pacific template):
+     * a per-employee-per-day punch/hours block (A–X) followed by the salary
+     * computation block (Y–AM). Column order is fixed — do not reorder.
+     */
+    private const TIMEKEEPING_HEADERS = [
+        'LAST NAME', 'FIRST NAME', 'DATE', 'SCHEDULE', 'IN', 'OUT', 'OT (IN)', 'OT(OUT)',
+        'LATE (HR)', 'REG (HRS)', 'REG ND (HRS)', 'REG OT (HR)', 'REG ND OT (HRS)',
+        'RD REG (HRS)', 'RD REG ND (HRS)', 'RD OT (HR)', 'RH (HRS)', 'LH (HR)', 'LH OT (HRS)',
+        'SH (HR)', 'SH ND(HR)', 'SH OT(HR)', 'SH OT (ND)', 'REMARKS',
+        'Employee ID', 'Employee Name', 'Monthly Rate', 'Daily Rate', 'HOURLY Rate',
+        'LATE DEDUCTION', 'REG (HRS)', 'REG ND (HR)', 'REG OT (HR)', 'REG OT (ND) HRS',
+        'RD HRS', 'RD OT HRS', 'LH (HR)', 'SUB TOTAL', 'TOTAL SALARY',
+    ];
+
     public function dtr(Request $request): BinaryFileResponse
     {
         abort_unless($request->user()->can('attendance.view'), 403);
@@ -52,43 +67,168 @@ class ReportController extends Controller
             ->when($request->department_id, fn ($q) => $q->whereHas(
                 'employee', fn ($e) => $e->where('department_id', $request->department_id)
             ))
-            // Keep agency workers out of the company's internal DTR — they have their
-            // own per-agency report. An explicit employee_id still returns anyone.
+            // Keep agency workers out of the company's internal timekeeping — they have
+            // their own per-agency report. An explicit employee_id still returns anyone.
             ->when(! $request->employee_id, fn ($q) => $q->whereHas(
                 'employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)->orWhere('is_project_crew', true))
             ))
-            ->orderBy('work_date')
-            ->orderBy('employee_id')
             ->get();
 
-        $headers = [
-            'Date', 'Employee No', 'Name', 'Department',
-            'Time In', 'Time Out', 'Hours Worked',
-            'Late (min)', 'Undertime (min)', 'OT (min)', 'Night Diff (min)',
-            'Status',
-        ];
+        // Monthly rate per employee drives the salary computations (Daily = Monthly/313*12).
+        $rates = EmployeeCompensation::query()
+            ->whereIn('employee_id', $rows->pluck('employee_id')->unique())
+            ->where('is_active', true)
+            ->pluck('basic_monthly', 'employee_id');
+
+        // Group by department, then employee (last name), then date — one row per day.
+        $byDept = $rows
+            ->groupBy(fn ($r) => $r->employee?->department?->name ?: 'Unassigned')
+            ->sortKeys();
+
         $data = [];
-        foreach ($rows as $r) {
-            $data[] = [
+        $grand = 0.0;
+        foreach ($byDept as $deptName => $deptRows) {
+            $band = array_fill(0, count(self::TIMEKEEPING_HEADERS), '');
+            $band[0] = strtoupper((string) $deptName);
+            $data[] = $band;
+
+            $deptTotal = 0.0;
+            $ordered = $deptRows->sortBy(fn ($r) => sprintf(
+                '%s|%s|%s',
+                $r->employee?->last_name ?? '',
+                $r->employee?->first_name ?? '',
                 $r->work_date->toDateString(),
-                $r->employee?->employee_no ?? '',
-                ($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? ''),
-                $r->employee?->department?->name ?? '',
-                $r->actual_in?->format('H:i') ?? '',
-                $r->actual_out?->format('H:i') ?? '',
-                $r->hours_worked !== null ? (float) $r->hours_worked : '',
-                (int) ($r->late_minutes ?? 0),
-                (int) ($r->undertime_minutes ?? 0),
-                (int) ($r->overtime_minutes ?? 0),
-                (int) ($r->night_diff_minutes ?? 0),
-                $r->dayStatus(),
-            ];
+            ));
+            foreach ($ordered as $r) {
+                [$row, $total] = $this->timekeepingRow($r, (float) ($rates[$r->employee_id] ?? 0));
+                $data[] = $row;
+                $deptTotal += $total;
+            }
+
+            $sub = array_fill(0, count(self::TIMEKEEPING_HEADERS), '');
+            $sub[25] = 'DEPARTMENT TOTAL';
+            $sub[38] = round($deptTotal, 2);
+            $data[] = $sub;
+            $grand += $deptTotal;
+        }
+        if (count($byDept) > 1) {
+            $g = array_fill(0, count(self::TIMEKEEPING_HEADERS), '');
+            $g[25] = 'GRAND TOTAL';
+            $g[38] = round($grand, 2);
+            $data[] = $g;
         }
 
-        return XlsxReport::download("dtr_{$request->date_from}_to_{$request->date_to}.xlsx", $headers, $data, [
-            'title' => 'Daily Time Records',
-            'subtitle' => "Period {$request->date_from} to {$request->date_to} · generated ".now()->format('M d, Y g:i A'),
-        ]);
+        $company = Company::find($request->user()->active_company_id);
+        $companyName = $company?->legal_name ?: $company?->trade_name ?: 'TIMEKEEPING';
+        $period = strtoupper(date('F j, Y', strtotime($request->date_from)))
+            .' TO '.strtoupper(date('F j, Y', strtotime($request->date_to)));
+
+        return XlsxReport::download(
+            "timekeeping_{$request->date_from}_to_{$request->date_to}.xlsx",
+            self::TIMEKEEPING_HEADERS,
+            $data,
+            [
+                'title' => $companyName,
+                'subtitle' => "{$period}  ·  CUT OFF PERIOD",
+                'sheet' => 'TIMEKEEPING',
+                // Section band = department name (empty DATE, filled col A); totals carry a label in Employee Name.
+                'emphasize' => function ($row) {
+                    if (($row[2] ?? '') === '' && ($row[0] ?? '') !== '') {
+                        return 'header';
+                    }
+                    if (in_array($row[25] ?? '', ['DEPARTMENT TOTAL', 'GRAND TOTAL'], true)) {
+                        return 'total';
+                    }
+
+                    return null;
+                },
+            ]
+        );
+    }
+
+    /**
+     * Build one TIMEKEEPING row for a day's DTR, pre-filled from attendance, with the
+     * salary block computed exactly as the template's formulas:
+     *   Daily = Monthly/313*12 · Hourly = Daily/8 · pay = Hourly × multiplier × hours.
+     * Late deduction is written as a negative so SUB TOTAL = SUM(late..LH) nets it out.
+     * Buckets we don't store per day (RD-ND-OT, holiday ND/OT) stay blank for manual entry.
+     *
+     * @return array{0: array<int, mixed>, 1: float}  [row, totalSalary]
+     */
+    private function timekeepingRow(DailyTimeRecord $r, float $monthly): array
+    {
+        $emp = $r->employee;
+        $daily = $monthly > 0 ? $monthly / 313 * 12 : 0.0;
+        $hourly = $daily / 8;
+
+        $lateHrs = round(((int) ($r->late_minutes ?? 0)) / 60, 2);
+        $worked = (float) ($r->hours_worked ?? 0);
+        $ndHrs = round(((int) ($r->night_diff_minutes ?? 0)) / 60, 2);
+        $otHrs = round(((int) ($r->overtime_minutes ?? 0)) / 60, 2);
+
+        // Hour buckets by day type (only J,K,L,M,N,P,R feed the salary formulas).
+        $J = $K = $L = $M = $N = $O = $P = $Q = $RH = $LHh = $LHot = $SH = $SHnd = $SHot = $SHotNd = 0.0;
+        $ht = strtolower((string) ($r->holiday_type ?? ''));
+        if ($r->is_absent) {
+            $remark = 'ABSENT';
+        } elseif ($r->is_on_leave) {
+            $remark = 'ON LEAVE';
+        } elseif ($ht !== '' && str_contains($ht, 'special')) {
+            $SH = $worked;                                   // special holiday — recorded, paid manually
+            $remark = 'SPECIAL HOLIDAY';
+        } elseif ($ht !== '') {
+            $LHh = min($worked, 8.0);                         // regular/legal holiday — 2× via LH
+            $LHot = max(0.0, $worked - 8.0);
+            $remark = 'HOLIDAY';
+        } elseif ($r->is_rest_day) {
+            $N = min($worked, 8.0);                           // rest day — 1.3× first 8h, 1.69× beyond
+            $P = max(0.0, $worked - 8.0);
+            $remark = 'REST DAY';
+        } else {
+            $L = $otHrs;                                      // regular day: split worked into day/night/OT
+            $K = $ndHrs;
+            $J = max(0.0, round($worked - $ndHrs - $otHrs, 2));
+            $remark = '';
+        }
+
+        // Salary block (template formulas, evaluated). Late deduction is negative.
+        $lateDed = -1 * $hourly * $lateHrs;
+        $regP = $hourly * $J;
+        $regNdP = $hourly * 1.1 * $K;
+        $regOtP = $hourly * 1.25 * $L;
+        $regOtNdP = $hourly * 1.25 * 1.1 * $M;
+        $rdP = $hourly * 1.3 * $N;
+        $rdOtP = $hourly * 1.69 * $P;
+        $lhP = $hourly * 2 * $LHh;
+        $subtotal = $lateDed + $regP + $regNdP + $regOtP + $regOtNdP + $rdP + $rdOtP + $lhP;
+
+        $hm = fn (?string $col) => $r->{$col}?->format('H:i') ?? '';
+        $sched = ($r->scheduled_in && $r->scheduled_out) ? $hm('scheduled_in').'-'.$hm('scheduled_out') : '';
+        $hr = fn (float $x) => $x > 0.0001 ? round($x, 2) : '';        // blank instead of 0 for hour cells
+        $money = fn (float $x) => abs($x) > 0.0001 ? round($x, 2) : ''; // blank instead of 0 for peso cells
+
+        $row = [
+            $emp?->last_name ?? '', $emp?->first_name ?? '',              // A,B
+            $r->work_date->format('n/j/Y'), $sched,                       // C,D
+            $hm('actual_in'), $hm('actual_out'), '', '',                  // E,F,G,H
+            $hr($lateHrs),                                                // I LATE (HR)
+            $hr($J), $hr($K), $hr($L), $hr($M),                           // J,K,L,M
+            $hr($N), $hr($O), $hr($P),                                    // N,O,P
+            $hr($Q), $hr($LHh), $hr($LHot),                               // Q RH, R LH, S LH OT
+            $hr($SH), $hr($SHnd), $hr($SHot), $hr($SHotNd),               // T,U,V,W
+            $remark,                                                      // X REMARKS
+            $emp?->employee_no ?? '',                                     // Y Employee ID
+            trim(($emp?->last_name ?? '').', '.($emp?->first_name ?? '')),// Z Employee Name
+            $monthly > 0 ? round($monthly, 2) : '',                       // AA Monthly Rate
+            $monthly > 0 ? round($daily, 2) : '',                         // AB Daily Rate
+            $monthly > 0 ? round($hourly, 2) : '',                        // AC Hourly Rate
+            $money($lateDed),                                            // AD Late Deduction
+            $money($regP), $money($regNdP), $money($regOtP), $money($regOtNdP), // AE..AH
+            $money($rdP), $money($rdOtP), $money($lhP),                   // AI,AJ,AK
+            round($subtotal, 2), round($subtotal, 2),                    // AL SUB TOTAL, AM TOTAL SALARY
+        ];
+
+        return [$row, $subtotal];
     }
 
     /**
