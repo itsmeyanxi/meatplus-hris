@@ -101,15 +101,28 @@ class PayrollComputer
      *
      * @return array{0: float, 1: array<int, array{loan_id:int, type:string, amount:float}>}
      */
-    private function loansFor(int $employeeId): array
+    /**
+     * Recurring loan amortizations to deduct this cutoff.
+     *
+     * Rule: only ONGOING loans deduct (is_active = true) — a paused loan never
+     * deducts, even with a balance owing. A loan that carries a start_date only
+     * begins deducting once that date has arrived; a loan with NO start_date
+     * deducts as soon as it's ongoing (so imported loans that lack a start date
+     * still get collected). Paused + no-start-date is therefore never deducted.
+     */
+    private function loansFor(int $employeeId, \Carbon\CarbonInterface $periodEnd): array
     {
         $total = 0.0;
         $items = [];
         $loans = EmployeeLoan::query()
             ->where('employee_id', $employeeId)
-            ->where('is_active', true)
+            ->where('is_active', true)               // ongoing only — paused loans are skipped
             ->where('outstanding_balance', '>', 0)
             ->where('amortization', '>', 0)
+            ->where(function ($q) use ($periodEnd) {
+                // No start date → deduct now (if ongoing); a dated loan waits for its date.
+                $q->whereNull('start_date')->orWhereDate('start_date', '<=', $periodEnd);
+            })
             ->get();
 
         foreach ($loans as $loan) {
@@ -318,7 +331,7 @@ class PayrollComputer
         $tax = round($this->statutory->monthlyTax($taxableMonthly) / 2, 2);
 
         // Recurring loan amortizations (capped at each loan's remaining balance).
-        [$loansDeduction, $loanBreakdown] = $this->loansFor($comp->employee_id);
+        [$loansDeduction, $loanBreakdown] = $this->loansFor($comp->employee_id, $run->period_end);
 
         $totalDeductions = round(
             $sss + $philhealth + $pagibig + $tax + $absencesDeduction + $tardinessDeduction + $loansDeduction + $otherDeductions,
