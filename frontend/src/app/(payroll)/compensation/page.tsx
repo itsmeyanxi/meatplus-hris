@@ -7,6 +7,7 @@ import { PageHeader, TableShell } from "@/components/ui";
 import { SearchSelect } from "@/components/SearchSelect";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { compensationApi, type CompRow } from "@/lib/payroll";
+import { EmployeeBenefitsModal } from "@/components/payroll/EmployeeBenefitsModal";
 
 type Edit = { payType: "monthly" | "daily"; rate: string; allowance: string; deMinimis: string; commAllowance: string; transportAllowance: string; mealAllowance: string; fleetCard: string; effectiveFrom: string };
 
@@ -22,6 +23,7 @@ export default function CompensationPage() {
   const [edits, setEdits] = useState<Record<number, Edit>>({});
   const [search, setSearch] = useState("");
   const [confiFilter, setConfiFilter] = useState<ConfiFilter>("all");
+  const [benefitsFor, setBenefitsFor] = useState<CompRow | null>(null);
 
   // Client-side search (name / employee no) + confidential filter. Confidential
   // rows are already withheld by the server for viewers who can't see them, so
@@ -249,14 +251,23 @@ export default function CompensationPage() {
                       />
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      <button
-                        onClick={() => save.mutate(r)}
-                        disabled={save.isPending || !e.effectiveFrom}
-                        title={!e.effectiveFrom ? "Set an effective date first" : "Save this rate"}
-                        className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-40"
-                      >
-                        Save
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => setBenefitsFor(r)}
+                          title="Add other benefits / allowances for this employee"
+                          className="rounded-md border border-brand-200 px-2.5 py-1 text-xs font-medium text-brand-700 transition hover:bg-brand-50"
+                        >
+                          ＋ Benefit
+                        </button>
+                        <button
+                          onClick={() => save.mutate(r)}
+                          disabled={save.isPending || !e.effectiveFrom}
+                          title={!e.effectiveFrom ? "Set an effective date first" : "Save this rate"}
+                          className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-40"
+                        >
+                          Save
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -264,6 +275,14 @@ export default function CompensationPage() {
             </tbody>
           </table>
         </TableShell>
+      )}
+
+      {benefitsFor && (
+        <EmployeeBenefitsModal
+          employeeId={benefitsFor.employee_id}
+          employeeName={benefitsFor.name}
+          onClose={() => setBenefitsFor(null)}
+        />
       )}
     </div>
   );

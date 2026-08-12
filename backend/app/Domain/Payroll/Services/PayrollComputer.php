@@ -319,6 +319,20 @@ class PayrollComputer
         // Per-day allowance (e.g. meal): a PER-DAY rate × days actually attended this
         // cutoff — so it scales with attendance, unlike the monthly allowances above.
         $dailyAllowance = round((float) ($profile->daily_allowance ?? 0) * $presentDays, 2);
+
+        // HR-defined recurring benefits/allowances, each paid by its cadence.
+        $customBenefits = 0.0;
+        $benefitLines = [];
+        foreach (\App\Domain\Payroll\Models\EmployeePayItem::query()
+            ->where('employee_id', $comp->employee_id)->where('is_active', true)->get() as $item) {
+            $amt = $item->amountForCutoff($presentDays);
+            if ($amt <= 0) {
+                continue;
+            }
+            $customBenefits += $amt;
+            $benefitLines[] = ['label' => $item->label, 'cadence' => $item->cadence, 'amount' => $amt];
+        }
+        $customBenefits = round($customBenefits, 2);
         $overtimePay = round(($otMinutes / 60) * $hourlyRate * 1.25, 2);
         $nightDiffPay = round(($nightMinutes / 60) * $hourlyRate * 0.10, 2); // 10% night differential
         $tardinessDeduction = round($lateMinutes * $minuteRate, 2);
@@ -326,7 +340,7 @@ class PayrollComputer
         // One-off adjustments for this run (bonus, backpay, uniform, correction…).
         [$otherEarnings, $otherDeductions, $adjustmentBreakdown] = $this->adjustmentsFor($run, $comp->employee_id);
 
-        $grossPay = round($basicPay + $allowance + $deMinimis + $commAllowance + $transportAllowance + $dailyAllowance + $overtimePay + $nightDiffPay + $holidayPremium + $restDayPremium + $otherEarnings, 2);
+        $grossPay = round($basicPay + $allowance + $deMinimis + $commAllowance + $transportAllowance + $dailyAllowance + $customBenefits + $overtimePay + $nightDiffPay + $holidayPremium + $restDayPremium + $otherEarnings, 2);
 
         // Statutory + tax (monthly figures, split across two cutoffs).
         $contrib = $this->statutory->monthlyContributions($basicMonthly);
@@ -358,6 +372,7 @@ class PayrollComputer
         $breakdown = array_filter([
             'sss_regular' => $sss > 0 ? $sssRegular : null,
             'sss_wisp' => $sss > 0 ? $sssWisp : null,
+            'benefits' => $benefitLines ?: null,
             'loans' => $loanBreakdown ?: null,
             'adjustments' => $adjustmentBreakdown ?: null,
         ], fn ($v) => $v !== null);

@@ -276,6 +276,11 @@ Route::prefix('v1')->group(function () {
         Route::put('employees/{employee}/payroll-profile', [\App\Http\Controllers\Api\V1\Payroll\PayrollProfileController::class, 'upsert']);
         Route::get('employees/{employee}/compensations', [\App\Http\Controllers\Api\V1\Payroll\CompensationController::class, 'history']);
         Route::delete('employees/{employee}/compensations/{compensation}', [\App\Http\Controllers\Api\V1\Payroll\CompensationController::class, 'destroy']);
+        // HR-defined recurring pay benefits/allowances per employee.
+        Route::get('pay-items', [\App\Http\Controllers\Api\V1\Payroll\EmployeePayItemController::class, 'index']);
+        Route::post('pay-items', [\App\Http\Controllers\Api\V1\Payroll\EmployeePayItemController::class, 'store']);
+        Route::patch('pay-items/{payItem}', [\App\Http\Controllers\Api\V1\Payroll\EmployeePayItemController::class, 'update']);
+        Route::delete('pay-items/{payItem}', [\App\Http\Controllers\Api\V1\Payroll\EmployeePayItemController::class, 'destroy']);
         Route::get('payroll-runs', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'index']);
         Route::post('payroll-runs', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'store']);
         Route::get('payroll-runs/{payrollRun}', [\App\Http\Controllers\Api\V1\Payroll\PayrollRunController::class, 'show']);

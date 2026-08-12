@@ -33,6 +33,7 @@ class PayslipResource extends JsonResource
             'communication_allowance' => $this->communication_allowance,
             'transportation_allowance' => $this->transportation_allowance,
             'daily_allowance' => $this->daily_allowance,
+            'benefits' => $this->breakdown['benefits'] ?? [],
             'loans_deduction' => $this->loans_deduction,
             'gross_pay' => $this->gross_pay,
             'sss' => $this->sss,

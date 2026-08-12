@@ -83,6 +83,10 @@ class PayslipController extends Controller
         };
         $add($compensation, 'DE MINIMIS BENEFITS', (float) $p->de_minimis);
         $add($compensation, 'MEAL ALLOWANCE', (float) $p->daily_allowance);
+        // HR-defined recurring benefits (labelled per employee).
+        foreach ($p->breakdown['benefits'] ?? [] as $b) {
+            $add($compensation, strtoupper((string) ($b['label'] ?? 'BENEFIT')), (float) ($b['amount'] ?? 0));
+        }
         $add($compensation, 'Non-Taxable Allowance', (float) $p->allowance);
         $add($compensation, 'OVERTIME ADJUSTMENT', (float) $p->overtime_pay);
         $add($compensation, 'HOLIDAY PAY', (float) $p->holiday_pay);

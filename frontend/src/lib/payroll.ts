@@ -35,6 +35,7 @@ export type Payslip = {
   communication_allowance?: string | number;
   transportation_allowance?: string | number;
   daily_allowance?: string | number;
+  benefits?: { label: string; cadence: string; amount: number }[];
   gross_pay: string | number;
   sss: string | number;
   sss_regular?: string | number;
@@ -116,6 +117,26 @@ export const loansApi = {
 };
 
 export type AdjustmentImportResult = { created: number; skipped: number; total: number; errors: { row: number; message: string }[] };
+
+// ── HR-defined recurring pay benefits/allowances ────────────────────────────
+export type PayItemCadence = "monthly" | "per_cutoff" | "per_day";
+export type PayItem = { id: number; employee_id: number; label: string; amount: number; cadence: PayItemCadence; is_active: boolean; notes: string | null };
+
+export const PAY_ITEM_CADENCES: { value: PayItemCadence; label: string; hint: string }[] = [
+  { value: "monthly", label: "Per month", hint: "Fixed monthly amount, paid at half each cutoff" },
+  { value: "per_cutoff", label: "Per cutoff", hint: "Flat amount every payroll run" },
+  { value: "per_day", label: "Per day present", hint: "Amount × the employee's days of attendance" },
+];
+
+export const payItemsApi = {
+  list: async (employeeId: number): Promise<PayItem[]> =>
+    (await api.get<Listed<PayItem>>("/api/v1/pay-items", { params: { employee_id: employeeId } })).data.data,
+  create: async (body: { employee_id: number; label: string; amount: number; cadence: PayItemCadence }): Promise<PayItem> =>
+    (await api.post<{ data: PayItem }>("/api/v1/pay-items", body)).data.data,
+  update: async (id: number, body: Partial<{ label: string; amount: number; cadence: PayItemCadence; is_active: boolean }>): Promise<PayItem> =>
+    (await api.patch<{ data: PayItem }>(`/api/v1/pay-items/${id}`, body)).data.data,
+  remove: async (id: number) => (await api.delete(`/api/v1/pay-items/${id}`)).data,
+};
 
 export const adjustmentsApi = {
   list: async (runId: number): Promise<PayslipAdjustment[]> =>

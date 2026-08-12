@@ -97,6 +97,9 @@ export default function PayslipDetailPage() {
           {Number(slip.daily_allowance ?? 0) > 0 && (
             <LineRow label="Meal Allowance" value={peso(slip.daily_allowance ?? 0)} />
           )}
+          {(slip.benefits ?? []).map((b, i) => (
+            <LineRow key={i} label={b.label} value={peso(b.amount)} />
+          ))}
           <LineRow label="Days Worked" value={`${Number(slip.days_worked)}`} />
           <LineRow label="Gross Pay" value={peso(slip.gross_pay)} bold />
         </AppCard>
