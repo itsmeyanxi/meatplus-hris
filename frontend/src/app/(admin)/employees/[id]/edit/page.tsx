@@ -18,8 +18,9 @@ export default function EditEmployeePage() {
 
   const [form, setForm] = useState({
     first_name: "", middle_name: "", last_name: "", suffix: "",
-    birth_date: "", gender: "", civil_status: "", nationality: "",
+    birth_date: "", gender: "", civil_status: "", nationality: "", religion: "",
     email_personal: "", email_company: "", mobile: "", phone_home: "",
+    address_line1: "", address_line2: "", city: "", province: "", postal_code: "", country: "",
     biometric_user_id: "",
     branch_id: 0,
     department_id: 0,
@@ -49,10 +50,17 @@ export default function EditEmployeePage() {
       gender: emp.gender ?? "",
       civil_status: emp.civil_status ?? "",
       nationality: emp.nationality ?? "",
+      religion: emp.religion ?? "",
       email_personal: emp.email_personal ?? "",
       email_company: emp.email_company ?? "",
       mobile: emp.mobile ?? "",
       phone_home: emp.phone_home ?? "",
+      address_line1: emp.address?.line1 ?? "",
+      address_line2: emp.address?.line2 ?? "",
+      city: emp.address?.city ?? "",
+      province: emp.address?.province ?? "",
+      postal_code: emp.address?.postal_code ?? "",
+      country: emp.address?.country ?? "",
       biometric_user_id: emp.biometric_user_id ?? "",
       branch_id: emp.branch?.id ?? 0,
       department_id: emp.department?.id ?? 0,
@@ -72,19 +80,32 @@ export default function EditEmployeePage() {
 
   const { data: departments = [] } = useQuery({ queryKey: ["lookup-departments"], queryFn: () => getLookup("departments"), staleTime: 300_000 });
   const { data: branches = [] } = useQuery({ queryKey: ["lookup-branches"], queryFn: () => getLookup("branches"), staleTime: 300_000 });
-  const { data: positions = [] } = useQuery({ queryKey: ["lookup-positions"], queryFn: () => getLookup("positions"), staleTime: 300_000 });
+  // Positions are scoped to the chosen department so you can't assign a position
+  // that belongs to another department.
+  const { data: positions = [] } = useQuery({
+    queryKey: ["lookup-positions", form.department_id],
+    queryFn: () => getLookup("positions", form.department_id ? { department_id: form.department_id } : {}),
+    enabled: !!form.department_id,
+    staleTime: 300_000,
+  });
   const { data: empTypes = [] } = useQuery({ queryKey: ["lookup-employment-types"], queryFn: () => getLookup("employment-types"), staleTime: 300_000 });
 
   const mutation = useMutation({
-    mutationFn: () => updateEmployee(employeeId, {
-      ...form,
-      gender: form.gender as EmployeeCreateInput["gender"],
-      civil_status: form.civil_status as EmployeeCreateInput["civil_status"],
-      branch_id: form.branch_id ? Number(form.branch_id) : undefined,
-      department_id: form.department_id ? Number(form.department_id) : undefined,
-      position_id: form.position_id ? Number(form.position_id) : undefined,
-      employment_type_id: form.employment_type_id ? Number(form.employment_type_id) : undefined,
-    }),
+    mutationFn: () => {
+      const { gender, civil_status, ...rest } = form;
+      const payload: Partial<EmployeeCreateInput> = {
+        ...rest,
+        branch_id: form.branch_id ? Number(form.branch_id) : undefined,
+        department_id: form.department_id ? Number(form.department_id) : undefined,
+        position_id: form.position_id ? Number(form.position_id) : undefined,
+        employment_type_id: form.employment_type_id ? Number(form.employment_type_id) : undefined,
+      };
+      // Only send the enum fields when actually set — an empty string fails the
+      // API's `in:` validation, which blocked saving records with no gender yet.
+      if (gender) payload.gender = gender as EmployeeCreateInput["gender"];
+      if (civil_status) payload.civil_status = civil_status as EmployeeCreateInput["civil_status"];
+      return updateEmployee(employeeId, payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
@@ -105,11 +126,24 @@ export default function EditEmployeePage() {
 
   if (isLoading) return <div className="space-y-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-40 animate-pulse rounded-xl bg-slate-100" />)}</div>;
 
+  // Warn when a lookup this company needs came back empty (dropdown would be blank).
+  const missingLookups = [
+    departments.length === 0 ? "departments" : null,
+    empTypes.length === 0 ? "employment types" : null,
+  ].filter(Boolean) as string[];
+
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); setError(null); mutation.mutate(); }}
       className="space-y-6"
     >
+      {missingLookups.length > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          This company has no <strong>{missingLookups.join(", ")}</strong> set up yet, so
+          the matching dropdown{missingLookups.length > 1 ? "s are" : " is"} empty. Ask an
+          admin to add {missingLookups.length > 1 ? "them" : "it"} to change these fields.
+        </div>
+      )}
       {/* ── Section: Identity ── */}
       <FormSection title="Personal information" description="Name, birth date, gender and civil status.">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -159,6 +193,9 @@ export default function EditEmployeePage() {
           <Field label="Nationality">
             <input name="nationality" value={form.nationality} onChange={set} className={inp} />
           </Field>
+          <Field label="Religion">
+            <input name="religion" value={form.religion} onChange={set} className={inp} />
+          </Field>
         </div>
       </FormSection>
 
@@ -180,6 +217,30 @@ export default function EditEmployeePage() {
         </div>
       </FormSection>
 
+      {/* ── Section: Address ── */}
+      <FormSection title="Current address" description="Where the employee currently resides.">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Address line 1">
+            <input name="address_line1" value={form.address_line1} onChange={set} className={inp} />
+          </Field>
+          <Field label="Address line 2">
+            <input name="address_line2" value={form.address_line2} onChange={set} className={inp} />
+          </Field>
+          <Field label="City / Municipality">
+            <input name="city" value={form.city} onChange={set} className={inp} />
+          </Field>
+          <Field label="Province">
+            <input name="province" value={form.province} onChange={set} className={inp} />
+          </Field>
+          <Field label="Postal code">
+            <input name="postal_code" value={form.postal_code} onChange={set} className={inp} />
+          </Field>
+          <Field label="Country">
+            <input name="country" value={form.country} onChange={set} className={inp} />
+          </Field>
+        </div>
+      </FormSection>
+
       {/* ── Section: Employment ── */}
       <FormSection title="Employment details" description={`Department, position, ${branch.singular} and employment dates.`}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -196,7 +257,7 @@ export default function EditEmployeePage() {
             <SearchSelect
               className={inp}
               value={form.department_id}
-              onChange={(v) => setForm((p) => ({ ...p, department_id: v ? Number(v) : 0 }))}
+              onChange={(v) => setForm((p) => ({ ...p, department_id: v ? Number(v) : 0, position_id: 0 }))}
               placeholder="— Select department —"
               options={departments.map((d) => ({ value: String(d.id), label: d.name }))}
             />
@@ -206,7 +267,8 @@ export default function EditEmployeePage() {
               className={inp}
               value={form.position_id}
               onChange={(v) => setForm((p) => ({ ...p, position_id: v ? Number(v) : 0 }))}
-              placeholder="— Select position —"
+              disabled={!form.department_id}
+              placeholder={form.department_id ? "— Select position —" : "Pick department first"}
               options={positions.map((p) => ({ value: String(p.id), label: p.name ?? (p as any).title }))}
             />
           </Field>

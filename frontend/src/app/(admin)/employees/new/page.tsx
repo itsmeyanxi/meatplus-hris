@@ -12,6 +12,7 @@ import { SearchSelect } from "@/components/SearchSelect";
 
 const schema = z.object({
   employee_no: z.string().min(1, "Required").max(30),
+  biometric_user_id: z.string().max(50).optional(),
   first_name: z.string().min(1, "Required"),
   middle_name: z.string().optional(),
   last_name: z.string().min(1, "Required"),
@@ -81,12 +82,29 @@ export default function NewEmployeePage() {
     mutation.mutate(values);
   };
 
+  // Lookups that came back empty for the active company. Creating an employee is
+  // impossible without them, so warn instead of showing silently-empty dropdowns
+  // (e.g. a company set up without employment types).
+  const missingLookups = [
+    branches && branches.filter((b) => !b.is_agency).length === 0 ? branch.plural : null,
+    departments && departments.length === 0 ? "departments" : null,
+    employmentTypes && employmentTypes.length === 0 ? "employment types" : null,
+  ].filter(Boolean) as string[];
+
   return (
     <div className="max-w-3xl space-y-6">
       <div>
         <h2 className="text-2xl font-semibold">New employee</h2>
         <p className="text-sm text-slate-500">Required fields are marked with *.</p>
       </div>
+
+      {missingLookups.length > 0 && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          This company has no <strong>{missingLookups.join(", ")}</strong> set up yet, so
+          the matching dropdown{missingLookups.length > 1 ? "s are" : " is"} empty. Ask an
+          admin to add {missingLookups.length > 1 ? "them" : "it"} before creating an employee here.
+        </div>
+      )}
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" noValidate>
         <Section title="Identity">
@@ -242,7 +260,13 @@ export default function NewEmployeePage() {
             <Field label="Date hired *" error={form.formState.errors.date_hired?.message}>
               <input type="date" className={inputCls} {...form.register("date_hired")} />
             </Field>
+            <Field label="Biometric ID">
+              <input className={inputCls} placeholder="Leave blank to use Employee No." {...form.register("biometric_user_id")} />
+            </Field>
           </Grid>
+          <p className="mt-2 text-xs text-slate-400">
+            Biometric ID matches this person to their punches on the attendance terminal. Setting it now means attendance works from day one.
+          </p>
         </Section>
 
         {serverError && (

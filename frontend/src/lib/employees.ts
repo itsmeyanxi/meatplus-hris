@@ -206,9 +206,13 @@ export type EmployeeCreateInput = {
   local_trunk_line?: string | null;
   trunk_pin?: string | null;
   skype_id?: string | null;
+  religion?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
   city?: string | null;
   province?: string | null;
   postal_code?: string | null;
+  country?: string | null;
   branch_id: number;
   department_id: number;
   position_id: number;
