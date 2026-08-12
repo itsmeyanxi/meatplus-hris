@@ -287,6 +287,8 @@ Route::prefix('v1')->group(function () {
 
         // One-off adjustments on a run (earnings/deductions)
         Route::get('payroll-runs/{payrollRun}/adjustments', [\App\Http\Controllers\Api\V1\Payroll\PayslipAdjustmentController::class, 'index']);
+        Route::get('payroll-runs/{payrollRun}/adjustments/import/template', [\App\Http\Controllers\Api\V1\Payroll\PayslipAdjustmentController::class, 'importTemplate']);
+        Route::post('payroll-runs/{payrollRun}/adjustments/import', [\App\Http\Controllers\Api\V1\Payroll\PayslipAdjustmentController::class, 'import']);
         Route::post('payroll-runs/{payrollRun}/adjustments', [\App\Http\Controllers\Api\V1\Payroll\PayslipAdjustmentController::class, 'store']);
         Route::delete('payroll-adjustments/{adjustment}', [\App\Http\Controllers\Api\V1\Payroll\PayslipAdjustmentController::class, 'destroy']);
 

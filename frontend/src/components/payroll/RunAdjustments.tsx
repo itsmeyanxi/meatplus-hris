@@ -1,12 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppCard } from "@/components/ui";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { SearchSelect } from "@/components/SearchSelect";
-import { adjustmentsApi, peso } from "@/lib/payroll";
+import { adjustmentsApi, peso, type AdjustmentImportResult } from "@/lib/payroll";
 import { inputCls, labelCls } from "@/lib/form-classes";
 
 /**
@@ -47,6 +47,26 @@ export function RunAdjustments({ runId, editable, onChanged }: { runId: number; 
     onSuccess: () => { toast.success("Removed — press Compute to apply."); invalidate(); },
   });
 
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [importResult, setImportResult] = useState<AdjustmentImportResult | null>(null);
+  const importFile = useMutation({
+    mutationFn: (file: File) => adjustmentsApi.import(runId, file),
+    onSuccess: (res) => {
+      setImportResult(res);
+      if (res.created > 0) { toast.success(`Imported ${res.created} adjustment${res.created === 1 ? "" : "s"} — press Compute to apply.`); invalidate(); }
+      else if (res.errors.length === 0) toast.message("No new adjustments found in the file.");
+    },
+    onError: (e: unknown) => {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err?.response?.data?.message ?? "Import failed.");
+    },
+  });
+  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) { setImportResult(null); importFile.mutate(f); }
+    e.target.value = "";
+  };
+
   const canSubmit = employeeId !== "" && label.trim() && Number(amount) > 0;
 
   if (!editable && items.length === 0) return null;
@@ -54,13 +74,45 @@ export function RunAdjustments({ runId, editable, onChanged }: { runId: number; 
   return (
     <AppCard title="Adjustments" description="One-off earnings or deductions for this run (bonus, backpay, uniform). Applied on the next Compute.">
       {editable && (
-        <div className="mb-3 flex justify-end">
+        <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+          <a
+            href={adjustmentsApi.importTemplateUrl(runId)}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            title="Download the one-time-adjustment worksheet (Payrollpie format)"
+          >
+            Template
+          </a>
+          <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={onPick} />
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={importFile.isPending}
+            className="rounded-lg border border-brand-600 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+            title="Bulk-upload a CSV/Excel of adjustments (Payrollpie one-time adjustment worksheet)"
+          >
+            {importFile.isPending ? "Importing…" : "⬆ Import"}
+          </button>
           <button
             onClick={() => setOpen((v) => !v)}
             className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
           >
             {open ? "Cancel" : "+ Add adjustment"}
           </button>
+        </div>
+      )}
+
+      {importResult && (
+        <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+          <p className="font-semibold text-slate-700">
+            Imported <span className="text-emerald-700">{importResult.created}</span>
+            {importResult.skipped > 0 && <> · skipped {importResult.skipped}</>}
+            {importResult.errors.length > 0 && <> · <span className="text-rose-700">{importResult.errors.length} error{importResult.errors.length === 1 ? "" : "s"}</span></>}
+          </p>
+          {importResult.errors.length > 0 && (
+            <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-rose-700">
+              {importResult.errors.slice(0, 8).map((er, i) => <li key={i}>Row {er.row}: {er.message}</li>)}
+              {importResult.errors.length > 8 && <li>…and {importResult.errors.length - 8} more.</li>}
+            </ul>
+          )}
         </div>
       )}
       {open && editable && (

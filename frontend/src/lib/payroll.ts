@@ -112,12 +112,20 @@ export const loansApi = {
   },
 };
 
+export type AdjustmentImportResult = { created: number; skipped: number; total: number; errors: { row: number; message: string }[] };
+
 export const adjustmentsApi = {
   list: async (runId: number): Promise<PayslipAdjustment[]> =>
     (await api.get<Listed<PayslipAdjustment>>(`/api/v1/payroll-runs/${runId}/adjustments`)).data.data,
   create: async (runId: number, body: { employee_id: number; label: string; kind: "earning" | "deduction"; amount: number; notes?: string }): Promise<PayslipAdjustment> =>
     (await api.post<{ data: PayslipAdjustment }>(`/api/v1/payroll-runs/${runId}/adjustments`, body)).data.data,
   remove: async (id: number) => (await api.delete(`/api/v1/payroll-adjustments/${id}`)).data,
+  importTemplateUrl: (runId: number) => `/api/v1/payroll-runs/${runId}/adjustments/import/template`,
+  import: async (runId: number, file: File): Promise<AdjustmentImportResult> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return (await api.post<AdjustmentImportResult>(`/api/v1/payroll-runs/${runId}/adjustments/import`, fd)).data;
+  },
 };
 
 /** Bank disbursement CSV — download via a plain link (uses the session cookie). */
@@ -136,6 +144,8 @@ export type CompRow = {
   daily_rate?: string | number | null;
   allowance_monthly: string | number | null;
   de_minimis?: string | number | null;
+  communication_allowance?: string | number | null;
+  transportation_allowance?: string | number | null;
   fleet_card?: string | number | null;
   has_compensation: boolean;
 };
@@ -260,6 +270,8 @@ export const compensationApi = {
     daily_rate?: number;
     allowance_monthly?: number;
     de_minimis?: number;
+    communication_allowance?: number;
+    transportation_allowance?: number;
     fleet_card?: number;
     effective_from?: string | null;
   }) => (await api.post("/api/v1/compensations", body)).data,
