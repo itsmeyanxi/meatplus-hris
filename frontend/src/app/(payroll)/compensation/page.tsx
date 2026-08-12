@@ -129,7 +129,7 @@ export default function CompensationPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-3">Employee</th>
+                <th className="sticky left-0 z-20 bg-white px-4 py-3 shadow-[1px_0_0_rgba(15,23,42,0.06)]">Employee</th>
                 <th className="px-4 py-3">Department</th>
                 <th className="px-4 py-3">Pay type</th>
                 <th className="px-4 py-3">Rate</th>
@@ -140,15 +140,15 @@ export default function CompensationPage() {
                 <th className="px-4 py-3">Meal Allowance <span className="font-normal normal-case text-slate-400">/ day</span></th>
                 <th className="px-4 py-3">Fleet Card <span className="font-normal normal-case text-slate-400">(tracked only)</span></th>
                 <th className="px-4 py-3">Effective date <span className="text-rose-400">*</span></th>
-                <th className="px-4 py-3"></th>
+                <th className="sticky right-0 z-20 bg-white px-4 py-3 shadow-[-1px_0_0_rgba(15,23,42,0.06)]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {visibleRows.map((r) => {
                 const e = cur(r);
                 return (
-                  <tr key={r.employee_id} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-2.5">
+                  <tr key={r.employee_id} className="group hover:bg-slate-50">
+                    <td className="sticky left-0 z-10 bg-white px-4 py-2.5 shadow-[1px_0_0_rgba(15,23,42,0.06)] group-hover:bg-slate-50">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-slate-800">{r.name}</span>
                         {r.is_confidential && (
@@ -259,7 +259,7 @@ export default function CompensationPage() {
                         title="When this rate starts. Payroll pays this rate from this date onward."
                       />
                     </td>
-                    <td className="px-4 py-2.5 text-right">
+                    <td className="sticky right-0 z-10 bg-white px-4 py-2.5 text-right shadow-[-1px_0_0_rgba(15,23,42,0.06)] group-hover:bg-slate-50">
                       <button
                         onClick={() => save.mutate(r)}
                         disabled={save.isPending || !e.effectiveFrom}
