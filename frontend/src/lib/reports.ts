@@ -147,6 +147,62 @@ export function downloadRemittance(type: "sss" | "philhealth" | "pagibig" | "tax
  * Can take a while to build, so we allow a generous timeout and keep the
  * server-provided filename (company code + timestamp).
  */
+// ── Employee Master Data report (configurable field-picker export) ─────────────
+
+export type MasterField = { key: string; label: string; group: string; sensitive: boolean };
+export type MasterFieldsResponse = { company: { id: number; name: string } | null; fields: MasterField[] };
+export type MasterColumn = { key: string; label: string };
+export type MasterPreview = {
+  columns: MasterColumn[];
+  rows: Record<string, string | number | null>[];
+  total: number;
+  returned: number;
+  truncated: boolean;
+};
+
+export type MasterFilters = {
+  fields: string[];
+  department_ids: number[];
+  branch_ids: number[];
+  employee_id?: number | "";
+  exclude_inactive?: boolean;
+};
+
+function masterParams(f: MasterFilters): Record<string, string | undefined> {
+  return {
+    fields: f.fields.length ? f.fields.join(",") : undefined,
+    department_ids: f.department_ids.length ? f.department_ids.join(",") : undefined,
+    branch_ids: f.branch_ids.length ? f.branch_ids.join(",") : undefined,
+    employee_id: f.employee_id ? String(f.employee_id) : undefined,
+    exclude_inactive: f.exclude_inactive ? "1" : undefined,
+  };
+}
+
+export async function getEmployeeMasterFields(): Promise<MasterFieldsResponse> {
+  const { data } = await api.get<MasterFieldsResponse>("/api/v1/reports/employee-master/fields");
+  return data;
+}
+
+export async function previewEmployeeMaster(f: MasterFilters): Promise<MasterPreview> {
+  const { data } = await api.get<MasterPreview>("/api/v1/reports/employee-master", {
+    params: { ...masterParams(f), format: "json" },
+  });
+  return data;
+}
+
+export async function downloadEmployeeMaster(f: MasterFilters, format: "xlsx" | "csv") {
+  const params: Record<string, string | undefined> = { ...masterParams(f), format };
+  const filtered = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== ""));
+  const qs = new URLSearchParams(filtered as Record<string, string>).toString();
+  const { data } = await api.get<Blob>(`/api/v1/reports/employee-master?${qs}`, { responseType: "blob", timeout: 120000 });
+  const href = URL.createObjectURL(data);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = `employee_master.${format === "xlsx" ? "xlsx" : "csv"}`;
+  a.click();
+  URL.revokeObjectURL(href);
+}
+
 export async function downloadFullExport() {
   const res = await api.get<Blob>("/api/v1/reports/full-export", { responseType: "blob", timeout: 180000 });
   const cd = (res.headers["content-disposition"] as string | undefined) ?? "";

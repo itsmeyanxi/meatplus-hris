@@ -1,671 +1,267 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui";
-import { payrollApi } from "@/lib/payroll";
-import {
-  downloadEmployeeRoster,
-  downloadDtrReport,
-  downloadLeaveReport,
-  downloadOvertimeReport,
-  downloadPayrollReport,
-  downloadFullExport,
-  downloadAttendanceSummary,
-  downloadTimeLogsReport,
-  downloadCompensationReport,
-  downloadLoansReport,
-  downloadThirteenthMonth,
-  downloadYtd,
-  downloadRemittance,
-} from "@/lib/reports";
-import { getMe } from "@/lib/auth";
 import { getLookup } from "@/lib/employees";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
-import { SearchSelect } from "@/components/SearchSelect";
+import {
+  getEmployeeMasterFields,
+  previewEmployeeMaster,
+  downloadEmployeeMaster,
+  type MasterField,
+  type MasterPreview,
+} from "@/lib/reports";
 
-const fieldCls =
-  "mt-0.5 block rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900";
+// Columns pre-ticked on first load — the common identity + job fields. Any that
+// the viewer can't access (e.g. pay columns) are simply skipped.
+const DEFAULT_FIELDS = [
+  "employee_no", "last_name", "first_name", "middle_name",
+  "gender", "department", "location", "position",
+  "employment_type", "status", "date_hired", "mobile",
+];
+
+const GROUP_ORDER = ["Identity", "Personal", "Employment", "Government", "Contact", "Compensation", "Bank"];
 
 export default function ReportsPage() {
-  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
-  const canPayroll = me?.user.permissions?.includes("payroll.view") ?? false;
+  const { data: fieldsData } = useQuery({ queryKey: ["report-fields"], queryFn: getEmployeeMasterFields });
+  const { data: departments = [] } = useQuery({ queryKey: ["lookups", "departments"], queryFn: () => getLookup("departments"), staleTime: 5 * 60 * 1000 });
+  const { data: branches = [] } = useQuery({ queryKey: ["lookups", "branches"], queryFn: () => getLookup("branches"), staleTime: 5 * 60 * 1000 });
+
+  const allFields = useMemo(() => fieldsData?.fields ?? [], [fieldsData]);
+
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deptIds, setDeptIds] = useState<number[]>([]);
+  const [branchIds, setBranchIds] = useState<number[]>([]);
+  const [employeeId, setEmployeeId] = useState<number | "">("");
+  const [excludeInactive, setExcludeInactive] = useState(false);
+
+  const [preview, setPreview] = useState<MasterPreview | null>(null);
+  const [busy, setBusy] = useState<null | "search" | "xlsx" | "csv">(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Tick the sensible defaults once the catalog arrives.
+  useEffect(() => {
+    if (allFields.length && selected.size === 0) {
+      const keys = new Set(allFields.map((f) => f.key));
+      setSelected(new Set(DEFAULT_FIELDS.filter((k) => keys.has(k))));
+    }
+  }, [allFields, selected.size]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, MasterField[]>();
+    for (const f of allFields) {
+      if (!map.has(f.group)) map.set(f.group, []);
+      map.get(f.group)!.push(f);
+    }
+    return [...map.entries()].sort((a, b) => GROUP_ORDER.indexOf(a[0]) - GROUP_ORDER.indexOf(b[0]));
+  }, [allFields]);
+
+  const toggleField = (key: string) =>
+    setSelected((s) => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
+  const selectAll = () => setSelected(new Set(allFields.map((f) => f.key)));
+  const deselectAll = () => setSelected(new Set());
+  const toggleIn = (arr: number[], id: number) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
+
+  const filters = () => ({
+    fields: allFields.map((f) => f.key).filter((k) => selected.has(k)), // keep catalog order
+    department_ids: deptIds,
+    branch_ids: branchIds,
+    employee_id: employeeId,
+    exclude_inactive: excludeInactive,
+  });
+
+  const run = async (what: "search" | "xlsx" | "csv") => {
+    if (selected.size === 0) { setError("Select at least one field to include."); return; }
+    setError(null); setBusy(what);
+    try {
+      if (what === "search") setPreview(await previewEmployeeMaster(filters()));
+      else await downloadEmployeeMaster(filters(), what);
+    } catch {
+      setError(what === "search" ? "Failed to load preview." : "Failed to download.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const organicBranches = branches.filter((b) => !(b as { is_agency?: boolean }).is_agency);
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports" description="Download data exports as formatted Excel files, or the full company dataset as a zipped Excel bundle." />
+      <PageHeader
+        title="Employee List Report"
+        description="Choose the columns you want, filter the employees, then preview on screen or export to Excel / CSV. Leave the columns as-is to capture the standard set."
+      />
 
-      <SectionTitle>Attendance</SectionTitle>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <AttendanceSummaryCard />
-        <DtrReportCard />
-        <TimeLogsCard />
-        <LeaveReportCard />
-        <OvertimeReportCard />
-      </div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-5">
+        {/* Filters */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Labeled label="Company">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              {fieldsData?.company?.name ?? "Active company"}
+            </div>
+          </Labeled>
+          <Labeled label="Employee">
+            <EmployeeSearchSelect
+              value={employeeId}
+              onChange={(id) => setEmployeeId(id === "" ? "" : Number(id))}
+              placeholder="All employees"
+              className="mt-0.5 block w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            />
+          </Labeled>
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={excludeInactive} onChange={(e) => setExcludeInactive(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
+              Exclude inactive employees
+            </label>
+          </div>
+        </div>
 
-      <SectionTitle>Employees</SectionTitle>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <EmployeeRosterCard />
-        {canPayroll && <CompensationCard />}
-      </div>
+        <ChipFilter label="Department" items={departments.map((d) => ({ id: d.id, name: d.name ?? "" }))} selected={deptIds} onToggle={(id) => setDeptIds((a) => toggleIn(a, id))} onClear={() => setDeptIds([])} />
+        <ChipFilter label="Location" items={organicBranches.map((b) => ({ id: b.id, name: b.name ?? "" }))} selected={branchIds} onToggle={(id) => setBranchIds((a) => toggleIn(a, id))} onClear={() => setBranchIds([])} />
 
-      {canPayroll && (
-        <>
-          <SectionTitle>Payroll</SectionTitle>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <PayrollReportCard />
-            <LoansCard />
+        {/* Field picker */}
+        <div className="border-t border-slate-100 pt-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-800">Columns to include <span className="text-slate-400">({selected.size} selected)</span></h3>
+            <div className="flex gap-2">
+              <button type="button" onClick={selectAll} className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Select All</button>
+              <button type="button" onClick={deselectAll} className="rounded-md border border-amber-400 px-3 py-1.5 text-xs font-semibold text-amber-600 hover:bg-amber-50">Deselect All</button>
+            </div>
           </div>
 
-          <SectionTitle>Statutory &amp; Year-End</SectionTitle>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <ThirteenthMonthCard />
-            <YtdCard />
-            <RemittanceCard />
+          <div className="space-y-4">
+            {grouped.map(([group, fields]) => (
+              <div key={group}>
+                <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">{group}</div>
+                <div className="flex flex-wrap gap-2">
+                  {fields.map((f) => {
+                    const on = selected.has(f.key);
+                    return (
+                      <button
+                        key={f.key}
+                        type="button"
+                        onClick={() => toggleField(f.key)}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                          on ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
+                        }`}
+                        title={f.sensitive ? "Sensitive pay data — hidden for confidential employees you can't view" : undefined}
+                      >
+                        {f.label}{f.sensitive && <span className={on ? "text-amber-200" : "text-amber-500"}> •</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
-        </>
+        </div>
+
+        {/* Actions */}
+        {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+          <ActionButton onClick={() => run("search")} busy={busy === "search"} variant="outline">Search (preview)</ActionButton>
+          <ActionButton onClick={() => run("xlsx")} busy={busy === "xlsx"} variant="solid">Download as Excel</ActionButton>
+          <ActionButton onClick={() => run("csv")} busy={busy === "csv"} variant="solid">Download as Flat File (CSV)</ActionButton>
+        </div>
+      </div>
+
+      {/* Preview */}
+      {preview && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-800">Preview</h3>
+            <span className="text-xs text-slate-500">
+              {preview.truncated ? `Showing first ${preview.returned} of ${preview.total}` : `${preview.total} employee${preview.total === 1 ? "" : "s"}`}
+            </span>
+          </div>
+          {preview.rows.length === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-400">No employees match these filters.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                    {preview.columns.map((c) => <th key={c.key} className="whitespace-nowrap px-3 py-2 font-semibold">{c.label}</th>)}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {preview.rows.map((row, i) => (
+                    <tr key={i} className="hover:bg-slate-50/60">
+                      {preview.columns.map((c) => (
+                        <td key={c.key} className="whitespace-nowrap px-3 py-1.5 text-slate-700">{row[c.key] === null || row[c.key] === "" ? "—" : String(row[c.key])}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
-
-      <SectionTitle>Everything</SectionTitle>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FullExportCard />
-      </div>
     </div>
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="pt-2 text-xs font-bold uppercase tracking-wide text-slate-500">{children}</h2>;
-}
-
-// ── simple one-click download card ──────────────────────────────────────────
-function SimpleDownloadCard({ title, description, fn }: { title: string; description: string; fn: () => Promise<void> }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const download = async () => {
-    setError(null); setLoading(true);
-    try { await fn(); } catch { setError("Failed to download."); } finally { setLoading(false); }
-  };
+function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <ReportCard title={title} description={description}>
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <DownloadButton onClick={download} loading={loading}>Download Excel</DownloadButton>
-    </ReportCard>
-  );
-}
-
-function CompensationCard() {
-  return <SimpleDownloadCard title="Compensation / Salaries" description="Active pay type, rate, allowance and effective date per employee." fn={downloadCompensationReport} />;
-}
-
-function LoansCard() {
-  return <SimpleDownloadCard title="Loans & Balances" description="Every employee loan with amortization and outstanding balance." fn={downloadLoansReport} />;
-}
-
-// ── date-range card with department + employee filters ──────────────────────
-function RangeReportCard({
-  title, description, onDownload,
-}: {
-  title: string;
-  description: string;
-  onDownload: (p: { from: string; to: string; employee_id: number | ""; department_id: number | "" }) => Promise<void>;
-}) {
-  const today = new Date().toISOString().slice(0, 10);
-  const firstOfMonth = today.slice(0, 8) + "01";
-  const [from, setFrom] = useState(firstOfMonth);
-  const [to, setTo] = useState(today);
-  const [employeeId, setEmployeeId] = useState<number | "">("");
-  const [departmentId, setDepartmentId] = useState<number | "">("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const { data: departments = [] } = useQuery({ queryKey: ["lookups", "departments"], queryFn: () => getLookup("departments"), staleTime: 5 * 60 * 1000 });
-
-  const download = async () => {
-    if (!from || !to) { setError("Both dates are required."); return; }
-    setError(null); setLoading(true);
-    try { await onDownload({ from, to, employee_id: employeeId, department_id: departmentId }); }
-    catch { setError("Failed to download. Check your date range."); }
-    finally { setLoading(false); }
-  };
-
-  return (
-    <ReportCard title={title} description={description}>
-      <div className="flex flex-wrap gap-2">
-        <label className="block"><span className="text-xs text-slate-500">From</span>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={fieldCls} /></label>
-        <label className="block"><span className="text-xs text-slate-500">To</span>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={fieldCls} /></label>
-        <label className="block"><span className="text-xs text-slate-500">Department</span>
-          <SearchSelect value={departmentId} onChange={(v) => setDepartmentId(v ? Number(v) : "")} className={fieldCls}
-            options={[{ value: "", label: "All departments" }, ...departments.map((d) => ({ value: String(d.id), label: d.name }))]} /></label>
-        <label className="block"><span className="text-xs text-slate-500">Employee</span>
-          <EmployeeSearchSelect value={employeeId} onChange={(id) => setEmployeeId(id === "" ? "" : Number(id))} placeholder="All employees" className={fieldCls} /></label>
-      </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <DownloadButton onClick={download} loading={loading}>Download Excel</DownloadButton>
-    </ReportCard>
-  );
-}
-
-function AttendanceSummaryCard() {
-  return (
-    <RangeReportCard
-      title="Attendance Summary"
-      description="One row per employee for the period — present / absent / leave days and late, OT, undertime & night totals, like the timekeeping review."
-      onDownload={(p) => downloadAttendanceSummary({ date_from: p.from, date_to: p.to, employee_id: p.employee_id, department_id: p.department_id })}
-    />
-  );
-}
-
-function TimeLogsCard() {
-  return (
-    <RangeReportCard
-      title="Time Logs (raw punches)"
-      description="Every biometric / manual punch in the range, with device and location."
-      onDownload={(p) => downloadTimeLogsReport({ from: p.from, to: p.to, employee_id: p.employee_id, department_id: p.department_id })}
-    />
-  );
-}
-
-function ThirteenthMonthCard() {
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const download = async () => {
-    setError(null); setLoading(true);
-    try { await downloadThirteenthMonth(year); } catch { setError("Failed to download."); } finally { setLoading(false); }
-  };
-  return (
-    <ReportCard title="13th-Month Pay" description="Per employee: total basic earned in the year ÷ 12 (per DOLE).">
-      <label className="block">
-        <span className="text-xs text-slate-500">Year</span>
-        <input type="number" min={2020} max={2100} value={year} onChange={(e) => setYear(Number(e.target.value))} className={fieldCls} />
-      </label>
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <DownloadButton onClick={download} loading={loading}>Download Excel</DownloadButton>
-    </ReportCard>
-  );
-}
-
-function YtdCard() {
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const download = async () => {
-    setError(null); setLoading(true);
-    try { await downloadYtd(year); } catch { setError("Failed to download."); } finally { setLoading(false); }
-  };
-  return (
-    <ReportCard title="Year-to-Date (YTD) Payroll" description="Per employee: YTD earnings, gov contributions, tax and net — combining in-system runs with prior-period carry-over. Excel.">
-      <label className="block">
-        <span className="text-xs text-slate-500">Year</span>
-        <input type="number" min={2020} max={2100} value={year} onChange={(e) => setYear(Number(e.target.value))} className={fieldCls} />
-      </label>
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <DownloadButton onClick={download} loading={loading}>Download Excel</DownloadButton>
-    </ReportCard>
-  );
-}
-
-function RemittanceCard() {
-  const now = new Date();
-  const [type, setType] = useState<"sss" | "philhealth" | "pagibig" | "tax">("sss");
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const download = async () => {
-    setError(null); setLoading(true);
-    try { await downloadRemittance(type, year, month); } catch { setError("Failed to download."); } finally { setLoading(false); }
-  };
-  return (
-    <ReportCard title="Statutory Remittance" description="Monthly SSS / PhilHealth / Pag-IBIG (employee + employer share) or BIR 1601-C withholding tax. The SSS (R3) sheet breaks each contribution into Regular SS, MPF/WISP, and the employer EC premium.">
-      <div className="flex flex-wrap gap-2">
-        <label className="block"><span className="text-xs text-slate-500">Report</span>
-          <SearchSelect value={type} onChange={(v) => setType(v as typeof type)} className={fieldCls}
-            options={[{ value: "sss", label: "SSS (R3)" }, { value: "philhealth", label: "PhilHealth (RF1)" }, { value: "pagibig", label: "Pag-IBIG (MCRF)" }, { value: "tax", label: "BIR 1601-C (Tax)" }]} /></label>
-        <label className="block"><span className="text-xs text-slate-500">Year</span>
-          <input type="number" min={2020} max={2100} value={year} onChange={(e) => setYear(Number(e.target.value))} className={fieldCls} /></label>
-        <label className="block"><span className="text-xs text-slate-500">Month</span>
-          <SearchSelect value={String(month)} onChange={(v) => setMonth(Number(v))} className={fieldCls}
-            options={["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m, i) => ({ value: String(i + 1), label: m }))} /></label>
-      </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <DownloadButton onClick={download} loading={loading}>Download Excel</DownloadButton>
-    </ReportCard>
-  );
-}
-
-function ReportCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
-      <div>
-        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-        <p className="mt-0.5 text-xs text-slate-500">{description}</p>
-      </div>
+    <label className="block">
+      <span className="text-xs font-medium text-slate-500">{label}</span>
       {children}
+    </label>
+  );
+}
+
+function ChipFilter({ label, items, selected, onToggle, onClear }: {
+  label: string;
+  items: { id: number; name: string }[];
+  selected: number[];
+  onToggle: (id: number) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center gap-2">
+        <span className="text-xs font-medium text-slate-500">{label}</span>
+        <span className="text-[11px] text-slate-400">{selected.length ? `${selected.length} selected` : "All"}</span>
+        {selected.length > 0 && <button type="button" onClick={onClear} className="text-[11px] font-medium text-amber-600 hover:underline">clear</button>}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {items.length === 0 && <span className="text-xs text-slate-400">None available.</span>}
+        {items.map((it) => {
+          const on = selected.includes(it.id);
+          return (
+            <button
+              key={it.id}
+              type="button"
+              onClick={() => onToggle(it.id)}
+              className={`rounded-md border px-2.5 py-1 text-xs font-medium transition ${
+                on ? "border-slate-800 bg-slate-800 text-white" : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
+              }`}
+            >
+              {it.name}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function DownloadButton({
-  onClick,
-  loading,
-  children,
-}: {
+function ActionButton({ onClick, busy, variant, children }: {
   onClick: () => void;
-  loading: boolean;
+  busy: boolean;
+  variant: "solid" | "outline";
   children: React.ReactNode;
 }) {
+  const base = "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50";
+  const cls = variant === "solid"
+    ? `${base} bg-brand-600 text-white hover:bg-brand-700`
+    : `${base} border border-slate-300 text-slate-700 hover:bg-slate-100`;
   return (
-    <button
-      onClick={onClick}
-      disabled={loading}
-      className="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition"
-    >
-      {loading ? (
-        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-      ) : (
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-        </svg>
-      )}
+    <button onClick={onClick} disabled={busy} className={cls}>
+      {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />}
       {children}
     </button>
-  );
-}
-
-// Full data export ─────────────────────────────────────────────────────────────
-
-function FullExportCard() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const download = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await downloadFullExport();
-    } catch {
-      setError("Failed to generate the export. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="sm:col-span-2 rounded-2xl border border-slate-900 bg-slate-900 p-5 space-y-4 text-white">
-      <div>
-        <h2 className="text-sm font-semibold">Full Data Export — Excel, zipped</h2>
-        <p className="mt-0.5 text-xs text-slate-300">
-          Everything for the company you&apos;re currently in — employees, salaries, time logs, daily records,
-          leave, overtime, payslips, and devices — as separate Excel files bundled in one ZIP.
-          Only the categories you have access to are included. Large datasets may take a moment.
-        </p>
-      </div>
-      {error && <p className="rounded-md bg-red-500/20 px-3 py-2 text-xs text-red-200">{error}</p>}
-      <button
-        onClick={download}
-        disabled={loading}
-        className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:opacity-50 transition"
-      >
-        {loading ? (
-          <>
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-900 border-t-transparent" />
-            Preparing ZIP…
-          </>
-        ) : (
-          <>
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Download full export (.zip)
-          </>
-        )}
-      </button>
-    </div>
-  );
-}
-
-// RP-2 ─────────────────────────────────────────────────────────────────────────
-
-function EmployeeRosterCard() {
-  const [departmentId, setDepartmentId] = useState<number | "">("");
-  const [loading, setLoading] = useState(false);
-
-  const { data: departments = [] } = useQuery({
-    queryKey: ["lookups", "departments"],
-    queryFn: () => getLookup("departments"),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const download = async () => {
-    setLoading(true);
-    try {
-      await downloadEmployeeRoster({ department_id: departmentId || undefined });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <ReportCard
-      title="Employee Roster"
-      description="All active and inactive employees with their department, position, and employment details."
-    >
-      <div className="flex gap-2 flex-wrap">
-        <label className="block">
-          <span className="text-xs text-slate-500">Department</span>
-          <SearchSelect
-            value={departmentId}
-            onChange={(v) => setDepartmentId(v ? Number(v) : "")}
-            className={fieldCls}
-            options={[
-              { value: "", label: "All departments" },
-              ...departments.map((d) => ({ value: String(d.id), label: d.name })),
-            ]}
-          />
-        </label>
-      </div>
-      <DownloadButton onClick={download} loading={loading}>
-        Download Excel
-      </DownloadButton>
-    </ReportCard>
-  );
-}
-
-// RP-1 ─────────────────────────────────────────────────────────────────────────
-
-function DtrReportCard() {
-  const today = new Date().toISOString().slice(0, 10);
-  const firstOfMonth = today.slice(0, 8) + "01";
-  const [from, setFrom] = useState(firstOfMonth);
-  const [to, setTo] = useState(today);
-  const [employeeId, setEmployeeId] = useState<number | "">("");
-  const [departmentId, setDepartmentId] = useState<number | "">("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const { data: departments = [] } = useQuery({
-    queryKey: ["lookups", "departments"],
-    queryFn: () => getLookup("departments"),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const download = async () => {
-    if (!from || !to) {
-      setError("Both dates are required.");
-      return;
-    }
-    setError(null);
-    setLoading(true);
-    try {
-      await downloadDtrReport({
-        date_from: from,
-        date_to: to,
-        employee_id: employeeId || undefined,
-        department_id: departmentId || undefined,
-      });
-    } catch {
-      setError("Failed to download. Check your date range.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <ReportCard title="Timekeeping Worksheet" description="Per-employee-per-day timekeeping in the Pacific template — punches + hours pre-filled, salary computed, grouped by department.">
-      <div className="flex gap-2 flex-wrap">
-        <label className="block">
-          <span className="text-xs text-slate-500">From</span>
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className={fieldCls}
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs text-slate-500">To</span>
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className={fieldCls}
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs text-slate-500">Department</span>
-          <SearchSelect
-            value={departmentId}
-            onChange={(v) => setDepartmentId(v ? Number(v) : "")}
-            className={fieldCls}
-            options={[
-              { value: "", label: "All departments" },
-              ...departments.map((d) => ({ value: String(d.id), label: d.name })),
-            ]}
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs text-slate-500">Employee</span>
-          <EmployeeSearchSelect
-            value={employeeId}
-            onChange={(id) => setEmployeeId(id === "" ? "" : Number(id))}
-            placeholder="All employees"
-            className={fieldCls}
-          />
-        </label>
-      </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <DownloadButton onClick={download} loading={loading}>
-        Download Excel
-      </DownloadButton>
-    </ReportCard>
-  );
-}
-
-// RP-3 ─────────────────────────────────────────────────────────────────────────
-
-function LeaveReportCard() {
-  const today = new Date().toISOString().slice(0, 10);
-  const firstOfYear = today.slice(0, 4) + "-01-01";
-  const [from, setFrom] = useState(firstOfYear);
-  const [to, setTo] = useState(today);
-  const [status, setStatus] = useState("");
-  const [employeeId, setEmployeeId] = useState<number | "">("");
-  const [departmentId, setDepartmentId] = useState<number | "">("");
-  const [loading, setLoading] = useState(false);
-
-  const { data: departments = [] } = useQuery({
-    queryKey: ["lookups", "departments"],
-    queryFn: () => getLookup("departments"),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const download = async () => {
-    setLoading(true);
-    try {
-      await downloadLeaveReport({
-        date_from: from,
-        date_to: to,
-        status: status || undefined,
-        employee_id: employeeId || undefined,
-        department_id: departmentId || undefined,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <ReportCard title="Leave Report" description="Leave applications within a date range, filterable by status.">
-      <div className="flex gap-2 flex-wrap">
-        <label className="block">
-          <span className="text-xs text-slate-500">From</span>
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className={fieldCls}
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs text-slate-500">To</span>
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className={fieldCls}
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs text-slate-500">Status</span>
-          <SearchSelect
-            value={status}
-            onChange={setStatus}
-            className={fieldCls}
-            options={[
-              { value: "", label: "All" },
-              { value: "pending", label: "Pending" },
-              { value: "approved", label: "Approved" },
-              { value: "rejected", label: "Rejected" },
-              { value: "cancelled", label: "Cancelled" },
-            ]}
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs text-slate-500">Department</span>
-          <SearchSelect
-            value={departmentId}
-            onChange={(v) => setDepartmentId(v ? Number(v) : "")}
-            className={fieldCls}
-            options={[
-              { value: "", label: "All departments" },
-              ...departments.map((d) => ({ value: String(d.id), label: d.name })),
-            ]}
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs text-slate-500">Employee</span>
-          <EmployeeSearchSelect
-            value={employeeId}
-            onChange={(id) => setEmployeeId(id === "" ? "" : Number(id))}
-            placeholder="All employees"
-            className={fieldCls}
-          />
-        </label>
-      </div>
-      <DownloadButton onClick={download} loading={loading}>
-        Download Excel
-      </DownloadButton>
-    </ReportCard>
-  );
-}
-
-// Overtime ─────────────────────────────────────────────────────────────────────
-
-function OvertimeReportCard() {
-  const today = new Date().toISOString().slice(0, 10);
-  const firstOfMonth = today.slice(0, 7) + "-01";
-  const [from, setFrom] = useState(firstOfMonth);
-  const [to, setTo] = useState(today);
-  const [status, setStatus] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const download = async () => {
-    setLoading(true);
-    try {
-      await downloadOvertimeReport({ date_from: from, date_to: to, status: status || undefined });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <ReportCard title="Overtime Report" description="Overtime requests within a date range, filterable by status.">
-      <div className="flex gap-2 flex-wrap">
-        <label className="block">
-          <span className="text-xs text-slate-500">From</span>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={fieldCls} />
-        </label>
-        <label className="block">
-          <span className="text-xs text-slate-500">To</span>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={fieldCls} />
-        </label>
-        <label className="block">
-          <span className="text-xs text-slate-500">Status</span>
-          <SearchSelect
-            value={status}
-            onChange={setStatus}
-            className={fieldCls}
-            options={[
-              { value: "", label: "All" },
-              { value: "pending", label: "Pending" },
-              { value: "approved", label: "Approved" },
-              { value: "rejected", label: "Rejected" },
-              { value: "cancelled", label: "Cancelled" },
-            ]}
-          />
-        </label>
-      </div>
-      <DownloadButton onClick={download} loading={loading}>
-        Download Excel
-      </DownloadButton>
-    </ReportCard>
-  );
-}
-
-// Payroll ──────────────────────────────────────────────────────────────────────
-
-function PayrollReportCard() {
-  const { data: runs = [] } = useQuery({ queryKey: ["payroll-runs"], queryFn: payrollApi.listRuns });
-  const [selected, setSelected] = useState<number | "">("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const download = async () => {
-    if (!selected) {
-      setError("Select a payroll run first.");
-      return;
-    }
-    setError(null);
-    setLoading(true);
-    const run = runs.find((r) => r.id === selected);
-    try {
-      await downloadPayrollReport(selected as number, run?.name ?? String(selected));
-    } catch {
-      setError("Failed to download.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <ReportCard title="Payroll Report" description="Payslip breakdown for a specific payroll run.">
-      <SearchSelect
-        value={selected}
-        onChange={(v) => setSelected(v ? Number(v) : "")}
-        placeholder="Select payroll run…"
-        className="block w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-        options={runs.map((r) => ({
-          value: String(r.id),
-          label: `${r.name} (${r.period_start} – ${r.period_end})`,
-        }))}
-      />
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <DownloadButton onClick={download} loading={loading}>
-        Download Excel
-      </DownloadButton>
-    </ReportCard>
   );
 }

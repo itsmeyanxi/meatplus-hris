@@ -1343,4 +1343,236 @@ class ReportController extends Controller
         return response()->download($zipPath, $filename, ['Content-Type' => 'application/zip'])
             ->deleteFileAfterSend(true);
     }
+
+    // ── Employee Master Data report (Sprout-style field-picker export) ──────────
+
+    /**
+     * The catalog of every column the master-data report can output, in display
+     * order and grouped for the UI. Each entry carries the eager-loads it needs
+     * and a resolver. Flags:
+     *   sensitive    → pay data; only offered to payroll/compensation viewers.
+     *   confidential → pay/bank; blanked for confidential employees unless the
+     *                  viewer may see confidential data (hr_confi / admin).
+     *
+     * @return array<string, array{label:string, group:string, with?:array<int,string>, sensitive?:bool, confidential?:bool, resolve:callable}>
+     */
+    private function masterFieldCatalog(): array
+    {
+        $d = fn ($v) => $v ? \Illuminate\Support\Carbon::parse($v)->format('Y-m-d') : '';
+        $humanize = fn (?string $v) => $v ? ucwords(str_replace('_', ' ', $v)) : '';
+
+        return [
+            // Identity
+            'system_id'        => ['label' => 'System ID', 'group' => 'Identity', 'resolve' => fn ($e) => $e->id],
+            'employee_no'      => ['label' => 'Employee ID', 'group' => 'Identity', 'resolve' => fn ($e) => $e->employee_no],
+            'biometric_user_id' => ['label' => 'Biometric ID', 'group' => 'Identity', 'resolve' => fn ($e) => $e->biometric_user_id ?? ''],
+            'username'         => ['label' => 'Username', 'group' => 'Identity', 'with' => ['user'], 'resolve' => fn ($e) => $e->user?->username ?? ''],
+
+            // Personal
+            'last_name'    => ['label' => 'Last Name', 'group' => 'Personal', 'resolve' => fn ($e) => $e->last_name],
+            'first_name'   => ['label' => 'First Name', 'group' => 'Personal', 'resolve' => fn ($e) => $e->first_name],
+            'middle_name'  => ['label' => 'Middle Name', 'group' => 'Personal', 'resolve' => fn ($e) => $e->middle_name ?? ''],
+            'suffix'       => ['label' => 'Suffix', 'group' => 'Personal', 'resolve' => fn ($e) => $e->suffix ?? ''],
+            'full_name'    => ['label' => 'Full Name', 'group' => 'Personal', 'resolve' => fn ($e) => $e->full_name],
+            'gender'       => ['label' => 'Gender', 'group' => 'Personal', 'resolve' => fn ($e) => $humanize($e->gender)],
+            'civil_status' => ['label' => 'Civil Status', 'group' => 'Personal', 'resolve' => fn ($e) => $humanize($e->civil_status)],
+            'birth_date'   => ['label' => 'Birthday', 'group' => 'Personal', 'resolve' => fn ($e) => $d($e->birth_date)],
+            'age'          => ['label' => 'Age', 'group' => 'Personal', 'resolve' => fn ($e) => $e->birth_date ? $e->birth_date->age : ''],
+            'nationality'  => ['label' => 'Nationality', 'group' => 'Personal', 'resolve' => fn ($e) => $e->nationality ?? ''],
+            'religion'     => ['label' => 'Religion', 'group' => 'Personal', 'resolve' => fn ($e) => $e->religion ?? ''],
+
+            // Employment
+            'department'          => ['label' => 'Department', 'group' => 'Employment', 'with' => ['department'], 'resolve' => fn ($e) => $e->department?->name ?? ''],
+            'location'            => ['label' => 'Location', 'group' => 'Employment', 'with' => ['branch'], 'resolve' => fn ($e) => $e->branch?->name ?? ''],
+            'position'            => ['label' => 'Position', 'group' => 'Employment', 'with' => ['position'], 'resolve' => fn ($e) => $e->position?->title ?? ''],
+            'employment_type'     => ['label' => 'Employment Type', 'group' => 'Employment', 'with' => ['employmentType'], 'resolve' => fn ($e) => $e->employmentType?->name ?? ''],
+            'employee_category'   => ['label' => 'Employee Category', 'group' => 'Employment', 'resolve' => fn ($e) => $humanize($e->employee_type)],
+            'status'              => ['label' => 'Status', 'group' => 'Employment', 'resolve' => fn ($e) => $e->is_active ? 'Active' : 'Inactive'],
+            'immediate_supervisor' => ['label' => 'Immediate Supervisor', 'group' => 'Employment', 'with' => ['manager'], 'resolve' => fn ($e) => $e->manager?->full_name ?? ''],
+            'next_level_approver' => ['label' => 'Next Level Approver', 'group' => 'Employment', 'with' => ['manager.manager'], 'resolve' => fn ($e) => $e->manager?->manager?->full_name ?? ''],
+            'schedule_type'       => ['label' => 'Schedule Type', 'group' => 'Employment', 'resolve' => fn ($e) => $humanize($e->schedule_type)],
+            'payroll_run_type'    => ['label' => 'Payroll Run Type', 'group' => 'Employment', 'resolve' => fn ($e) => $humanize($e->payroll_run_type)],
+            'user_type'           => ['label' => 'User Level', 'group' => 'Employment', 'resolve' => fn ($e) => $humanize($e->user_type)],
+            'job_code'            => ['label' => 'Job Code', 'group' => 'Employment', 'resolve' => fn ($e) => $e->job_code ?? ''],
+            'job_grade'           => ['label' => 'Job Grade', 'group' => 'Employment', 'resolve' => fn ($e) => $e->job_grade ?? ''],
+            'client_name'         => ['label' => 'Client Name', 'group' => 'Employment', 'resolve' => fn ($e) => $e->client_name ?? ''],
+            'billability'         => ['label' => 'Billability', 'group' => 'Employment', 'resolve' => fn ($e) => $humanize($e->billability)],
+            'designated_workplace' => ['label' => 'Designated Workplace', 'group' => 'Employment', 'resolve' => fn ($e) => $e->designated_workplace ?? ''],
+            'date_hired'          => ['label' => 'Hire Date', 'group' => 'Employment', 'resolve' => fn ($e) => $d($e->date_hired)],
+            'date_regularized'    => ['label' => 'Regularization Date', 'group' => 'Employment', 'resolve' => fn ($e) => $d($e->date_regularized)],
+            'date_separated'      => ['label' => 'Separation Date', 'group' => 'Employment', 'resolve' => fn ($e) => $d($e->date_separated)],
+            'separation_reason'   => ['label' => 'Reason for Leaving', 'group' => 'Employment', 'resolve' => fn ($e) => $e->separation_reason ?? ''],
+
+            // Government IDs
+            'sss_no'      => ['label' => 'SSS', 'group' => 'Government', 'with' => ['governmentIds'], 'resolve' => fn ($e) => $e->governmentIds?->sss_no ?? ''],
+            'tin'         => ['label' => 'TIN', 'group' => 'Government', 'with' => ['governmentIds'], 'resolve' => fn ($e) => $e->governmentIds?->tin ?? ''],
+            'philhealth_no' => ['label' => 'PhilHealth', 'group' => 'Government', 'with' => ['governmentIds'], 'resolve' => fn ($e) => $e->governmentIds?->philhealth_no ?? ''],
+            'pagibig_no'  => ['label' => 'Pag-IBIG No.', 'group' => 'Government', 'with' => ['governmentIds'], 'resolve' => fn ($e) => $e->governmentIds?->pagibig_no ?? ''],
+            'prc_no'      => ['label' => 'PRC No.', 'group' => 'Government', 'with' => ['governmentIds'], 'resolve' => fn ($e) => $e->governmentIds?->prc_no ?? ''],
+            'passport_no' => ['label' => 'Passport No.', 'group' => 'Government', 'with' => ['governmentIds'], 'resolve' => fn ($e) => $e->governmentIds?->passport_no ?? ''],
+
+            // Contact
+            'mobile'         => ['label' => 'Contact', 'group' => 'Contact', 'resolve' => fn ($e) => $e->mobile ?? ''],
+            'email_company'  => ['label' => 'Company Email', 'group' => 'Contact', 'resolve' => fn ($e) => $e->email_company ?? ''],
+            'email_personal' => ['label' => 'Personal Email', 'group' => 'Contact', 'resolve' => fn ($e) => $e->email_personal ?? ''],
+            'phone_home'     => ['label' => 'Home Phone', 'group' => 'Contact', 'resolve' => fn ($e) => $e->phone_home ?? ''],
+            'skype_id'       => ['label' => 'Skype', 'group' => 'Contact', 'resolve' => fn ($e) => $e->skype_id ?? ''],
+            'address'        => ['label' => 'Address', 'group' => 'Contact', 'resolve' => fn ($e) => trim(implode(', ', array_filter([$e->address_line1, $e->address_line2, $e->city, $e->province, $e->postal_code])))],
+            'emergency_contact' => ['label' => 'Emergency Contact', 'group' => 'Contact', 'with' => ['emergencyContacts'], 'resolve' => function ($e) {
+                $c = $e->emergencyContacts->first();
+                return $c ? trim($c->name.($c->relationship ? " ({$c->relationship})" : '').($c->mobile ? " — {$c->mobile}" : '')) : '';
+            }],
+            'dependents' => ['label' => 'Dependents', 'group' => 'Contact', 'with' => ['dependents'], 'resolve' => fn ($e) => $e->dependents->count() ?: ''],
+
+            // Compensation (sensitive + confidential-aware)
+            'pay_type'      => ['label' => 'Pay Type', 'group' => 'Compensation', 'sensitive' => true, 'confidential' => true, 'with' => ['compensation'], 'resolve' => fn ($e) => $humanize($e->compensation?->pay_type)],
+            'base_salary'   => ['label' => 'Base Salary', 'group' => 'Compensation', 'sensitive' => true, 'confidential' => true, 'with' => ['compensation'], 'resolve' => fn ($e) => $e->compensation ? (float) $e->compensation->basic_monthly : ''],
+            'daily_rate'    => ['label' => 'Daily Rate', 'group' => 'Compensation', 'sensitive' => true, 'confidential' => true, 'with' => ['compensation'], 'resolve' => fn ($e) => $e->compensation && $e->compensation->daily_rate ? (float) $e->compensation->daily_rate : ''],
+            'allowance'     => ['label' => 'Allowance', 'group' => 'Compensation', 'sensitive' => true, 'confidential' => true, 'with' => ['compensation'], 'resolve' => fn ($e) => $e->compensation ? (float) $e->compensation->allowance_monthly : ''],
+            'monthly_gross' => ['label' => 'Monthly Gross', 'group' => 'Compensation', 'sensitive' => true, 'confidential' => true, 'with' => ['compensation'], 'resolve' => fn ($e) => $e->compensation ? (float) $e->compensation->basic_monthly + (float) $e->compensation->allowance_monthly : ''],
+            'de_minimis'    => ['label' => 'De Minimis', 'group' => 'Compensation', 'sensitive' => true, 'confidential' => true, 'with' => ['payrollProfile'], 'resolve' => fn ($e) => $e->payrollProfile && $e->payrollProfile->de_minimis ? (float) $e->payrollProfile->de_minimis : ''],
+            'effective_from' => ['label' => 'Salary Effective From', 'group' => 'Compensation', 'sensitive' => true, 'confidential' => true, 'with' => ['compensation'], 'resolve' => fn ($e) => $d($e->compensation?->effective_from)],
+
+            // Bank (sensitive + confidential-aware)
+            'bank_accounts' => ['label' => 'Bank Accounts', 'group' => 'Bank', 'sensitive' => true, 'confidential' => true, 'with' => ['bankAccounts'], 'resolve' => function ($e) {
+                return $e->bankAccounts
+                    ->sortByDesc('is_primary')
+                    ->map(fn ($b) => trim(($b->bank_name ?? '').($b->account_number ? ' — '.$b->account_number : '')))
+                    ->filter()->implode('; ');
+            }],
+        ];
+    }
+
+    /** Catalog trimmed to what this user may output (pay columns need payroll/compensation view). */
+    private function availableMasterFields(Request $request): array
+    {
+        $canSeePay = $request->user()->can('payroll.view') || $request->user()->can('compensation.view');
+
+        return array_filter($this->masterFieldCatalog(), fn ($f) => $canSeePay || empty($f['sensitive']));
+    }
+
+    /** GET /api/v1/reports/employee-master/fields — the pickable columns for the UI. */
+    public function employeeMasterFields(Request $request): \Illuminate\Http\JsonResponse
+    {
+        abort_unless($request->user()->can('employee.view'), 403);
+
+        $fields = [];
+        foreach ($this->availableMasterFields($request) as $key => $f) {
+            $fields[] = ['key' => $key, 'label' => $f['label'], 'group' => $f['group'], 'sensitive' => (bool) ($f['sensitive'] ?? false)];
+        }
+
+        $company = Company::find($request->user()->active_company_id);
+
+        return response()->json([
+            'company' => $company ? ['id' => $company->id, 'name' => $company->trade_name ?: $company->legal_name] : null,
+            'fields' => $fields,
+        ]);
+    }
+
+    /**
+     * GET /api/v1/reports/employee-master
+     * Configurable employee master-data export. Params: fields (csv of keys),
+     * department_ids, branch_ids (csv), employee_id, exclude_inactive, format
+     * (json preview | xlsx | csv). Scoped to the active company; confidential
+     * employees keep their non-sensitive columns but pay/bank blanks unless allowed.
+     */
+    public function employeeMaster(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user->can('employee.view'), 403);
+
+        $canSeeConfidential = $user->can('employee.view.sensitive') || $user->hasRole('admin');
+        $available = $this->availableMasterFields($request);
+
+        // Selected fields — keep only valid/allowed keys, in catalog order. Empty = all.
+        $requested = array_filter(array_map('trim', explode(',', (string) $request->query('fields'))));
+        $fields = array_values(array_filter(array_keys($available), fn ($k) => empty($requested) || in_array($k, $requested, true)));
+        if (empty($fields)) {
+            $fields = array_keys($available);
+        }
+
+        $format = in_array($request->query('format'), ['xlsx', 'csv', 'json'], true) ? $request->query('format') : 'json';
+
+        $deptIds = array_values(array_filter(array_map('intval', explode(',', (string) $request->query('department_ids')))));
+        $branchIds = array_values(array_filter(array_map('intval', explode(',', (string) $request->query('branch_ids')))));
+        $employeeId = (int) $request->query('employee_id');
+        $excludeInactive = filter_var($request->query('exclude_inactive'), FILTER_VALIDATE_BOOLEAN);
+
+        // Union of eager-loads the chosen columns need.
+        $with = [];
+        foreach ($fields as $k) {
+            foreach ($available[$k]['with'] ?? [] as $rel) {
+                $with[$rel] = true;
+            }
+        }
+
+        $employees = Employee::query()
+            ->withoutGlobalScope(\App\Domain\Identity\Scopes\CompanyScope::class)
+            ->where('employees.company_id', $user->active_company_id)
+            ->with(array_keys($with))
+            ->when($deptIds, fn ($q) => $q->whereIn('department_id', $deptIds))
+            ->when($branchIds, fn ($q) => $q->whereIn('branch_id', $branchIds))
+            ->when($employeeId, fn ($q) => $q->where('id', $employeeId))
+            ->when($excludeInactive, fn ($q) => $q->where('is_active', true))
+            ->orderBy('last_name')->orderBy('first_name')
+            ->get();
+
+        $render = function (Employee $e) use ($fields, $available, $canSeeConfidential): array {
+            $out = [];
+            foreach ($fields as $k) {
+                $f = $available[$k];
+                if (! empty($f['confidential']) && $e->is_confidential && ! $canSeeConfidential) {
+                    $out[$k] = '';
+                    continue;
+                }
+                $out[$k] = $f['resolve']($e);
+            }
+
+            return $out;
+        };
+
+        $columns = array_map(fn ($k) => ['key' => $k, 'label' => $available[$k]['label']], $fields);
+
+        if ($format === 'json') {
+            $limit = 100;
+            $total = $employees->count();
+            $rows = $employees->take($limit)->map($render)->values();
+
+            return response()->json([
+                'columns' => $columns,
+                'rows' => $rows,
+                'total' => $total,
+                'returned' => $rows->count(),
+                'truncated' => $total > $limit,
+            ]);
+        }
+
+        $headers = array_map(fn ($k) => $available[$k]['label'], $fields);
+        $stamp = now()->format('Ymd_His');
+
+        if ($format === 'csv') {
+            $filename = "employee_master_{$stamp}.csv";
+
+            return response()->streamDownload(function () use ($headers, $employees, $render) {
+                $out = fopen('php://output', 'w');
+                fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel reads accents correctly
+                fputcsv($out, $headers);
+                foreach ($employees as $e) {
+                    fputcsv($out, array_values($render($e)));
+                }
+                fclose($out);
+            }, $filename, [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+            ]);
+        }
+
+        $company = Company::find($user->active_company_id);
+        $data = $employees->map(fn ($e) => array_values($render($e)))->all();
+
+        return XlsxReport::download("employee_master_{$stamp}.xlsx", $headers, $data, [
+            'title' => ($company?->trade_name ?: $company?->legal_name ?: 'Company').' — Employee Master Data',
+            'subtitle' => 'Generated '.now()->format('M d, Y g:i A').'  ·  '.count($data).' employees',
+            'sheet' => 'Employees',
+        ]);
+    }
 }

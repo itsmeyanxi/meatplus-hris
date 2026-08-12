@@ -235,6 +235,8 @@ Route::prefix('v1')->group(function () {
         Route::get('leave-applications/{leaveApplication}/attachment', [LeaveApplicationController::class, 'attachment']);
 
         // Reports (CSV exports)
+        Route::get('reports/employee-master/fields', [ReportController::class, 'employeeMasterFields']);
+        Route::get('reports/employee-master', [ReportController::class, 'employeeMaster']);
         Route::get('reports/full-export', [ReportController::class, 'fullExport']);
         Route::get('reports/dtr', [ReportController::class, 'dtr']);
         Route::get('reports/attendance-summary', [ReportController::class, 'attendanceSummary']);
