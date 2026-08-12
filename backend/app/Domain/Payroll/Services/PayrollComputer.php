@@ -244,6 +244,7 @@ class PayrollComputer
         $daysWorked = 0.0;   // paid days: worked, approved leave, or a (paid) holiday
         $daysAbsent = 0;
         $scheduledDays = 0;  // days the employee was expected to work (not a rest day)
+        $presentDays = 0;    // days physically attended — drives the per-day (meal) allowance
         $lateMinutes = 0;
         $otMinutes = 0;
         $nightMinutes = 0;
@@ -260,6 +261,11 @@ class PayrollComputer
             } elseif (! $d->is_rest_day && ((float) $d->hours_worked > 0 || $d->actual_in || $d->is_on_leave || $d->holiday_type)) {
                 // Pay by the day's fraction — an official half-day pays 0.5.
                 $daysWorked += (float) ($d->day_fraction ?? 1.0);
+            }
+            // A day of attendance = physically present (worked hours or a punch), not
+            // a leave/holiday-off/absent day. Drives the per-day allowance below.
+            if (! $d->is_absent && ! $d->is_on_leave && ((float) $d->hours_worked > 0 || $d->actual_in)) {
+                $presentDays++;
             }
             $lateMinutes += (int) $d->late_minutes;
             $otMinutes += (int) $d->overtime_minutes;
@@ -303,9 +309,16 @@ class PayrollComputer
         }
         $absencesDeduction = 0.0;
         $allowance = round((float) $comp->allowance_monthly / 2, 2);
-        // De-minimis benefit (tax-exempt) from the payroll profile — fixed per
-        // cutoff (halved from the monthly figure), added to pay but NOT taxed.
-        $deMinimis = round((float) (EmployeePayrollProfile::where('employee_id', $comp->employee_id)->value('de_minimis') ?? 0) / 2, 2);
+        // Profile-based allowances (tax-exempt), each a MONTHLY figure monetized
+        // across the two cutoffs (halved), added to pay but NOT taxed. Fleet Card
+        // on the same profile is deliberately never read here.
+        $profile = EmployeePayrollProfile::where('employee_id', $comp->employee_id)->first();
+        $deMinimis = round((float) ($profile->de_minimis ?? 0) / 2, 2);
+        $commAllowance = round((float) ($profile->communication_allowance ?? 0) / 2, 2);
+        $transportAllowance = round((float) ($profile->transportation_allowance ?? 0) / 2, 2);
+        // Per-day allowance (e.g. meal): a PER-DAY rate × days actually attended this
+        // cutoff — so it scales with attendance, unlike the monthly allowances above.
+        $dailyAllowance = round((float) ($profile->daily_allowance ?? 0) * $presentDays, 2);
         $overtimePay = round(($otMinutes / 60) * $hourlyRate * 1.25, 2);
         $nightDiffPay = round(($nightMinutes / 60) * $hourlyRate * 0.10, 2); // 10% night differential
         $tardinessDeduction = round($lateMinutes * $minuteRate, 2);
@@ -313,7 +326,7 @@ class PayrollComputer
         // One-off adjustments for this run (bonus, backpay, uniform, correction…).
         [$otherEarnings, $otherDeductions, $adjustmentBreakdown] = $this->adjustmentsFor($run, $comp->employee_id);
 
-        $grossPay = round($basicPay + $allowance + $deMinimis + $overtimePay + $nightDiffPay + $holidayPremium + $restDayPremium + $otherEarnings, 2);
+        $grossPay = round($basicPay + $allowance + $deMinimis + $commAllowance + $transportAllowance + $dailyAllowance + $overtimePay + $nightDiffPay + $holidayPremium + $restDayPremium + $otherEarnings, 2);
 
         // Statutory + tax (monthly figures, split across two cutoffs).
         $contrib = $this->statutory->monthlyContributions($basicMonthly);
@@ -366,6 +379,9 @@ class PayrollComputer
             'other_earnings' => $otherEarnings,
             'allowance' => $allowance,
             'de_minimis' => $deMinimis,
+            'communication_allowance' => $commAllowance,
+            'transportation_allowance' => $transportAllowance,
+            'daily_allowance' => $dailyAllowance,
             'gross_pay' => $grossPay,
             'sss' => $sss,
             'philhealth' => $philhealth,

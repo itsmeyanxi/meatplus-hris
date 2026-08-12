@@ -42,9 +42,14 @@ class CompensationController extends Controller
                 'daily_rate' => $e->compensation?->daily_rate,
                 // "Non-Taxable Allowance" in the UI — the compensation record's allowance.
                 'allowance_monthly' => $e->compensation?->allowance_monthly,
-                // De minimis (paid, tax-exempt) and Fleet Card (tracked only, NOT paid)
-                // both live on the payroll profile.
+                // De minimis, communication & transportation allowances (all paid,
+                // tax-exempt) and Fleet Card (tracked only, NOT paid) live on the
+                // payroll profile.
                 'de_minimis' => $e->payrollProfile?->de_minimis,
+                'communication_allowance' => $e->payrollProfile?->communication_allowance,
+                'transportation_allowance' => $e->payrollProfile?->transportation_allowance,
+                // Meal allowance — a PER-DAY rate paid × days of attendance.
+                'daily_allowance' => $e->payrollProfile?->daily_allowance,
                 'fleet_card' => $e->payrollProfile?->fleet_card,
                 'has_compensation' => (bool) $e->compensation,
             ]);
@@ -112,7 +117,9 @@ class CompensationController extends Controller
             // De minimis (paid, tax-exempt) and Fleet Card (tracked only, never paid)
             // live on the payroll profile, not the versioned compensation row. Upsert
             // just those keys so the rest of the profile is left untouched.
-            $profileFields = array_intersect_key($data, array_flip(['de_minimis', 'fleet_card']));
+            $profileFields = array_intersect_key($data, array_flip([
+                'de_minimis', 'fleet_card', 'communication_allowance', 'transportation_allowance', 'daily_allowance',
+            ]));
             if ($profileFields) {
                 EmployeePayrollProfile::updateOrCreate(
                     ['employee_id' => $data['employee_id']],

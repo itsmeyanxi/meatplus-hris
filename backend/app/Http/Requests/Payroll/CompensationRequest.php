@@ -26,6 +26,9 @@ class CompensationRequest extends FormRequest
             // De minimis (paid, tax-exempt) and Fleet Card (tracked only) — saved to
             // the payroll profile alongside the salary record.
             'de_minimis' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
+            'communication_allowance' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
+            'transportation_allowance' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
+            'daily_allowance' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'fleet_card' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'effective_from' => ['nullable', 'date'],
         ];

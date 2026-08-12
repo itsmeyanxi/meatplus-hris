@@ -94,6 +94,9 @@ export default function PayslipDetailPage() {
             <LineRow label="Night Differential" value={peso(slip.night_diff_pay)} />
           )}
           <LineRow label="Allowances" value={peso(slip.allowance)} />
+          {Number(slip.daily_allowance ?? 0) > 0 && (
+            <LineRow label="Meal Allowance" value={peso(slip.daily_allowance ?? 0)} />
+          )}
           <LineRow label="Days Worked" value={`${Number(slip.days_worked)}`} />
           <LineRow label="Gross Pay" value={peso(slip.gross_pay)} bold />
         </AppCard>

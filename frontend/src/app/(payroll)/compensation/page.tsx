@@ -8,7 +8,7 @@ import { SearchSelect } from "@/components/SearchSelect";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { compensationApi, type CompRow } from "@/lib/payroll";
 
-type Edit = { payType: "monthly" | "daily"; rate: string; allowance: string; deMinimis: string; fleetCard: string; effectiveFrom: string };
+type Edit = { payType: "monthly" | "daily"; rate: string; allowance: string; deMinimis: string; commAllowance: string; transportAllowance: string; mealAllowance: string; fleetCard: string; effectiveFrom: string };
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -43,6 +43,9 @@ export default function CompensationPage() {
       : (r.basic_monthly != null ? String(r.basic_monthly) : ""),
     allowance: r.allowance_monthly != null ? String(r.allowance_monthly) : "",
     deMinimis: r.de_minimis != null ? String(r.de_minimis) : "",
+    commAllowance: r.communication_allowance != null ? String(r.communication_allowance) : "",
+    transportAllowance: r.transportation_allowance != null ? String(r.transportation_allowance) : "",
+    mealAllowance: r.daily_allowance != null ? String(r.daily_allowance) : "",
     fleetCard: r.fleet_card != null ? String(r.fleet_card) : "",
     effectiveFrom: TODAY,
   });
@@ -61,6 +64,9 @@ export default function CompensationPage() {
           : { basic_monthly: Number(e.rate || 0) }),
         allowance_monthly: Number(e.allowance || 0),
         de_minimis: Number(e.deMinimis || 0),
+        communication_allowance: Number(e.commAllowance || 0),
+        transportation_allowance: Number(e.transportAllowance || 0),
+        daily_allowance: Number(e.mealAllowance || 0),
         fleet_card: Number(e.fleetCard || 0),
         effective_from: e.effectiveFrom || TODAY,
       });
@@ -73,7 +79,7 @@ export default function CompensationPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Compensation" description="Set each employee's pay type and rate. Monthly = fixed salary; Daily = paid per day worked. Non-Taxable Allowance and De Minimis are added to pay (tax-exempt). Fleet Card is tracked only — it is never added to pay, tax, or net. The Effective date decides which payroll cutoff a new rate starts in." />
+      <PageHeader title="Compensation" description="Set each employee's pay type and rate. Monthly = fixed salary; Daily = paid per day worked. Non-Taxable Allowance, De Minimis, Communication and Transportation allowances are monthly figures added to pay (tax-exempt), monetized at half per semi-monthly cutoff. Fleet Card is tracked only — it is never added to pay, tax, or net. The Effective date decides which payroll cutoff a new rate starts in." />
 
       {!isLoading && rows && rows.length > 0 && (
         <div className="flex flex-wrap items-center gap-3">
@@ -127,6 +133,9 @@ export default function CompensationPage() {
                 <th className="px-4 py-3">Rate</th>
                 <th className="px-4 py-3">Non-Taxable Allowance</th>
                 <th className="px-4 py-3">De Minimis</th>
+                <th className="px-4 py-3">Communication <span className="font-normal normal-case text-slate-400">/ mo</span></th>
+                <th className="px-4 py-3">Transportation <span className="font-normal normal-case text-slate-400">/ mo</span></th>
+                <th className="px-4 py-3">Meal Allowance <span className="font-normal normal-case text-slate-400">/ day</span></th>
                 <th className="px-4 py-3">Fleet Card <span className="font-normal normal-case text-slate-400">(tracked only)</span></th>
                 <th className="px-4 py-3">Effective date <span className="text-rose-400">*</span></th>
                 <th className="px-4 py-3"></th>
@@ -188,6 +197,36 @@ export default function CompensationPage() {
                         value={e.deMinimis}
                         onChange={(ev) => patch(r, { deMinimis: ev.target.value })}
                         placeholder="0.00"
+                      />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <input
+                        type="number" min={0} step="0.01"
+                        className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-sm tabular-nums"
+                        value={e.commAllowance}
+                        onChange={(ev) => patch(r, { commAllowance: ev.target.value })}
+                        placeholder="0.00"
+                        title="Monthly communication allowance — paid at half per cutoff."
+                      />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <input
+                        type="number" min={0} step="0.01"
+                        className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-sm tabular-nums"
+                        value={e.transportAllowance}
+                        onChange={(ev) => patch(r, { transportAllowance: ev.target.value })}
+                        placeholder="0.00"
+                        title="Monthly transportation allowance — paid at half per cutoff."
+                      />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <input
+                        type="number" min={0} step="0.01"
+                        className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-sm tabular-nums"
+                        value={e.mealAllowance}
+                        onChange={(ev) => patch(r, { mealAllowance: ev.target.value })}
+                        placeholder="0.00"
+                        title="Per-day meal allowance — paid × the employee's days of attendance in the cutoff."
                       />
                     </td>
                     <td className="px-4 py-2.5">

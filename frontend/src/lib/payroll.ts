@@ -32,6 +32,9 @@ export type Payslip = {
   other_earnings?: string | number;
   allowance: string | number;
   de_minimis?: string | number;
+  communication_allowance?: string | number;
+  transportation_allowance?: string | number;
+  daily_allowance?: string | number;
   gross_pay: string | number;
   sss: string | number;
   sss_regular?: string | number;
@@ -146,6 +149,7 @@ export type CompRow = {
   de_minimis?: string | number | null;
   communication_allowance?: string | number | null;
   transportation_allowance?: string | number | null;
+  daily_allowance?: string | number | null;
   fleet_card?: string | number | null;
   has_compensation: boolean;
 };
@@ -272,6 +276,7 @@ export const compensationApi = {
     de_minimis?: number;
     communication_allowance?: number;
     transportation_allowance?: number;
+    daily_allowance?: number;
     fleet_card?: number;
     effective_from?: string | null;
   }) => (await api.post("/api/v1/compensations", body)).data,

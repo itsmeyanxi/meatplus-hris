@@ -82,6 +82,7 @@ class PayslipController extends Controller
             }
         };
         $add($compensation, 'DE MINIMIS BENEFITS', (float) $p->de_minimis);
+        $add($compensation, 'MEAL ALLOWANCE', (float) $p->daily_allowance);
         $add($compensation, 'Non-Taxable Allowance', (float) $p->allowance);
         $add($compensation, 'OVERTIME ADJUSTMENT', (float) $p->overtime_pay);
         $add($compensation, 'HOLIDAY PAY', (float) $p->holiday_pay);
