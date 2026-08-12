@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Payroll;
 
 use App\Domain\HRIS\Models\Employee;
 use App\Domain\Payroll\Models\EmployeeCompensation;
+use App\Domain\Payroll\Models\EmployeePayrollProfile;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Payroll\CompensationRequest;
 use Illuminate\Http\JsonResponse;
@@ -27,7 +28,7 @@ class CompensationController extends Controller
         $employees = Employee::query()
             ->where('is_active', true)
             ->when(! $canSeeConfidential, fn ($q) => $q->where('is_confidential', false))
-            ->with(['department:id,name', 'compensation'])
+            ->with(['department:id,name', 'compensation', 'payrollProfile'])
             ->orderBy('last_name')->orderBy('first_name')
             ->get()
             ->map(fn (Employee $e) => [
@@ -39,7 +40,12 @@ class CompensationController extends Controller
                 'basic_monthly' => $e->compensation?->basic_monthly,
                 'pay_type' => $e->compensation?->pay_type ?? 'monthly',
                 'daily_rate' => $e->compensation?->daily_rate,
+                // "Non-Taxable Allowance" in the UI — the compensation record's allowance.
                 'allowance_monthly' => $e->compensation?->allowance_monthly,
+                // De minimis (paid, tax-exempt) and Fleet Card (tracked only, NOT paid)
+                // both live on the payroll profile.
+                'de_minimis' => $e->payrollProfile?->de_minimis,
+                'fleet_card' => $e->payrollProfile?->fleet_card,
                 'has_compensation' => (bool) $e->compensation,
             ]);
 
@@ -92,7 +98,7 @@ class CompensationController extends Controller
             // equivalent (rate × 22) when not given, so reports/displays still show a figure.
             $basicMonthly = $data['basic_monthly'] ?? ($dailyRate !== null ? round((float) $dailyRate * 22, 2) : null);
 
-            return EmployeeCompensation::create([
+            $comp = EmployeeCompensation::create([
                 'employee_id' => $data['employee_id'],
                 'company_id' => $request->user()->active_company_id,
                 'pay_type' => $payType,
@@ -102,6 +108,19 @@ class CompensationController extends Controller
                 'effective_from' => $data['effective_from'] ?? null,
                 'is_active' => true,
             ]);
+
+            // De minimis (paid, tax-exempt) and Fleet Card (tracked only, never paid)
+            // live on the payroll profile, not the versioned compensation row. Upsert
+            // just those keys so the rest of the profile is left untouched.
+            $profileFields = array_intersect_key($data, array_flip(['de_minimis', 'fleet_card']));
+            if ($profileFields) {
+                EmployeePayrollProfile::updateOrCreate(
+                    ['employee_id' => $data['employee_id']],
+                    $profileFields,
+                );
+            }
+
+            return $comp;
         });
 
         return response()->json([

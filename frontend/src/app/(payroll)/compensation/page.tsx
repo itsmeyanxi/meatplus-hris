@@ -8,7 +8,7 @@ import { SearchSelect } from "@/components/SearchSelect";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { compensationApi, type CompRow } from "@/lib/payroll";
 
-type Edit = { payType: "monthly" | "daily"; rate: string; allowance: string; effectiveFrom: string };
+type Edit = { payType: "monthly" | "daily"; rate: string; allowance: string; deMinimis: string; fleetCard: string; effectiveFrom: string };
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -42,6 +42,8 @@ export default function CompensationPage() {
       ? (r.daily_rate != null ? String(r.daily_rate) : "")
       : (r.basic_monthly != null ? String(r.basic_monthly) : ""),
     allowance: r.allowance_monthly != null ? String(r.allowance_monthly) : "",
+    deMinimis: r.de_minimis != null ? String(r.de_minimis) : "",
+    fleetCard: r.fleet_card != null ? String(r.fleet_card) : "",
     effectiveFrom: TODAY,
   });
   const cur = (r: CompRow): Edit => edits[r.employee_id] ?? base(r);
@@ -58,6 +60,8 @@ export default function CompensationPage() {
           ? { daily_rate: Number(e.rate || 0) }
           : { basic_monthly: Number(e.rate || 0) }),
         allowance_monthly: Number(e.allowance || 0),
+        de_minimis: Number(e.deMinimis || 0),
+        fleet_card: Number(e.fleetCard || 0),
         effective_from: e.effectiveFrom || TODAY,
       });
     },
@@ -69,7 +73,7 @@ export default function CompensationPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Compensation" description="Set each employee's pay type and rate. Monthly = fixed salary; Daily = paid per day worked. The Effective date decides which payroll cutoff a new rate starts in — a raise effective mid-cutoff is paid at the new rate for that cutoff." />
+      <PageHeader title="Compensation" description="Set each employee's pay type and rate. Monthly = fixed salary; Daily = paid per day worked. Non-Taxable Allowance and De Minimis are added to pay (tax-exempt). Fleet Card is tracked only — it is never added to pay, tax, or net. The Effective date decides which payroll cutoff a new rate starts in." />
 
       {!isLoading && rows && rows.length > 0 && (
         <div className="flex flex-wrap items-center gap-3">
@@ -121,7 +125,9 @@ export default function CompensationPage() {
                 <th className="px-4 py-3">Department</th>
                 <th className="px-4 py-3">Pay type</th>
                 <th className="px-4 py-3">Rate</th>
-                <th className="px-4 py-3">Allowance / month</th>
+                <th className="px-4 py-3">Non-Taxable Allowance</th>
+                <th className="px-4 py-3">De Minimis</th>
+                <th className="px-4 py-3">Fleet Card <span className="font-normal normal-case text-slate-400">(tracked only)</span></th>
                 <th className="px-4 py-3">Effective date <span className="text-rose-400">*</span></th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -173,6 +179,25 @@ export default function CompensationPage() {
                         value={e.allowance}
                         onChange={(ev) => patch(r, { allowance: ev.target.value })}
                         placeholder="0.00"
+                      />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <input
+                        type="number" min={0} step="0.01"
+                        className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-sm tabular-nums"
+                        value={e.deMinimis}
+                        onChange={(ev) => patch(r, { deMinimis: ev.target.value })}
+                        placeholder="0.00"
+                      />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <input
+                        type="number" min={0} step="0.01"
+                        className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-sm tabular-nums"
+                        value={e.fleetCard}
+                        onChange={(ev) => patch(r, { fleetCard: ev.target.value })}
+                        placeholder="0.00"
+                        title="Fleet Card is tracked only — it is not added to pay, tax, or net."
                       />
                     </td>
                     <td className="px-4 py-2.5">

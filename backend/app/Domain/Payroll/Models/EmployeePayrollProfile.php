@@ -13,7 +13,7 @@ class EmployeePayrollProfile extends Model
     protected $fillable = [
         'employee_id',
         'work_days_per_year', 'cost_center', 'is_rohq',
-        'is_minimum_wage_earner', 'daily_allowance', 'de_minimis',
+        'is_minimum_wage_earner', 'daily_allowance', 'de_minimis', 'fleet_card',
         'pay_group', 'consultant_percent_tax', 'work_hours_per_day', 'ot_computation_table',
         'sss_contribution_mode', 'sss_fixed_amount',
         'hdmf_contribution_mode', 'hdmf_additional',
@@ -34,6 +34,7 @@ class EmployeePayrollProfile extends Model
             'has_previous_employment' => 'boolean',
             'daily_allowance' => 'decimal:2',
             'de_minimis' => 'decimal:2',
+            'fleet_card' => 'decimal:2',
             'consultant_percent_tax' => 'decimal:2',
             'work_hours_per_day' => 'decimal:2',
             'sss_fixed_amount' => 'decimal:2',

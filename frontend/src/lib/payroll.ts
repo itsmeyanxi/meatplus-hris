@@ -135,6 +135,8 @@ export type CompRow = {
   pay_type?: "monthly" | "daily";
   daily_rate?: string | number | null;
   allowance_monthly: string | number | null;
+  de_minimis?: string | number | null;
+  fleet_card?: string | number | null;
   has_compensation: boolean;
 };
 
@@ -257,6 +259,8 @@ export const compensationApi = {
     basic_monthly?: number;
     daily_rate?: number;
     allowance_monthly?: number;
+    de_minimis?: number;
+    fleet_card?: number;
     effective_from?: string | null;
   }) => (await api.post("/api/v1/compensations", body)).data,
 
