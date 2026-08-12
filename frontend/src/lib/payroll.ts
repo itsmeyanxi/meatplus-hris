@@ -130,12 +130,15 @@ export type CompRow = {
   employee_no: string;
   name: string;
   department: string | null;
+  is_confidential?: boolean;
   basic_monthly: string | number | null;
   pay_type?: "monthly" | "daily";
   daily_rate?: string | number | null;
   allowance_monthly: string | number | null;
   has_compensation: boolean;
 };
+
+export type CompList = { rows: CompRow[]; canSeeConfidential: boolean };
 
 export type NewRunInput = {
   name: string;
@@ -243,9 +246,9 @@ export type SalaryRecord = {
 };
 
 export const compensationApi = {
-  list: async (): Promise<CompRow[]> => {
-    const { data } = await api.get<Listed<CompRow>>("/api/v1/compensations");
-    return data.data;
+  list: async (): Promise<CompList> => {
+    const { data } = await api.get<Listed<CompRow> & { can_see_confidential?: boolean }>("/api/v1/compensations");
+    return { rows: data.data, canSeeConfidential: !!data.can_see_confidential };
   },
   /** Appends a new salary record and closes the previous one. */
   save: async (body: {

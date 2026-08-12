@@ -15,10 +15,18 @@ class CompensationController extends Controller
     /** List employees with their current monthly compensation (for the payroll setup grid). */
     public function index(Request $request): JsonResponse
     {
-        abort_unless($request->user()->can('compensation.view') || $request->user()->can('payroll.view'), 403);
+        $user = $request->user();
+        abort_unless($user->can('compensation.view') || $user->can('payroll.view'), 403);
+
+        // Confidential employees' pay is visible only to hr_confi (the sensitive
+        // permission) or the company `admin` role — everyone else never sees a
+        // confidential row here at all. Filtered in the query, not just hidden in
+        // the UI, so the pay figures never leave the server for the wrong viewer.
+        $canSeeConfidential = $this->canSeeConfidential($request);
 
         $employees = Employee::query()
             ->where('is_active', true)
+            ->when(! $canSeeConfidential, fn ($q) => $q->where('is_confidential', false))
             ->with(['department:id,name', 'compensation'])
             ->orderBy('last_name')->orderBy('first_name')
             ->get()
@@ -27,6 +35,7 @@ class CompensationController extends Controller
                 'employee_no' => $e->employee_no,
                 'name' => $e->full_name,
                 'department' => $e->department?->name,
+                'is_confidential' => (bool) $e->is_confidential,
                 'basic_monthly' => $e->compensation?->basic_monthly,
                 'pay_type' => $e->compensation?->pay_type ?? 'monthly',
                 'daily_rate' => $e->compensation?->daily_rate,
@@ -34,7 +43,22 @@ class CompensationController extends Controller
                 'has_compensation' => (bool) $e->compensation,
             ]);
 
-        return response()->json(['data' => $employees]);
+        return response()->json([
+            'data' => $employees,
+            'can_see_confidential' => $canSeeConfidential,
+        ]);
+    }
+
+    /**
+     * May this user see confidential employees' compensation? Reserved for the
+     * hr_confi role (employee.view.sensitive) plus the company `admin` role — this
+     * page's deliberate exception to hr_confi being the sole holder elsewhere.
+     */
+    private function canSeeConfidential(Request $request): bool
+    {
+        $user = $request->user();
+
+        return $user->can('employee.view.sensitive') || $user->hasRole('admin');
     }
 
     /**
@@ -48,6 +72,13 @@ class CompensationController extends Controller
     public function store(CompensationRequest $request): JsonResponse
     {
         $data = $request->validated();
+
+        // A confidential employee's pay can only be set by someone allowed to see
+        // it — otherwise the confidential wall could be bypassed by POSTing an id.
+        if (! $this->canSeeConfidential($request)) {
+            $target = Employee::query()->find($data['employee_id']);
+            abort_if($target?->is_confidential, 403, 'You are not allowed to set this employee\'s compensation.');
+        }
 
         $comp = DB::transaction(function () use ($request, $data) {
             EmployeeCompensation::query()
@@ -90,6 +121,10 @@ class CompensationController extends Controller
             $request->user()->can('compensation.view') || $request->user()->can('payroll.view'),
             403,
         );
+
+        // Don't leak a confidential employee's salary history to a viewer who
+        // isn't allowed to see confidential pay.
+        abort_if($employee->is_confidential && ! $this->canSeeConfidential($request), 403);
 
         return response()->json([
             'data' => $employee->compensations()->get()->map(fn (EmployeeCompensation $c) => [
