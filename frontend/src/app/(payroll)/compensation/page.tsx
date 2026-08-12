@@ -157,7 +157,16 @@ export default function CompensationPage() {
                           </span>
                         )}
                       </div>
-                      <div className="font-mono text-xs text-slate-400">{r.employee_no}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-slate-400">{r.employee_no}</span>
+                        <button
+                          onClick={() => setBenefitsFor(r)}
+                          title="Add other benefits / allowances for this employee"
+                          className="rounded border border-brand-200 px-1.5 py-0.5 text-[11px] font-semibold text-brand-700 transition hover:bg-brand-50"
+                        >
+                          ＋ Benefit
+                        </button>
+                      </div>
                     </td>
                     <td className="px-4 py-2.5 text-slate-600">{r.department ?? "—"}</td>
                     <td className="px-4 py-2.5">
@@ -251,23 +260,14 @@ export default function CompensationPage() {
                       />
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => setBenefitsFor(r)}
-                          title="Add other benefits / allowances for this employee"
-                          className="rounded-md border border-brand-200 px-2.5 py-1 text-xs font-medium text-brand-700 transition hover:bg-brand-50"
-                        >
-                          ＋ Benefit
-                        </button>
-                        <button
-                          onClick={() => save.mutate(r)}
-                          disabled={save.isPending || !e.effectiveFrom}
-                          title={!e.effectiveFrom ? "Set an effective date first" : "Save this rate"}
-                          className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-40"
-                        >
-                          Save
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => save.mutate(r)}
+                        disabled={save.isPending || !e.effectiveFrom}
+                        title={!e.effectiveFrom ? "Set an effective date first" : "Save this rate"}
+                        className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-40"
+                      >
+                        Save
+                      </button>
                     </td>
                   </tr>
                 );
