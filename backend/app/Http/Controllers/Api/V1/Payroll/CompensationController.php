@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Api\V1\Payroll;
 use App\Domain\HRIS\Models\Employee;
 use App\Domain\Payroll\Models\EmployeeCompensation;
 use App\Domain\Payroll\Models\EmployeePayrollProfile;
+use App\Domain\Payroll\Services\CompensationImportService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Payroll\CompensationRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CompensationController extends Controller
 {
@@ -138,6 +140,49 @@ class CompensationController extends Controller
                 'allowance_monthly' => $comp->allowance_monthly,
             ],
         ]);
+    }
+
+    /** Bulk-import compensation (rate + allowances) from a CSV/XLSX. */
+    public function import(Request $request, CompensationImportService $service): JsonResponse
+    {
+        abort_unless($request->user()->can('compensation.manage'), 403);
+        $request->validate(['file' => ['required', 'file', 'max:5120']]);
+
+        $file = $request->file('file');
+        $head = @file_get_contents($file->getRealPath(), false, null, 0, 8) ?: '';
+        $ext = str_starts_with($head, "PK\x03\x04") ? 'xlsx' : (str_starts_with($head, "\xD0\xCF\x11\xE0") ? null : 'csv');
+        if ($ext === null) {
+            return response()->json(['message' => 'Unsupported file. Upload a .csv or .xlsx.'], 422);
+        }
+
+        return response()->json($service->import(
+            $file->getRealPath(),
+            $ext,
+            (int) $request->user()->active_company_id,
+            $this->canSeeConfidential($request),
+        ));
+    }
+
+    /** CSV template for the compensation bulk upload. */
+    public function importTemplate(Request $request): StreamedResponse
+    {
+        abort_unless($request->user()->can('compensation.manage'), 403);
+
+        $header = ['Employee ID', 'Pay Type', 'Rate', 'Non-Taxable Allowance', 'De Minimis', 'Communication', 'Transportation', 'Meal Allowance', 'Fleet Card', 'Effective Date'];
+        $examples = [
+            ['3480103', 'Monthly', '22000', '3000', '1500', '0', '0', '0', '0', now()->toDateString()],
+            ['3480065', 'Daily', '900', '0', '1500', '0', '0', '100', '0', now()->toDateString()],
+        ];
+
+        return response()->streamDownload(function () use ($header, $examples) {
+            $o = fopen('php://output', 'w');
+            fputcsv($o, ['Only the columns you include are updated (leave a column out to keep it as-is). Rate = monthly salary, or the daily rate when Pay Type is Daily. Meal Allowance is per day of attendance.']);
+            fputcsv($o, $header);
+            foreach ($examples as $ex) {
+                fputcsv($o, $ex);
+            }
+            fclose($o);
+        }, 'compensation_import_template.csv', ['Content-Type' => 'text/csv']);
     }
 
     /** Salary history for one employee, newest first. */

@@ -308,7 +308,15 @@ export const compensationApi = {
   },
   destroy: (employeeId: number, id: number) =>
     api.delete(`/api/v1/employees/${employeeId}/compensations/${id}`),
+  importTemplateUrl: "/api/v1/compensations/import/template",
+  import: async (file: File): Promise<CompImportResult> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return (await api.post<CompImportResult>("/api/v1/compensations/import", fd)).data;
+  },
 };
+
+export type CompImportResult = { created: number; updated: number; skipped: number; total: number; errors: { row: number; message: string }[] };
 
 // ── Employee's own payslips ─────────────────────────────────────────────────
 

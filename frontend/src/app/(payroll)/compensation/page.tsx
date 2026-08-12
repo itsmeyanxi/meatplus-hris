@@ -1,12 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader, TableShell } from "@/components/ui";
 import { SearchSelect } from "@/components/SearchSelect";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
-import { compensationApi, type CompRow } from "@/lib/payroll";
+import { compensationApi, type CompRow, type CompImportResult } from "@/lib/payroll";
 import { EmployeeBenefitsModal } from "@/components/payroll/EmployeeBenefitsModal";
 
 type Edit = { payType: "monthly" | "daily"; rate: string; allowance: string; deMinimis: string; commAllowance: string; transportAllowance: string; mealAllowance: string; fleetCard: string; effectiveFrom: string };
@@ -79,6 +79,24 @@ export default function CompensationPage() {
     },
   });
 
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [importResult, setImportResult] = useState<CompImportResult | null>(null);
+  const importComp = useMutation({
+    mutationFn: (file: File) => compensationApi.import(file),
+    onSuccess: (res) => {
+      setImportResult(res);
+      const touched = res.created + res.updated;
+      if (touched > 0) { toast.success(`Compensation updated for ${touched} employee${touched === 1 ? "" : "s"}.`); qc.invalidateQueries({ queryKey: ["compensations"] }); }
+      else if (res.errors.length === 0) toast.message("No changes found in the file.");
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Import failed."),
+  });
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) { setImportResult(null); importComp.mutate(f); }
+    e.target.value = "";
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader title="Compensation" description="Set each employee's pay type and rate. Monthly = fixed salary; Daily = paid per day worked. Non-Taxable Allowance, De Minimis, Communication and Transportation allowances are monthly figures added to pay (tax-exempt), monetized at half per semi-monthly cutoff. Fleet Card is tracked only — it is never added to pay, tax, or net. The Effective date decides which payroll cutoff a new rate starts in." />
@@ -115,6 +133,40 @@ export default function CompensationPage() {
             </div>
           )}
           <span className="text-xs text-slate-400">{visibleRows.length} shown</span>
+          <div className="ml-auto flex items-center gap-2">
+            <a
+              href={compensationApi.importTemplateUrl}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              title="Download the compensation upload template (CSV)"
+            >
+              Template
+            </a>
+            <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={onPickFile} />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={importComp.isPending}
+              className="rounded-lg border border-brand-600 px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+              title="Bulk-upload rates & allowances from a CSV/Excel"
+            >
+              {importComp.isPending ? "Importing…" : "⬆ Import"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {importResult && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+          <p className="font-semibold text-slate-700">
+            Updated <span className="text-emerald-700">{importResult.created + importResult.updated}</span> employee(s)
+            {importResult.skipped > 0 && <> · skipped {importResult.skipped}</>}
+            {importResult.errors.length > 0 && <> · <span className="text-rose-700">{importResult.errors.length} issue{importResult.errors.length === 1 ? "" : "s"}</span></>}
+          </p>
+          {importResult.errors.length > 0 && (
+            <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-rose-700">
+              {importResult.errors.slice(0, 8).map((er, i) => <li key={i}>Row {er.row}: {er.message}</li>)}
+              {importResult.errors.length > 8 && <li>…and {importResult.errors.length - 8} more.</li>}
+            </ul>
+          )}
         </div>
       )}
 
