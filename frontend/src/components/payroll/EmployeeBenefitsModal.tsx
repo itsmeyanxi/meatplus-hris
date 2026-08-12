@@ -20,11 +20,12 @@ export function EmployeeBenefitsModal({ employeeId, employeeName, onClose }: { e
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
   const [cadence, setCadence] = useState<PayItemCadence>("monthly");
+  const [taxable, setTaxable] = useState(false);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: key });
   const add = useMutation({
-    mutationFn: () => payItemsApi.create({ employee_id: employeeId, label: label.trim(), amount: Number(amount), cadence }),
-    onSuccess: () => { toast.success("Benefit added — press Compute on the run to apply."); setLabel(""); setAmount(""); setCadence("monthly"); invalidate(); },
+    mutationFn: () => payItemsApi.create({ employee_id: employeeId, label: label.trim(), amount: Number(amount), cadence, taxable }),
+    onSuccess: () => { toast.success("Benefit added — press Compute on the run to apply."); setLabel(""); setAmount(""); setCadence("monthly"); setTaxable(false); invalidate(); },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Failed to add."),
   });
   const remove = useMutation({
@@ -44,7 +45,7 @@ export function EmployeeBenefitsModal({ employeeId, employeeName, onClose }: { e
         </div>
         <p className="mb-4 text-sm text-slate-500">{employeeName} — add any recurring benefit. It's added to pay on the next Compute.</p>
 
-        <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 sm:grid-cols-[1fr_7rem_9rem_auto] sm:items-end">
+        <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 sm:grid-cols-[1fr_6rem_8rem_8rem_auto] sm:items-end">
           <div>
             <label className={labelCls}>Benefit name</label>
             <input className={inputCls} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Rice subsidy, HMO, Hazard pay" />
@@ -58,12 +59,19 @@ export function EmployeeBenefitsModal({ employeeId, employeeName, onClose }: { e
             <SearchSelect className={inputCls} value={cadence} onChange={(v) => setCadence(v as PayItemCadence)}
               options={PAY_ITEM_CADENCES.map((c) => ({ value: c.value, label: c.label }))} />
           </div>
+          <div>
+            <label className={labelCls}>Tax</label>
+            <SearchSelect className={inputCls} value={taxable ? "1" : "0"} onChange={(v) => setTaxable(v === "1")}
+              options={[{ value: "0", label: "Non-taxable" }, { value: "1", label: "Taxable" }]} />
+          </div>
           <button onClick={() => add.mutate()} disabled={!canAdd || add.isPending}
             className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
             Add
           </button>
         </div>
-        <p className="-mt-2 mb-4 text-xs text-slate-400">{PAY_ITEM_CADENCES.find((c) => c.value === cadence)?.hint}</p>
+        <p className="-mt-2 mb-4 text-xs text-slate-400">
+          {PAY_ITEM_CADENCES.find((c) => c.value === cadence)?.hint}. {taxable ? "Taxable — added to the withholding-tax base." : "Non-taxable — added to pay but not taxed."}
+        </p>
 
         {isLoading ? (
           <p className="py-4 text-center text-sm text-slate-400">Loading…</p>
@@ -77,6 +85,9 @@ export function EmployeeBenefitsModal({ employeeId, employeeName, onClose }: { e
                   <span className="text-sm font-medium text-slate-800">{it.label}</span>
                   <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">{peso(it.amount)}</span>
                   <span className="ml-2 text-xs text-slate-400">{cadenceLabel(it.cadence)}</span>
+                  <span className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-semibold ${it.taxable ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
+                    {it.taxable ? "Taxable" : "Non-taxable"}
+                  </span>
                   {!it.is_active && <span className="ml-2 text-xs text-rose-500">paused</span>}
                 </div>
                 <button onClick={() => remove.mutate(it.id)} disabled={remove.isPending} className="text-xs font-medium text-rose-600 hover:underline disabled:opacity-50">Remove</button>

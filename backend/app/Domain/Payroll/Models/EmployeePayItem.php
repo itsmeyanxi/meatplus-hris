@@ -17,13 +17,14 @@ class EmployeePayItem extends Model
     use BelongsToCompany;
 
     protected $fillable = [
-        'company_id', 'employee_id', 'label', 'amount', 'cadence', 'is_active', 'notes',
+        'company_id', 'employee_id', 'label', 'amount', 'cadence', 'taxable', 'is_active', 'notes',
     ];
 
     protected function casts(): array
     {
         return [
             'amount' => 'decimal:2',
+            'taxable' => 'boolean',
             'is_active' => 'boolean',
         ];
     }

@@ -322,6 +322,7 @@ class PayrollComputer
 
         // HR-defined recurring benefits/allowances, each paid by its cadence.
         $customBenefits = 0.0;
+        $taxableBenefits = 0.0; // the subset flagged taxable — folded into the tax base below
         $benefitLines = [];
         foreach (\App\Domain\Payroll\Models\EmployeePayItem::query()
             ->where('employee_id', $comp->employee_id)->where('is_active', true)->get() as $item) {
@@ -330,9 +331,13 @@ class PayrollComputer
                 continue;
             }
             $customBenefits += $amt;
-            $benefitLines[] = ['label' => $item->label, 'cadence' => $item->cadence, 'amount' => $amt];
+            if ($item->taxable) {
+                $taxableBenefits += $amt;
+            }
+            $benefitLines[] = ['label' => $item->label, 'cadence' => $item->cadence, 'amount' => $amt, 'taxable' => (bool) $item->taxable];
         }
         $customBenefits = round($customBenefits, 2);
+        $taxableBenefits = round($taxableBenefits, 2);
         $overtimePay = round(($otMinutes / 60) * $hourlyRate * 1.25, 2);
         $nightDiffPay = round(($nightMinutes / 60) * $hourlyRate * 0.10, 2); // 10% night differential
         $tardinessDeduction = round($lateMinutes * $minuteRate, 2);
@@ -354,7 +359,9 @@ class PayrollComputer
         $sssRegular = round(($sssParts['regular_ee'] ?? 0) / 2, 2);
         $sssWisp = round($sss - $sssRegular, 2);
 
-        $taxableMonthly = max(0, $basicMonthly - ($contrib['sss'] + $contrib['philhealth'] + $contrib['pagibig']));
+        // Taxable benefits add to the taxable base. Tax is computed monthly then
+        // halved, so use the benefit's monthly equivalent (this cutoff's amount × 2).
+        $taxableMonthly = max(0, $basicMonthly + ($taxableBenefits * 2) - ($contrib['sss'] + $contrib['philhealth'] + $contrib['pagibig']));
         $tax = round($this->statutory->monthlyTax($taxableMonthly) / 2, 2);
 
         // Recurring loan amortizations (capped at each loan's remaining balance).

@@ -43,6 +43,7 @@ class EmployeePayItemController extends Controller
             'label' => $data['label'],
             'amount' => $data['amount'],
             'cadence' => $data['cadence'],
+            'taxable' => $data['taxable'] ?? false,
             'is_active' => $data['is_active'] ?? true,
             'notes' => $data['notes'] ?? null,
         ]);
@@ -77,6 +78,7 @@ class EmployeePayItemController extends Controller
             'label' => [Rule::requiredIf($creating), 'string', 'max:100'],
             'amount' => [Rule::requiredIf($creating), 'numeric', 'min:0', 'max:99999999'],
             'cadence' => [Rule::requiredIf($creating), Rule::in(EmployeePayItem::CADENCES)],
+            'taxable' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
             'notes' => ['nullable', 'string', 'max:255'],
         ]);
@@ -99,6 +101,7 @@ class EmployeePayItemController extends Controller
             'label' => $i->label,
             'amount' => (float) $i->amount,
             'cadence' => $i->cadence,
+            'taxable' => (bool) $i->taxable,
             'is_active' => (bool) $i->is_active,
             'notes' => $i->notes,
         ];
