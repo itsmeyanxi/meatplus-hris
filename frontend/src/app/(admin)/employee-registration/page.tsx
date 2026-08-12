@@ -970,6 +970,7 @@ export default function EmployeeRegistrationPage() {
                         photoPreview={photoPreview}
                         photoError={photoError}
                         onPickPhoto={pickPhoto}
+                        supervisors={supervisors?.data}
                       />
                     )}
                     {section.key === "work"        && (
@@ -1137,13 +1138,17 @@ export default function EmployeeRegistrationPage() {
 
 type FF = ReturnType<typeof useForm<FormInput, unknown, FormValues>>;
 
-function BasicSection({ form, photoPreview, photoError, onPickPhoto }: {
+function BasicSection({ form, photoPreview, photoError, onPickPhoto, supervisors }: {
   form: FF;
   photoPreview: string | null;
   photoError: string | null;
   onPickPhoto: (file: File | null) => void;
+  supervisors?: EmployeeListItem[];
 }) {
   const E = form.formState.errors;
+  // Same field as the one in Work Information — both read/write manager_employee_id,
+  // so a pick here shows there and vice-versa.
+  const selectedSup = supervisors?.find((s) => String(s.id) === String(form.watch("manager_employee_id")));
   return (
     <div className="flex flex-col gap-6 md:flex-row">
       {/* Photo */}
@@ -1235,6 +1240,57 @@ function BasicSection({ form, photoPreview, photoError, onPickPhoto }: {
           <Field label="Suffix"><Input {...form.register("suffix")} placeholder="Jr., III…" /></Field>
           <Field label="Nationality"><Input {...form.register("nationality")} /></Field>
         </Grid>
+
+        {/* Immediate Supervisor / Manager — a searchable picker plus a table of who
+            is set. Backed by manager_employee_id (same field as Work Information). */}
+        <div className="rounded-xl border border-slate-200">
+          <div className="border-b border-slate-100 bg-slate-50 px-4 py-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Immediate Supervisor / Manager</h4>
+          </div>
+          <div className="space-y-3 p-4">
+            <SearchSelect
+              value={String(form.watch("manager_employee_id") ?? "")}
+              onChange={(v) => form.setValue("manager_employee_id", v ? Number(v) : "")}
+              placeholder="Search an employee to set as supervisor…"
+              options={[
+                { value: "", label: "— None —" },
+                ...(supervisors?.map((s) => ({ value: String(s.id), label: `${s.full_name} (${s.employee_no})` })) ?? []),
+              ]}
+            />
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-slate-400">
+                  <th className="pb-1 font-semibold">Name</th>
+                  <th className="pb-1 font-semibold">Employee No</th>
+                  <th className="pb-1"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedSup ? (
+                  <tr className="border-t border-slate-100">
+                    <td className="py-2 font-medium text-slate-700">{selectedSup.full_name}</td>
+                    <td className="py-2 font-mono text-xs text-slate-500">{selectedSup.employee_no}</td>
+                    <td className="py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => form.setValue("manager_employee_id", "")}
+                        className="text-xs font-medium text-red-500 transition hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr className="border-t border-slate-100">
+                    <td colSpan={3} className="py-2 text-xs text-slate-400">
+                      No supervisor selected yet{supervisors?.length ? "." : " — pick a company first (defaults to your active company)."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );
