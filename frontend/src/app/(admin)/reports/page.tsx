@@ -12,6 +12,7 @@ import {
   type MasterField,
   type MasterPreview,
 } from "@/lib/reports";
+import { ImportEmployeesModal } from "@/components/employees/ImportEmployeesModal";
 
 // Columns pre-ticked on first load — the common identity + job fields. Any that
 // the viewer can't access (e.g. pay columns) are simply skipped.
@@ -35,6 +36,7 @@ export default function ReportsPage() {
   const [branchIds, setBranchIds] = useState<number[]>([]);
   const [employeeId, setEmployeeId] = useState<number | "">("");
   const [excludeInactive, setExcludeInactive] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   const [preview, setPreview] = useState<MasterPreview | null>(null);
   const [busy, setBusy] = useState<null | "search" | "xlsx" | "csv">(null);
@@ -84,7 +86,17 @@ export default function ReportsPage() {
     }
   };
 
-  const organicBranches = branches.filter((b) => !(b as { is_agency?: boolean }).is_agency);
+  // Split the branch filter so worksites, agencies and project crews are clearly
+  // separate (they were previously lumped into one "Location" list). All three
+  // feed the same branch_ids selection.
+  const locationBranches = branches.filter((b) => !b.is_agency && !b.is_project_crew);
+  const agencyBranches = branches.filter((b) => b.is_agency);
+  const projectBranches = branches.filter((b) => b.is_project_crew);
+
+  // Columns that round-trip through Employees → Import (fill new rows, re-upload).
+  const importableKeys = useMemo(() => allFields.filter((f) => f.importable).map((f) => f.key), [allFields]);
+  const selectImportTemplate = () => setSelected(new Set(importableKeys));
+  const activeCompanies = fieldsData?.company ? [{ id: fieldsData.company.id, name: fieldsData.company.name }] : [];
 
   return (
     <div className="space-y-6">
@@ -118,17 +130,27 @@ export default function ReportsPage() {
         </div>
 
         <ChipFilter label="Department" items={departments.map((d) => ({ id: d.id, name: d.name ?? "" }))} selected={deptIds} onToggle={(id) => setDeptIds((a) => toggleIn(a, id))} onClear={() => setDeptIds([])} />
-        <ChipFilter label="Location" items={organicBranches.map((b) => ({ id: b.id, name: b.name ?? "" }))} selected={branchIds} onToggle={(id) => setBranchIds((a) => toggleIn(a, id))} onClear={() => setBranchIds([])} />
+        <ChipFilter label="Location" items={locationBranches.map((b) => ({ id: b.id, name: b.name ?? "" }))} selected={branchIds} onToggle={(id) => setBranchIds((a) => toggleIn(a, id))} onClear={() => setBranchIds((a) => a.filter((id) => !locationBranches.some((b) => b.id === id)))} />
+        {agencyBranches.length > 0 && (
+          <ChipFilter label="Agencies" items={agencyBranches.map((b) => ({ id: b.id, name: b.name ?? "" }))} selected={branchIds} onToggle={(id) => setBranchIds((a) => toggleIn(a, id))} onClear={() => setBranchIds((a) => a.filter((id) => !agencyBranches.some((b) => b.id === id)))} />
+        )}
+        {projectBranches.length > 0 && (
+          <ChipFilter label="Project-based" items={projectBranches.map((b) => ({ id: b.id, name: b.name ?? "" }))} selected={branchIds} onToggle={(id) => setBranchIds((a) => toggleIn(a, id))} onClear={() => setBranchIds((a) => a.filter((id) => !projectBranches.some((b) => b.id === id)))} />
+        )}
 
         {/* Field picker */}
         <div className="border-t border-slate-100 pt-4">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-800">Columns to include <span className="text-slate-400">({selected.size} selected)</span></h3>
             <div className="flex gap-2">
+              <button type="button" onClick={selectImportTemplate} className="rounded-md border border-brand-600 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50" title="Pick only the columns you can fill and re-upload via Employees → Import">Import template ⇄</button>
               <button type="button" onClick={selectAll} className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Select All</button>
               <button type="button" onClick={deselectAll} className="rounded-md border border-amber-400 px-3 py-1.5 text-xs font-semibold text-amber-600 hover:bg-amber-50">Deselect All</button>
             </div>
           </div>
+          <p className="mb-3 text-xs text-slate-500">
+            <span className="font-semibold text-brand-700">⇄</span> = round-trip column: export it, fill in new or updated staff, then re-upload under <strong>Employees → Import</strong>. Un-marked columns are export/display-only.
+          </p>
 
           <div className="space-y-4">
             {grouped.map(([group, fields]) => (
@@ -145,9 +167,11 @@ export default function ReportsPage() {
                         className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                           on ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
                         }`}
-                        title={f.sensitive ? "Sensitive pay data — hidden for confidential employees you can't view" : undefined}
+                        title={f.sensitive ? "Sensitive pay data — hidden for confidential employees you can't view" : f.importable ? "Round-trip column — can be filled and re-uploaded via Employees → Import" : "Export / display-only column"}
                       >
-                        {f.label}{f.sensitive && <span className={on ? "text-amber-200" : "text-amber-500"}> •</span>}
+                        {f.label}
+                        {f.importable && <span className={on ? "text-white/70" : "text-brand-600"}> ⇄</span>}
+                        {f.sensitive && <span className={on ? "text-amber-200" : "text-amber-500"}> •</span>}
                       </button>
                     );
                   })}
@@ -159,12 +183,30 @@ export default function ReportsPage() {
 
         {/* Actions */}
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-        <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
           <ActionButton onClick={() => run("search")} busy={busy === "search"} variant="outline">Search (preview)</ActionButton>
           <ActionButton onClick={() => run("xlsx")} busy={busy === "xlsx"} variant="solid">Download as Excel</ActionButton>
           <ActionButton onClick={() => run("csv")} busy={busy === "csv"} variant="solid">Download as Flat File (CSV)</ActionButton>
+          <span className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" />
+          <button
+            type="button"
+            onClick={() => setShowImport(true)}
+            className="flex items-center gap-2 rounded-lg border border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50"
+            title="Fill a downloaded template with new/updated staff and upload it"
+          >
+            ⇄ Import filled sheet
+          </button>
         </div>
       </div>
+
+      {showImport && (
+        <ImportEmployeesModal
+          mode="organic"
+          companies={activeCompanies}
+          onClose={() => setShowImport(false)}
+          onDone={() => setShowImport(false)}
+        />
+      )}
 
       {/* Preview */}
       {preview && (

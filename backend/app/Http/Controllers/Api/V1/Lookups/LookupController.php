@@ -88,7 +88,7 @@ class LookupController extends Controller
                 ->where('is_active', true)
                 ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
                 ->orderBy('name')
-                ->get(['id', 'code', 'name', 'is_head_office', 'is_agency', 'latitude', 'longitude']),
+                ->get(['id', 'code', 'name', 'is_head_office', 'is_agency', 'is_project_crew', 'latitude', 'longitude']),
         ]);
     }
 

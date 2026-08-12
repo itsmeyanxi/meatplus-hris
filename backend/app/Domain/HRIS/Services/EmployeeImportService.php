@@ -34,7 +34,7 @@ class EmployeeImportService
         'civil_status' => ['civil status', 'civil_status', 'marital status'],
         'department' => ['department', 'dept'],
         'location' => ['location', 'branch', 'site', 'office'],
-        'email' => ['email', 'email address', 'e-mail'],
+        'email' => ['email', 'email address', 'e-mail', 'company email', 'work email'],
         'position' => ['position', 'job title', 'title', 'designation', 'role'],
         'employment_type' => ['employment type', 'employment_type', 'emp type', 'type', 'employee type'],
         'date_hired' => ['date hired', 'date_hired', 'hire date', 'hired', 'date of hire'],
@@ -62,7 +62,7 @@ class EmployeeImportService
         'meal' => ['meal'],
         'communication' => ['communication'],
         'travel' => ['travel'],
-        'allowance_others' => ['others', 'other allowance'],
+        'allowance_others' => ['others', 'other allowance', 'allowance'],
     ];
 
     /** @var array<string,int> name(lower) => id */

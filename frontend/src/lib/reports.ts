@@ -149,7 +149,7 @@ export function downloadRemittance(type: "sss" | "philhealth" | "pagibig" | "tax
  */
 // ── Employee Master Data report (configurable field-picker export) ─────────────
 
-export type MasterField = { key: string; label: string; group: string; sensitive: boolean };
+export type MasterField = { key: string; label: string; group: string; sensitive: boolean; importable: boolean };
 export type MasterFieldsResponse = { company: { id: number; name: string } | null; fields: MasterField[] };
 export type MasterColumn = { key: string; label: string };
 export type MasterPreview = {

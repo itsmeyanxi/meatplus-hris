@@ -72,7 +72,7 @@ type PaginatedResponse<T> = {
   links: { first: string; last: string; prev: string | null; next: string | null };
 };
 
-export type LookupItem = { id: number; code?: string; name?: string; title?: string; employees_count?: number; is_agency?: boolean };
+export type LookupItem = { id: number; code?: string; name?: string; title?: string; employees_count?: number; is_agency?: boolean; is_project_crew?: boolean };
 
 export async function listEmployees(params: {
   q?: string;

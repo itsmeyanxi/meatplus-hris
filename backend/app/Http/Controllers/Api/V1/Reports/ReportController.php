@@ -1456,9 +1456,27 @@ class ReportController extends Controller
     {
         abort_unless($request->user()->can('employee.view'), 403);
 
+        // Columns whose header label the employee importer recognises, so a file
+        // exported here can be filled with new/updated staff and re-uploaded via
+        // Employees → Import (a true round-trip template). Everything else is
+        // export/display-only (Full Name, Age, System ID, Supervisor, …).
+        $importable = [
+            'employee_no', 'biometric_user_id', 'last_name', 'first_name', 'middle_name',
+            'gender', 'civil_status', 'birth_date', 'department', 'location', 'position',
+            'employment_type', 'status', 'date_hired', 'date_separated',
+            'sss_no', 'tin', 'philhealth_no', 'pagibig_no', 'prc_no', 'passport_no',
+            'email_company', 'base_salary', 'de_minimis', 'allowance',
+        ];
+
         $fields = [];
         foreach ($this->availableMasterFields($request) as $key => $f) {
-            $fields[] = ['key' => $key, 'label' => $f['label'], 'group' => $f['group'], 'sensitive' => (bool) ($f['sensitive'] ?? false)];
+            $fields[] = [
+                'key' => $key,
+                'label' => $f['label'],
+                'group' => $f['group'],
+                'sensitive' => (bool) ($f['sensitive'] ?? false),
+                'importable' => in_array($key, $importable, true),
+            ];
         }
 
         $company = Company::find($request->user()->active_company_id);
