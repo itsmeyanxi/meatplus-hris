@@ -494,7 +494,14 @@ class DtrComputer
         // Absent = a SCHEDULED workday with no attendance and nothing that excuses it
         // (rest day, holiday, paid leave, COA, OB, or being punch-exempt). Unscheduled/
         // contractual staff are never absent.
-        $isAbsent = $hasSchedule && ! $hasAnyLogs && ! $isRestDay && ! $holiday && ! $leavePaid && ! $excused && ! $punchExempt;
+        //
+        // Absence can only be judged for a day that has fully elapsed: today is still
+        // in progress and future days have not happened, so they are NEVER absent even
+        // when this runs on-the-fly for a range that reaches into the future (e.g. the
+        // attendance matrix / a payroll cutoff ending later this month). Mirrors the
+        // nightly SyncDtr, which caps at yesterday.
+        $isAbsent = $hasSchedule && ! $hasAnyLogs && ! $isRestDay && ! $holiday && ! $leavePaid && ! $excused && ! $punchExempt
+            && $day->lt(CarbonImmutable::today());
 
         // Portion of the day payable via basic pay. An official half-day shift
         // adjustment pays 0.5; an UNPAID half-day leave pays only the worked half
