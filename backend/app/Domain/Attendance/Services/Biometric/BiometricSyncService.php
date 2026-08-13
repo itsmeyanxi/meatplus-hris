@@ -81,12 +81,27 @@ class BiometricSyncService
             $employee = $employeeCache[$e['person_id']]
                 ??= $this->resolveEmployee($device->company_id, $e['person_id']);
 
+            $ts = Carbon::parse($e['time'])->addSeconds($shiftSeconds)->setTimezone($tz);
+
             if (! $employee) {
                 $unmapped[$e['person_id']] = ($unmapped[$e['person_id']] ?? 0) + 1;
+                // Stage rather than drop — reclaimed once this person_id maps to an
+                // employee (newly added, or biometric_user_id set to this ID).
+                \App\Domain\Attendance\Models\UnmatchedPunch::firstOrCreate(
+                    ['device_key' => $deviceKey, 'source_event_id' => $e['event_id']],
+                    [
+                        'company_id' => $device->company_id,
+                        'pin' => $e['person_id'],
+                        'logged_at' => $ts->toDateTimeString(),
+                        'status' => (string) ($e['status'] ?? ''),
+                        'raw' => $e['name'] ?? null,
+                        'source' => 'biometric',
+                    ],
+                );
+
                 continue;
             }
 
-            $ts = Carbon::parse($e['time'])->addSeconds($shiftSeconds)->setTimezone($tz);
             $date = $ts->toDateString();
             $maxEventTime = $maxEventTime && $maxEventTime->gte($ts) ? $maxEventTime : $ts;
 

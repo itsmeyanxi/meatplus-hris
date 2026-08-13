@@ -13,3 +13,10 @@ Schedule::command('attendance:sync-biometric')
     ->everyFiveMinutes()
     ->withoutOverlapping()
     ->runInBackground();
+
+// Attach any staged (unmatched) biometric punches whose device ID has since been
+// mapped to an employee, then recompute their DTRs. Cheap when nothing is pending.
+Schedule::command('attendance:reclaim-unmatched')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->runInBackground();

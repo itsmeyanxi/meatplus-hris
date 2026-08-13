@@ -116,13 +116,29 @@ class AdmsIngestionService
                 continue;
             }
 
-            $employee = $employeeCache[$pin] ??= $this->resolveEmployee($device->company_id, $pin);
-            if (! $employee) {
-                continue; // unmapped PIN — skip
-            }
-
             $ts = Carbon::parse($timeStr, $tz);
             $date = $ts->toDateString();
+
+            $employee = $employeeCache[$pin] ??= $this->resolveEmployee($device->company_id, $pin);
+            if (! $employee) {
+                // Don't drop it: stage the punch so it can be reclaimed the moment this
+                // PIN maps to an employee (a re-enrolled device ID, or a newly-added
+                // hire the HRIS hasn't caught up to). No attendance is ever lost.
+                \App\Domain\Attendance\Models\UnmatchedPunch::firstOrCreate(
+                    ['device_key' => $deviceKey, 'source_event_id' => "{$pin}|{$timeStr}|{$verify}"],
+                    [
+                        'company_id' => $device->company_id,
+                        'pin' => $pin,
+                        'logged_at' => $ts->toDateTimeString(),
+                        'status' => $statusCode,
+                        'verify' => $verify,
+                        'raw' => $line,
+                        'source' => 'biometric',
+                    ],
+                );
+
+                continue;
+            }
 
             // Seed the in/out alternation from this employee's BIOMETRIC punches only.
             // Counting web/manual/upload punches here would offset the parity and flip

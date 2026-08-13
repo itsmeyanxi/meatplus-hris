@@ -62,6 +62,21 @@ class Employee extends Model
                 $e->time_in_out_required = ! in_array($e->schedule_type, self::NO_PUNCH_TYPES, true);
             }
         });
+
+        // When a biometric ID is set or corrected (a re-enrolled device ID, or a
+        // brand-new hire), immediately claim any punches that were staged for that
+        // ID while the HRIS didn't know it — so recovered attendance shows at once.
+        // Failures here must never block saving the employee.
+        static::saved(function (self $e) {
+            if ($e->wasChanged('biometric_user_id') && $e->biometric_user_id) {
+                try {
+                    app(\App\Domain\Attendance\Services\Biometric\UnmatchedPunchReclaimer::class)
+                        ->reclaim((string) $e->biometric_user_id, (int) $e->company_id);
+                } catch (\Throwable $ex) {
+                    \Illuminate\Support\Facades\Log::warning('Unmatched-punch reclaim failed for employee '.$e->id.': '.$ex->getMessage());
+                }
+            }
+        });
     }
 
     protected function casts(): array
