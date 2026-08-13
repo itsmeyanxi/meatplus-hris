@@ -183,6 +183,11 @@ Route::prefix('v1')->group(function () {
         Route::post('attendance-devices/{attendanceDevice}/sync', [AttendanceDeviceController::class, 'sync']);
         Route::get('attendance-devices/{attendanceDevice}/users', [AttendanceDeviceController::class, 'users']);
 
+        // Biometric mapping issues (PIN-reuse collisions) — HR review + resolve
+        Route::get('attendance/biometric-anomalies', [\App\Http\Controllers\Api\V1\Attendance\BiometricAnomalyController::class, 'index']);
+        Route::post('attendance/biometric-anomalies/rescan', [\App\Http\Controllers\Api\V1\Attendance\BiometricAnomalyController::class, 'rescan']);
+        Route::post('attendance/biometric-anomalies/{biometricAnomaly}/resolve', [\App\Http\Controllers\Api\V1\Attendance\BiometricAnomalyController::class, 'resolve']);
+
         Route::get('time-logs', [TimeLogController::class, 'index']);
         Route::get('my/time-logs', [TimeLogController::class, 'mine']); // self-service: own punches
         Route::get('time-logs/export', [TimeLogController::class, 'export']);

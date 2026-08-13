@@ -21,6 +21,7 @@ const TABS: Tab[] = [
   { href: "/attendance/uploads",   label: "Uploads",   permissions: ["attendance.manage", "attendance.approve.any"] },
   { href: "/attendance/schedules", label: "Schedules", permissions: ["attendance.manage"] },
   { href: "/attendance/holidays",  label: "Holidays",  permissions: ["attendance.manage"] },
+  { href: "/attendance/biometric-issues", label: "Biometric Issues", permissions: ["attendance.manage"] },
 ];
 
 export default function AttendanceLayout({ children }: { children: ReactNode }) {

@@ -196,7 +196,7 @@ class BiometricAnomalyDetector
                 $a['pin'],
                 $a['device_name'],
                 $a['punches'],
-                "/employees/{$a['employee_id']}",
+                '/attendance/biometric-issues',
                 $a['employee_id'],
             ));
         } catch (\Throwable $e) {
