@@ -133,11 +133,14 @@ class AdmsIngestionService
                 ->whereDate('logged_at', $date)
                 ->count();
 
-            // Direction: when the employee explicitly marks an OUT / break / OT-out
-            // on the device (status 1,2,3,5) we TRUST it — that is the whole point of
-            // the in/out selection. For a plain tap (status 0/4, the device default)
-            // we fall back to the alternating in/out count.
-            $direction = in_array($statusCode, ['1', '2', '3', '5'], true)
+            // Direction: trust the device's OWN status code whenever it is a known
+            // one (0/4 = in, 1/5 = out, 2/3 = break). The Meatplus terminals reliably
+            // report in vs out, so the code is authoritative. This matters for
+            // night / shifting workers whose calendar day begins with the PREVIOUS
+            // shift's clock-out — the old "first punch of the day is in" guess flipped
+            // their real (plain-tap) arrival to OUT. Only an unknown/blank status
+            // falls back to the alternating in/out count.
+            $direction = isset(self::STATUS_MAP[$statusCode])
                 ? self::STATUS_MAP[$statusCode]
                 : ($dayCount[$employee->id][$date] % 2 === 0 ? 'in' : 'out');
 
