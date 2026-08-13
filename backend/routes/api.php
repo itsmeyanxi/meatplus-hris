@@ -117,6 +117,13 @@ Route::prefix('v1')->group(function () {
         Route::get('employees/export', [EmployeeController::class, 'export']);
         Route::post('employees/bulk-invite', [InvitationController::class, 'bulkSend']);
         Route::post('employees/bulk-confidentiality', [EmployeeController::class, 'bulkConfidentiality']);
+
+        // Employee data-health issues (missing payroll/attendance data, silent attendance).
+        // Declared before the resource so "data-issues" is not captured as {employee}.
+        Route::get('employees/data-issues', [\App\Http\Controllers\Api\V1\Employees\EmployeeDataIssueController::class, 'index']);
+        Route::post('employees/data-issues/rescan', [\App\Http\Controllers\Api\V1\Employees\EmployeeDataIssueController::class, 'rescan']);
+        Route::post('employees/data-issues/{employeeDataIssue}/ignore', [\App\Http\Controllers\Api\V1\Employees\EmployeeDataIssueController::class, 'ignore']);
+
         Route::apiResource('employees', EmployeeController::class);
         Route::apiResource('employees.dependents', DependentController::class)->scoped();
         Route::apiResource('employees.assets', EmployeeAssetController::class)

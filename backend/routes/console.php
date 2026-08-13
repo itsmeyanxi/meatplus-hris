@@ -28,3 +28,10 @@ Schedule::command('attendance:detect-biometric-anomalies')
     ->dailyAt('06:30')
     ->withoutOverlapping()
     ->runInBackground();
+
+// Scan employee records for data problems (missing payroll/attendance essentials,
+// silent attendance) and send HR one aggregated digest of new issues.
+Schedule::command('employees:detect-data-issues')
+    ->dailyAt('06:45')
+    ->withoutOverlapping()
+    ->runInBackground();
