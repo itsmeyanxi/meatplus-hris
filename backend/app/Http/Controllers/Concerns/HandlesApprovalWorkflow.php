@@ -251,9 +251,16 @@ trait HandlesApprovalWorkflow
             $subject = Employee::withoutGlobalScopes()
                 ->where('id', $model->employee_id)
                 ->with('department:id,head_employee_id')
-                ->first(['id', 'user_id', 'manager_employee_id', 'department_id', 'first_name', 'last_name']);
+                ->first(['id', 'company_id', 'user_id', 'manager_employee_id', 'department_id', 'first_name', 'last_name']);
             if (! $subject) {
                 return;
+            }
+
+            // Carry the subject's company so a cross-company approver is switched to
+            // it on click, instead of landing on an empty page for whichever company
+            // they happen to be viewing.
+            if ($subject->company_id) {
+                $url .= (str_contains($url, '?') ? '&' : '?').'company='.$subject->company_id;
             }
 
             $recipientIds = collect();

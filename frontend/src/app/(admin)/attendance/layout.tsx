@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { getMe } from "@/lib/auth";
 import { type ReactNode } from "react";
+import { CompanySwitchGate } from "@/components/CompanySwitchGate";
 
 type Tab = {
   href: string;
@@ -66,7 +67,7 @@ export default function AttendanceLayout({ children }: { children: ReactNode }) 
         })}
       </div>
 
-      {children}
+      <CompanySwitchGate>{children}</CompanySwitchGate>
     </div>
   );
 }
