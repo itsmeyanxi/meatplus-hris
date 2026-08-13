@@ -126,6 +126,30 @@ class EmployeeImportService
                 'errors' => [['row' => 1, 'message' => 'Missing required column for: Employee ID (check the header row).']]];
         }
 
+        // Suppress the per-row auto-reclaim (and its DTR recompute) while importing —
+        // firing it hundreds of times inside one request would be very slow / time out.
+        // The scheduled attendance:reclaim-unmatched (every 15 min) recovers any staged
+        // punches for the biometric IDs this import maps.
+        $wasSuppressing = Employee::$suppressAutoReclaim;
+        Employee::$suppressAutoReclaim = true;
+        try {
+            $r = $this->processRows($rows, $map, $companyId);
+        } finally {
+            Employee::$suppressAutoReclaim = $wasSuppressing;
+        }
+
+        return $r + ['total' => count($rows)];
+    }
+
+    /**
+     * Create/update each employee and its related records.
+     *
+     * @param  array<int,array<int,string>>  $rows
+     * @param  array<string,int>  $map  canonical column => column index
+     * @return array{created:int, updated:int, skipped:int, errors:array<int,array{row:int,message:string}>, warnings:array<int,array{row:int,message:string}>}
+     */
+    private function processRows(array $rows, array $map, int $companyId): array
+    {
         $created = 0;
         $updated = 0;
         $skipped = 0;
@@ -225,24 +249,12 @@ class EmployeeImportService
                     $present['birth_date'] = $born;
                 }
 
-                // Contact + address.
-                if (($mob = $get('mobile')) !== '') {
-                    $present['mobile'] = $mob;
-                }
-                if (($rel = $get('religion')) !== '') {
-                    $present['religion'] = $rel;
-                }
-                if (($nat = $get('nationality')) !== '') {
-                    $present['nationality'] = $nat;
-                }
-                if (($addr = $get('address')) !== '') {
-                    $present['address_line1'] = $addr;
-                }
-                if (($cty = $get('city')) !== '') {
-                    $present['city'] = $cty;
-                }
-                if (($prov = $get('province')) !== '') {
-                    $present['province'] = $prov;
+                // Contact + address — plain column => employee field.
+                foreach (['mobile' => 'mobile', 'religion' => 'religion', 'nationality' => 'nationality',
+                    'address' => 'address_line1', 'city' => 'city', 'province' => 'province'] as $col => $field) {
+                    if (($v = $get($col)) !== '') {
+                        $present[$field] = $v;
+                    }
                 }
 
                 // Immediate supervisor / manager, matched to another employee by name.
@@ -322,7 +334,7 @@ class EmployeeImportService
             }
         }
 
-        return ['created' => $created, 'updated' => $updated, 'skipped' => $skipped, 'total' => count($rows), 'errors' => $errors, 'warnings' => $warnings];
+        return compact('created', 'updated', 'skipped', 'errors', 'warnings');
     }
 
     /** Write the government IDs present in the row (encrypted by the model). */
@@ -403,9 +415,9 @@ class EmployeeImportService
             $this->nameIndex[$companyId] = [];
             foreach (Employee::query()->where('company_id', $companyId)->get(['id', 'first_name', 'middle_name', 'last_name']) as $e) {
                 $f = $e->first_name; $m = $e->middle_name; $l = $e->last_name;
-                // Index several name orderings so a supervisor written with or without a
-                // middle name, first-last or last-first, still resolves.
-                $variants = ["$f $l", "$l $f", "$f $m $l", "$l $f $m", "$f $l $m"];
+                // Index the common orderings so a supervisor written first-last,
+                // last-first, or with a middle name still resolves.
+                $variants = ["$f $l", "$l $f", "$f $m $l"];
                 foreach ($variants as $variant) {
                     $k = $this->normName($variant);
                     if ($k !== '') {
@@ -559,11 +571,17 @@ class EmployeeImportService
 
         if ($latest) {
             // Correcting an existing schedule: the new one takes effect today, and the
-            // old open assignment is closed the day before.
-            if ($latest->effective_to === null) {
-                $latest->update(['effective_to' => now()->subDay()->toDateString()]);
+            // old open assignment is closed the day before — but never before its own
+            // start (guards a same-day re-assign producing an invalid to < from range).
+            $today = now()->startOfDay();
+            $closeAt = $today->copy()->subDay();
+            if ($latest->effective_from && $latest->effective_from->greaterThan($closeAt)) {
+                $closeAt = $latest->effective_from;
             }
-            $effectiveFrom = now()->toDateString();
+            if ($latest->effective_to === null) {
+                $latest->update(['effective_to' => $closeAt->toDateString()]);
+            }
+            $effectiveFrom = $today->toDateString();
         } else {
             // Filling a gap: cover history from the hire date (or today if none).
             $effectiveFrom = $employee->date_hired?->toDateString() ?? now()->toDateString();

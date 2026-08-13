@@ -17,17 +17,6 @@ use Illuminate\Support\Facades\Log;
  */
 class BiometricSyncService
 {
-    /** Hikvision attendanceStatus -> our TimeLog.direction. */
-    private const STATUS_MAP = [
-        'checkIn' => 'in',
-        'checkOut' => 'out',
-        'breakIn' => 'break_in',
-        'breakOut' => 'break_out',
-        'overTimeIn' => 'in',
-        'overTimeOut' => 'out',
-        'overtimeIn' => 'in',
-        'overtimeOut' => 'out',
-    ];
 
     public function __construct(private readonly DtrComputer $dtr) {}
 
@@ -79,7 +68,7 @@ class BiometricSyncService
 
         foreach ($events as $e) {
             $employee = $employeeCache[$e['person_id']]
-                ??= $this->resolveEmployee($device->company_id, $e['person_id']);
+                ??= BiometricPunch::resolveEmployee($device->company_id, $e['person_id']);
 
             $ts = Carbon::parse($e['time'])->addSeconds($shiftSeconds)->setTimezone($tz);
 
@@ -179,22 +168,11 @@ class BiometricSyncService
     }
 
     /** Prefer an explicit biometric_user_id mapping, else fall back to employee_no. */
-    private function resolveEmployee(int $companyId, string $personId): ?Employee
-    {
-        return Employee::query()
-            ->where('company_id', $companyId)
-            ->where(fn ($q) => $q
-                ->where('biometric_user_id', $personId)
-                ->orWhere('employee_no', $personId))
-            ->orderByRaw('biometric_user_id = ? desc', [$personId])
-            ->first();
-    }
-
     /** Resolve direction from the device status, or alternate in/out by day position. */
     private function direction(?string $status, int $priorCountToday): string
     {
-        if ($status && isset(self::STATUS_MAP[$status])) {
-            return self::STATUS_MAP[$status];
+        if ($status && isset(BiometricPunch::STATUS_MAP[$status])) {
+            return BiometricPunch::STATUS_MAP[$status];
         }
 
         // No usable status: first punch of the day is IN, then alternate.

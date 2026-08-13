@@ -7,7 +7,6 @@ use App\Domain\Attendance\Models\UnmatchedPunch;
 use App\Domain\Attendance\Services\DtrComputer;
 use App\Domain\HRIS\Models\Employee;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Turns staged {@see UnmatchedPunch} rows into real time_logs once their device
@@ -17,13 +16,6 @@ use Illuminate\Support\Facades\DB;
  */
 class UnmatchedPunchReclaimer
 {
-    /** Device attendance status -> direction (ZKTeco numeric + Hikvision strings). */
-    private const STATUS_MAP = [
-        '0' => 'in', '1' => 'out', '2' => 'break_out', '3' => 'break_in', '4' => 'in', '5' => 'out',
-        'checkIn' => 'in', 'checkOut' => 'out', 'breakIn' => 'break_in', 'breakOut' => 'break_out',
-        'overTimeIn' => 'in', 'overTimeOut' => 'out', 'overtimeIn' => 'in', 'overtimeOut' => 'out',
-    ];
-
     public function __construct(private readonly DtrComputer $dtr) {}
 
     /**
@@ -35,73 +27,93 @@ class UnmatchedPunchReclaimer
      */
     public function reclaim(?string $pin = null, ?int $companyId = null): array
     {
+        $base = fn () => UnmatchedPunch::query()
+            ->whereNull('reclaimed_at')
+            ->when($pin !== null, fn ($q) => $q->where('pin', $pin))
+            ->when($companyId !== null, fn ($q) => $q->where('company_id', $companyId));
+
+        // Resolve PINs against an in-memory index built once per company in scope,
+        // instead of a query per distinct PIN on every (15-minute) run.
+        $indexes = [];
+        foreach ($base()->distinct()->pluck('company_id') as $cid) {
+            $indexes[(int) $cid] = $this->buildPinIndex((int) $cid);
+        }
+
         $reclaimed = 0;
         $affected = []; // employee_id => ['min' => date, 'max' => date]
 
-        UnmatchedPunch::query()
-            ->whereNull('reclaimed_at')
-            ->when($pin !== null, fn ($q) => $q->where('pin', $pin))
-            ->when($companyId !== null, fn ($q) => $q->where('company_id', $companyId))
-            ->orderBy('id')
-            ->chunkById(1000, function ($rows) use (&$reclaimed, &$affected) {
-                $empCache = [];
-                foreach ($rows as $u) {
-                    $key = $u->company_id.'|'.$u->pin;
-                    $emp = $empCache[$key] ??= $this->resolveEmployee((int) $u->company_id, (string) $u->pin);
-                    if (! $emp) {
-                        continue; // still unmapped — leave staged
-                    }
-
-                    $direction = self::STATUS_MAP[(string) $u->status] ?? 'in';
-
-                    TimeLog::firstOrCreate(
-                        ['device_id' => $u->device_key, 'source_event_id' => $u->source_event_id],
-                        [
-                            'company_id' => $emp->company_id,
-                            'employee_id' => $emp->id,
-                            'logged_at' => $u->logged_at,
-                            'direction' => $direction,
-                            'source' => 'biometric',
-                            'metadata' => [
-                                'device_key' => $u->device_key, 'pin' => $u->pin,
-                                'verify' => $u->verify, 'status' => $u->status,
-                                'raw' => $u->raw, 'reclaimed_at' => now()->toDateTimeString(),
-                            ],
-                        ],
-                    );
-
-                    $u->update(['reclaimed_at' => now()]);
-                    $reclaimed++;
-
-                    $d = CarbonImmutable::parse($u->logged_at)->toDateString();
-                    $affected[$emp->id]['min'] = min($affected[$emp->id]['min'] ?? $d, $d);
-                    $affected[$emp->id]['max'] = max($affected[$emp->id]['max'] ?? $d, $d);
+        $base()->orderBy('id')->chunkById(1000, function ($rows) use (&$reclaimed, &$affected, $indexes) {
+            foreach ($rows as $u) {
+                $empId = $indexes[(int) $u->company_id][(string) $u->pin] ?? null;
+                if (! $empId) {
+                    continue; // still unmapped — leave staged
                 }
-            });
 
-        // Recompute DTRs for each employee across the recovered range (future-safe).
+                TimeLog::firstOrCreate(
+                    ['device_id' => $u->device_key, 'source_event_id' => $u->source_event_id],
+                    [
+                        'company_id' => $u->company_id,
+                        'employee_id' => $empId,
+                        'logged_at' => $u->logged_at,
+                        'direction' => BiometricPunch::STATUS_MAP[(string) $u->status] ?? 'in',
+                        'source' => 'biometric',
+                        'metadata' => [
+                            'device_key' => $u->device_key, 'pin' => $u->pin,
+                            'verify' => $u->verify, 'status' => $u->status,
+                            'raw' => $u->raw, 'reclaimed_at' => now()->toDateTimeString(),
+                        ],
+                    ],
+                );
+
+                $u->update(['reclaimed_at' => now()]);
+                $reclaimed++;
+
+                $d = CarbonImmutable::parse($u->logged_at)->toDateString();
+                $affected[$empId]['min'] = min($affected[$empId]['min'] ?? $d, $d);
+                $affected[$empId]['max'] = max($affected[$empId]['max'] ?? $d, $d);
+            }
+        });
+
+        // Recompute DTRs for each affected employee across the recovered range.
+        $employees = Employee::withoutGlobalScopes()->whereIn('id', array_keys($affected))->get()->keyBy('id');
         foreach ($affected as $employeeId => $range) {
-            $employee = Employee::withoutGlobalScopes()->find($employeeId);
+            $employee = $employees->get($employeeId);
             if (! $employee) {
                 continue;
             }
             // Widen by a day so an overnight shift's tail is paired correctly.
-            $from = CarbonImmutable::parse($range['min'])->subDay();
-            $to = CarbonImmutable::parse($range['max'])->addDay();
-            $this->dtr->computeForEmployee($employee, $from, $to);
+            $this->dtr->computeForEmployee(
+                $employee,
+                CarbonImmutable::parse($range['min'])->subDay(),
+                CarbonImmutable::parse($range['max'])->addDay(),
+            );
         }
 
         return ['reclaimed' => $reclaimed, 'employees' => count($affected)];
     }
 
-    /** Same rule as ingestion: match a device PIN to an employee by biometric_user_id, else employee_no. */
-    private function resolveEmployee(int $companyId, string $pin): ?Employee
+    /**
+     * PIN -> employee id for one company, biometric_user_id taking precedence over
+     * employee_no (mirrors BiometricPunch::resolveEmployee's ordering).
+     *
+     * @return array<string,int>
+     */
+    private function buildPinIndex(int $companyId): array
     {
-        return Employee::query()
-            ->withoutGlobalScopes()
+        $employees = Employee::withoutGlobalScopes()
             ->where('company_id', $companyId)
-            ->where(fn ($q) => $q->where('biometric_user_id', $pin)->orWhere('employee_no', $pin))
-            ->orderByRaw('biometric_user_id = ? desc', [$pin])
-            ->first();
+            ->get(['id', 'biometric_user_id', 'employee_no']);
+
+        $index = [];
+        foreach ($employees as $e) {
+            if ($e->biometric_user_id) {
+                $index[(string) $e->biometric_user_id] = $e->id;
+            }
+        }
+        foreach ($employees as $e) {
+            $index[(string) $e->employee_no] ??= $e->id;
+        }
+
+        return $index;
     }
 }

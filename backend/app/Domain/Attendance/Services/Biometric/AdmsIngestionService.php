@@ -17,15 +17,6 @@ use Carbon\CarbonImmutable;
  */
 class AdmsIngestionService
 {
-    /** ZKTeco attendance status code -> our TimeLog.direction. */
-    private const STATUS_MAP = [
-        '0' => 'in',         // check in
-        '1' => 'out',        // check out
-        '2' => 'break_out',  // break out
-        '3' => 'break_in',   // break in
-        '4' => 'in',         // overtime in
-        '5' => 'out',        // overtime out
-    ];
 
     public function __construct(private readonly DtrComputer $dtr) {}
 
@@ -119,7 +110,7 @@ class AdmsIngestionService
             $ts = Carbon::parse($timeStr, $tz);
             $date = $ts->toDateString();
 
-            $employee = $employeeCache[$pin] ??= $this->resolveEmployee($device->company_id, $pin);
+            $employee = $employeeCache[$pin] ??= BiometricPunch::resolveEmployee($device->company_id, $pin);
             if (! $employee) {
                 // Don't drop it: stage the punch so it can be reclaimed the moment this
                 // PIN maps to an employee (a re-enrolled device ID, or a newly-added
@@ -156,8 +147,8 @@ class AdmsIngestionService
             // shift's clock-out — the old "first punch of the day is in" guess flipped
             // their real (plain-tap) arrival to OUT. Only an unknown/blank status
             // falls back to the alternating in/out count.
-            $direction = isset(self::STATUS_MAP[$statusCode])
-                ? self::STATUS_MAP[$statusCode]
+            $direction = isset(BiometricPunch::STATUS_MAP[$statusCode])
+                ? BiometricPunch::STATUS_MAP[$statusCode]
                 : ($dayCount[$employee->id][$date] % 2 === 0 ? 'in' : 'out');
 
             $log = TimeLog::firstOrCreate(
@@ -254,12 +245,4 @@ class AdmsIngestionService
     }
 
     /** Prefer an explicit biometric_user_id mapping, else fall back to employee_no. */
-    private function resolveEmployee(int $companyId, string $pin): ?Employee
-    {
-        return Employee::query()
-            ->where('company_id', $companyId)
-            ->where(fn ($q) => $q->where('biometric_user_id', $pin)->orWhere('employee_no', $pin))
-            ->orderByRaw('biometric_user_id = ? desc', [$pin])
-            ->first();
-    }
 }

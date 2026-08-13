@@ -47,6 +47,13 @@ class Employee extends Model
         'is_active', 'is_confidential', 'time_in_out_required', 'schedule_type', 'photo_path',
     ];
 
+    /**
+     * Set true to skip the per-save auto-reclaim of staged biometric punches (see
+     * booted()). Bulk operations (the importer) turn this on so they don't fire an
+     * expensive reclaim + DTR recompute per row — the scheduled reclaim catches up.
+     */
+    public static bool $suppressAutoReclaim = false;
+
     /** Schedule types that don't punch (always present). */
     public const NO_PUNCH_TYPES = ['exempted', 'field'];
 
@@ -68,6 +75,9 @@ class Employee extends Model
         // ID while the HRIS didn't know it — so recovered attendance shows at once.
         // Failures here must never block saving the employee.
         static::saved(function (self $e) {
+            if (self::$suppressAutoReclaim) {
+                return;
+            }
             if ($e->wasChanged('biometric_user_id') && $e->biometric_user_id) {
                 try {
                     app(\App\Domain\Attendance\Services\Biometric\UnmatchedPunchReclaimer::class)
