@@ -20,3 +20,11 @@ Schedule::command('attendance:reclaim-unmatched')
     ->everyFifteenMinutes()
     ->withoutOverlapping()
     ->runInBackground();
+
+// Alert HR to biometric PIN-reuse collisions (someone else's punches landing on an
+// employee via the employee-number fallback). Once a day is plenty; only NEW issues
+// notify, so this never spams the bell.
+Schedule::command('attendance:detect-biometric-anomalies')
+    ->dailyAt('06:30')
+    ->withoutOverlapping()
+    ->runInBackground();
