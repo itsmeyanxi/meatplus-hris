@@ -102,9 +102,15 @@ class EmployeeController extends Controller
             $like = '%'.str_replace('%', '\%', $search).'%';
             $query->where(function ($q) use ($like, $op) {
                 $q->where('employee_no', $op, $like)
+                    ->orWhere('biometric_user_id', $op, $like)
                     ->orWhere('first_name', $op, $like)
+                    ->orWhere('middle_name', $op, $like)
                     ->orWhere('last_name', $op, $like)
                     ->orWhere('email_company', $op, $like)
+                    // Full name as typed ("Juan Cruz" / "Juan Santos Cruz") — no single
+                    // column holds it. CONCAT_WS skips a null middle name cleanly.
+                    ->orWhereRaw("CONCAT_WS(' ', first_name, last_name) {$op} ?", [$like])
+                    ->orWhereRaw("CONCAT_WS(' ', first_name, middle_name, last_name) {$op} ?", [$like])
                     ->orWhereHas('department', function ($departmentQuery) use ($like, $op) {
                         $departmentQuery->where('name', $op, $like);
                     });

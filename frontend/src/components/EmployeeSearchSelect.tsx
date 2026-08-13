@@ -35,6 +35,7 @@ export function EmployeeSearchSelect({
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
   const [debounced, setDebounced] = useState("");
+  const [active, setActive] = useState(0);
   const [selectedLabel, setSelectedLabel] = useState<string>(initialLabel);
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -81,6 +82,7 @@ export function EmployeeSearchSelect({
   });
 
   const results = data?.data ?? [];
+  const total = data?.meta?.total ?? results.length;
 
   const pick = (e: EmployeeListItem | null) => {
     if (!e) { onChange("", ""); setSelectedLabel(""); }
@@ -90,6 +92,20 @@ export function EmployeeSearchSelect({
   };
 
   const openList = () => { updateRect(); setOpen(true); };
+
+  // Reset the highlight when the result set changes, and keep it in view.
+  useEffect(() => { setActive(0); }, [debounced, open]);
+  useEffect(() => {
+    if (!open) return;
+    document.getElementById(`emp-opt-${active}`)?.scrollIntoView({ block: "nearest" });
+  }, [active, open]);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(a + 1, results.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
+    else if (e.key === "Enter") { e.preventDefault(); if (results[active]) pick(results[active]); }
+    else if (e.key === "Escape") { setOpen(false); setTerm(""); }
+  };
 
   return (
     <div ref={boxRef} className={`relative ${className}`}>
@@ -118,6 +134,7 @@ export function EmployeeSearchSelect({
               autoFocus
               value={term}
               onChange={(e) => setTerm(e.target.value)}
+              onKeyDown={onKeyDown}
               placeholder="Search name or ID…"
               className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-brand-500"
             />
@@ -134,18 +151,25 @@ export function EmployeeSearchSelect({
             {!isFetching && results.length === 0 && debounced && (
               <li className="px-3 py-2 text-xs text-slate-400">No matches for “{debounced}”.</li>
             )}
-            {results.map((e) => (
+            {results.map((e, i) => (
               <li key={e.id}>
                 <button
+                  id={`emp-opt-${i}`}
                   type="button"
+                  onMouseEnter={() => setActive(i)}
                   onClick={() => pick(e)}
-                  className={`flex w-full flex-col px-3 py-1.5 text-left hover:bg-slate-50 ${e.id === value ? "bg-brand-50" : ""}`}
+                  className={`flex w-full flex-col px-3 py-1.5 text-left ${i === active ? "bg-slate-50" : ""} ${e.id === value ? "bg-brand-50" : ""}`}
                 >
                   <span className="font-medium text-slate-800">{e.full_name}</span>
                   <span className="font-mono text-xs text-slate-400">{e.employee_no}{e.company ? ` · ${e.company.code}` : ""}</span>
                 </button>
               </li>
             ))}
+            {total > results.length && (
+              <li className="border-t border-slate-100 px-3 py-1.5 text-[11px] text-slate-400">
+                Showing first {results.length} of {total} — keep typing to narrow.
+              </li>
+            )}
           </ul>
         </div>,
         document.body,
