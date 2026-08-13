@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getEmployee, updateEmployee, getLookup, type EmployeeCreateInput } from "@/lib/employees";
 import { getMe } from "@/lib/auth";
 import { useBranchTerm } from "@/lib/terminology";
@@ -34,16 +34,18 @@ export default function EditEmployeePage() {
     time_in_out_required: true,
   });
 
-  const [hydrated, setHydrated] = useState(false);
   const { data: emp, isLoading } = useQuery({
     queryKey: ["employee", employeeId],
     queryFn: () => getEmployee(employeeId),
     enabled: !!employeeId,
   });
 
-  if (emp && !hydrated) {
-    setHydrated(true);
-    setForm({
+  // Snapshot of the loaded values — used for dirty detection (below) and to
+  // hydrate the form once the record arrives (no setState during render).
+  const initialRef = useRef<typeof form | null>(null);
+  useEffect(() => {
+    if (!emp) return;
+    const snapshot = {
       first_name: emp.first_name ?? "",
       middle_name: emp.middle_name ?? "",
       last_name: emp.last_name ?? "",
@@ -74,8 +76,23 @@ export default function EditEmployeePage() {
       is_active: emp.is_active,
       is_confidential: emp.is_confidential,
       time_in_out_required: emp.time_in_out_required ?? true,
-    });
-  }
+    };
+    setForm(snapshot);
+    initialRef.current = snapshot;
+  }, [emp]);
+
+  // Whether the form differs from what was loaded — drives the Save button and the
+  // "leave without saving?" guard.
+  const dirty = initialRef.current !== null && JSON.stringify(form) !== JSON.stringify(initialRef.current);
+
+  // Warn before a browser navigation / tab close swallows unsaved edits.
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => { if (dirty && !saved) { e.preventDefault(); e.returnValue = ""; } };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty, saved]);
+
+  const leave = () => { if (!dirty || window.confirm("Discard unsaved changes?")) router.back(); };
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const canConfi = me?.user.permissions.includes("employee.view.sensitive") ?? false;
@@ -365,16 +382,20 @@ export default function EditEmployeePage() {
       {error && <p className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>}
 
       <div className="flex items-center justify-between border-t border-slate-200 pt-5">
-        <button type="button" onClick={() => router.back()} className="text-sm font-medium text-slate-500 hover:text-slate-800">
+        <button type="button" onClick={leave} className="text-sm font-medium text-slate-500 hover:text-slate-800">
           ← Cancel
         </button>
-        <button
-          type="submit"
-          disabled={mutation.isPending || saved}
-          className="rounded-xl bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-60 transition"
-        >
-          {saved ? "Saved ✓" : mutation.isPending ? "Saving…" : "Save changes"}
-        </button>
+        <div className="flex items-center gap-3">
+          {dirty && !saved && <span className="text-xs text-amber-600">Unsaved changes</span>}
+          <button
+            type="submit"
+            disabled={mutation.isPending || saved || !dirty}
+            className="rounded-xl bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-60 transition"
+            title={!dirty ? "No changes to save" : undefined}
+          >
+            {saved ? "Saved ✓" : mutation.isPending ? "Saving…" : "Save changes"}
+          </button>
+        </div>
       </div>
     </form>
   );
