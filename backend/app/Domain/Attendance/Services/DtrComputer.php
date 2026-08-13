@@ -26,6 +26,15 @@ class DtrComputer
     public const LATE_GRACE_MINUTES = 15;
 
     /**
+     * How far a worked arrival may sit from the scheduled start before the day is
+     * treated as a DIFFERENT shift than the one on the schedule. Beyond this the
+     * hours are still credited, but late / undertime are not charged — a shifting or
+     * rotating worker on the wrong (e.g. day) schedule is not billed as hours late
+     * for a night shift they actually worked. Normal tardiness is far below this.
+     */
+    public const OFF_SCHEDULE_MINUTES = 6 * 60;
+
+    /**
      * Longest a single shift may span from first punch to last. A missing out-punch
      * would otherwise pair an in-punch with the NEXT shift's punch, inventing a
      * 20-24 hour "day". 16h comfortably covers a 12-hour shift plus overtime while
@@ -70,31 +79,21 @@ class DtrComputer
             ->get()
             ->keyBy(fn ($h) => $h->holiday_date->toDateString());
 
-        // Punches belong to a SHIFT, not a calendar day. On an overnight shift
-        // (22:00-07:00) the exit lands on the next date, so grouping by calendar day
-        // would pair last night's exit with tonight's entry — inventing a 14-hour day.
-        // Attribute an early punch to the previous day when that day's shift crossed
-        // midnight and the punch falls inside its window (plus room for overtime).
-        $logs = TimeLog::query()
-            ->where('employee_id', $employee->id)
-            ->whereBetween('logged_at', [$from->subDay(), $to->addDay()])
-            ->orderBy('logged_at')
-            ->get()
-            ->groupBy(function (TimeLog $l) use ($assignments) {
-                $date = $l->logged_at->toDateString();
-                $prevDay = $l->logged_at->subDay()->startOfDay();
-                $prev = $this->resolveScheduleDay($assignments, $prevDay);
-
-                if ($prev && ! $prev->is_rest_day && $prev->time_in && $prev->time_out) {
-                    [$si, $so] = $this->scheduledWindow($prevDay->toDateString(), $prev->time_in, $prev->time_out);
-                    // $so rolls past midnight only when the shift is overnight.
-                    if ($si && $so && $so->greaterThan($si->endOfDay()) && $l->logged_at->lessThanOrEqualTo($so->addHours(4))) {
-                        return $prevDay->toDateString();
-                    }
-                }
-
-                return $date;
-            });
+        // Punches belong to a SHIFT, not a calendar day. On an overnight shift the
+        // clock-out lands on the next date, so grouping by calendar day would pair
+        // last night's exit with tonight's entry — inventing a 14-hour day. The
+        // terminals now report direction reliably, so shifts are stitched from the
+        // punches themselves (see groupPunchesByShiftDay): an early clock-out is
+        // credited to the evening it began, even for shifting crews whose schedule
+        // does not describe the shift as overnight.
+        $logs = $this->groupPunchesByShiftDay(
+            TimeLog::query()
+                ->where('employee_id', $employee->id)
+                ->whereBetween('logged_at', [$from->subDay(), $to->addDay()])
+                ->orderBy('logged_at')
+                ->get(),
+            $assignments,
+        );
 
         $adjustments = ShiftAdjustment::query()
             ->where('employee_id', $employee->id)
@@ -306,6 +305,72 @@ class DtrComputer
         return [$si, $so];
     }
 
+    /**
+     * Group punches by the WORK DATE of the shift they belong to, not the calendar
+     * date they land on. The terminals now reliably report direction, so an OUT (or
+     * break) punch is credited to the still-open IN's day whenever it falls within a
+     * shift's length of it — crediting an overnight shift's early-morning clock-out
+     * to the evening it started, even when the schedule is not defined as overnight
+     * (shifting / rotating crews). An orphan morning punch with no open IN falls back
+     * to the schedule-based overnight window, otherwise its own day.
+     *
+     * @param  Collection<int, TimeLog>  $punches  ordered by logged_at
+     * @param  Collection<int, EmployeeSchedule>  $assignments
+     * @return Collection<string, Collection<int, TimeLog>>  keyed by work_date
+     */
+    private function groupPunchesByShiftDay(Collection $punches, Collection $assignments): Collection
+    {
+        $openInDay = null;   // work_date of the shift currently open (its IN seen, no OUT yet)
+        $openInAt = null;    // CarbonImmutable of that IN
+        $byDate = [];
+
+        foreach ($punches as $l) {
+            $ownDate = $l->logged_at->toDateString();
+
+            if ($l->direction === 'in') {
+                // A new arrival opens (or re-opens) a shift on its own calendar day.
+                $openInDay = $ownDate;
+                $openInAt = $l->logged_at;
+                $date = $ownDate;
+            } elseif ($openInDay !== null && $openInAt !== null
+                && $l->logged_at->greaterThan($openInAt)
+                && $openInAt->diffInMinutes($l->logged_at) <= self::MAX_SHIFT_MINUTES) {
+                // OUT / break within the open shift → belongs to the day it started.
+                $date = $openInDay;
+                if ($l->direction === 'out') {
+                    $openInDay = $openInAt = null; // shift closed
+                }
+            } else {
+                // Orphan OUT/break with no open IN: keep the schedule-based overnight
+                // attribution (previous day scheduled to cross midnight), else own day.
+                $date = $this->scheduleOvernightDay($l, $assignments) ?? $ownDate;
+            }
+
+            $byDate[$date][] = $l;
+        }
+
+        return collect($byDate)->map(fn (array $rows) => collect($rows));
+    }
+
+    /**
+     * The previous day's work_date when an early punch belongs to a scheduled
+     * overnight shift that crossed midnight, otherwise null. Fallback for a morning
+     * punch that has no open IN to attribute it to.
+     */
+    private function scheduleOvernightDay(TimeLog $l, Collection $assignments): ?string
+    {
+        $prevDay = $l->logged_at->subDay()->startOfDay();
+        $prev = $this->resolveScheduleDay($assignments, $prevDay);
+        if ($prev && ! $prev->is_rest_day && $prev->time_in && $prev->time_out) {
+            [$si, $so] = $this->scheduledWindow($prevDay->toDateString(), $prev->time_in, $prev->time_out);
+            if ($si && $so && $so->greaterThan($si->endOfDay()) && $l->logged_at->lessThanOrEqualTo($so->addHours(4))) {
+                return $prevDay->toDateString();
+            }
+        }
+
+        return null;
+    }
+
     private function computeDay(
         Employee $employee,
         CarbonInterface $day,
@@ -355,15 +420,21 @@ class DtrComputer
             $actualOut = null;
         }
 
-        // A single punch is ambiguous: count it as a departure when it falls nearer
-        // the scheduled end than the scheduled start, otherwise as an arrival.
-        if ($sortedLogs->count() === 1 && $scheduleDay && ! $isRestDay
-            && $scheduleDay->time_in && $scheduleDay->time_out) {
-            $only = $sortedLogs->first()->logged_at;
-            [$si, $so] = $this->scheduledWindow($day->toDateString(), $scheduleDay->time_in, $scheduleDay->time_out);
-            if (abs($only->diffInMinutes($so)) < abs($only->diffInMinutes($si))) {
+        // A single punch: honour the device's own direction (now reliable) — a lone
+        // OUT is a departure, a lone IN an arrival. Only when the direction is unknown
+        // do we guess by schedule proximity (nearer the scheduled end = departure).
+        if ($sortedLogs->count() === 1 && ! $isRestDay) {
+            $onlyLog = $sortedLogs->first();
+            $only = $onlyLog->logged_at;
+            if ($onlyLog->direction === 'out') {
                 $actualIn = null;
                 $actualOut = $only;
+            } elseif ($onlyLog->direction !== 'in' && $scheduleDay && $scheduleDay->time_in && $scheduleDay->time_out) {
+                [$si, $so] = $this->scheduledWindow($day->toDateString(), $scheduleDay->time_in, $scheduleDay->time_out);
+                if (abs($only->diffInMinutes($so)) < abs($only->diffInMinutes($si))) {
+                    $actualIn = null;
+                    $actualOut = $only;
+                }
             }
         }
 
@@ -432,7 +503,14 @@ class DtrComputer
             $hoursWorked = round($minutes / 60, 2);
 
             [$schedIn, $schedOut] = $this->scheduledWindow($day->toDateString(), $scheduledIn, $scheduledOut);
-            if ($schedIn && ! $isRestDay) {
+            // Late / undertime only apply when the worked shift lines up with the
+            // schedule. A shifting/rotating worker whose punches fall in a wholly
+            // different window (night shift vs a day schedule) still gets the hours
+            // worked, but is not charged lateness/undertime against a shift they were
+            // not on. Ordinary tardiness sits far below OFF_SCHEDULE_MINUTES.
+            $scheduleMatches = ! $schedIn
+                || abs((int) round($schedIn->diffInMinutes($actualIn, false))) <= self::OFF_SCHEDULE_MINUTES;
+            if ($schedIn && ! $isRestDay && $scheduleMatches) {
                 $lateMinutes = max(0, (int) round($schedIn->diffInMinutes($actualIn, false)));
                 // Grace period: arriving within the allowance is not late at all.
                 // Past it, the full lateness from the scheduled start counts.
@@ -444,7 +522,7 @@ class DtrComputer
                     $lateMinutes = 0;
                 }
             }
-            if ($schedOut && ! $isRestDay) {
+            if ($schedOut && ! $isRestDay && $scheduleMatches) {
                 $undertimeMinutes = max(0, (int) round($actualOut->diffInMinutes($schedOut, false)));
             }
 
