@@ -20,6 +20,7 @@ export function EmployeeSearchSelect({
   companyId,
   scope,
   className = "",
+  initialLabel = "",
 }: {
   value: number | "";
   onChange: (id: number | "", label?: string) => void;
@@ -28,11 +29,13 @@ export function EmployeeSearchSelect({
   /** Which set to search: organic (default), agency, or all (both). */
   scope?: "organic" | "agency" | "all";
   className?: string;
+  /** Label to show for a pre-selected value (e.g. an existing manager), until changed. */
+  initialLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [selectedLabel, setSelectedLabel] = useState<string>("");
+  const [selectedLabel, setSelectedLabel] = useState<string>(initialLabel);
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);

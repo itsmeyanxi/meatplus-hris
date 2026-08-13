@@ -7,6 +7,9 @@ use App\Domain\HRIS\Models\Employee;
 use App\Domain\HRIS\Models\EmployeeGovernmentId;
 use App\Domain\HRIS\Models\EmploymentType;
 use App\Domain\HRIS\Models\Position;
+use App\Domain\Attendance\Models\EmployeeSchedule;
+use App\Domain\Attendance\Models\WorkSchedule;
+use App\Domain\Attendance\Models\WorkScheduleDay;
 use App\Domain\Identity\Models\Branch;
 use App\Domain\Payroll\Models\EmployeeCompensation;
 use App\Domain\Payroll\Models\EmployeePayrollProfile;
@@ -63,6 +66,20 @@ class EmployeeImportService
         'communication' => ['communication'],
         'travel' => ['travel'],
         'allowance_others' => ['others', 'other allowance', 'allowance'],
+        // Contact + address.
+        'mobile' => ['mobile', 'mobile no', 'mobile number', 'contact number', 'contact no', 'cellphone', 'cell no', 'phone', 'contact'],
+        'religion' => ['religion'],
+        'nationality' => ['nationality', 'citizenship'],
+        'address' => ['address', 'home address', 'present address', 'address line 1', 'street address', 'street'],
+        'city' => ['city', 'municipality', 'city/municipality', 'town'],
+        'province' => ['province', 'state'],
+        // Immediate supervisor / manager, resolved by name to another employee.
+        'supervisor' => ['immediate supervisor', 'supervisor', 'manager', 'reports to', 'superior', 'reporting manager', 'approver'],
+        // Work schedule / shift. Times accept 08:00, 8:00 AM, 0800. Rest days accept
+        // names (Sun) or numbers (0=Sun..6=Sat), comma-separated; blank = Sunday.
+        'schedule_in' => ['schedule in', 'shift start', 'time in', 'sched in', 'schedule_in', 'shift in', 'start time', 'shift'],
+        'schedule_out' => ['schedule out', 'shift end', 'time out', 'sched out', 'schedule_out', 'shift out', 'end time'],
+        'rest_days' => ['rest days', 'rest day', 'off days', 'day off', 'restday', 'rest'],
     ];
 
     /** @var array<string,int> name(lower) => id */
@@ -70,6 +87,9 @@ class EmployeeImportService
     private array $branchCache = [];
     private array $positionCache = [];
     private array $empTypeCache = [];
+    private array $scheduleCache = [];
+    /** @var array<int, array<string,int>> companyId => normalized-name => employee id */
+    private array $nameIndex = [];
 
     /** When true, branches resolved during this import are flagged is_agency. */
     private bool $asAgency = false;
@@ -205,6 +225,36 @@ class EmployeeImportService
                     $present['birth_date'] = $born;
                 }
 
+                // Contact + address.
+                if (($mob = $get('mobile')) !== '') {
+                    $present['mobile'] = $mob;
+                }
+                if (($rel = $get('religion')) !== '') {
+                    $present['religion'] = $rel;
+                }
+                if (($nat = $get('nationality')) !== '') {
+                    $present['nationality'] = $nat;
+                }
+                if (($addr = $get('address')) !== '') {
+                    $present['address_line1'] = $addr;
+                }
+                if (($cty = $get('city')) !== '') {
+                    $present['city'] = $cty;
+                }
+                if (($prov = $get('province')) !== '') {
+                    $present['province'] = $prov;
+                }
+
+                // Immediate supervisor / manager, matched to another employee by name.
+                if (($sup = $get('supervisor')) !== '') {
+                    $mgrId = $this->resolveSupervisor($companyId, $sup);
+                    if ($mgrId) {
+                        $present['manager_employee_id'] = $mgrId;
+                    } else {
+                        $warnings[] = ['row' => $line, 'message' => "Supervisor \"{$sup}\" not found in this company — left unchanged."];
+                    }
+                }
+
                 // Employment status: a "Resigned/Terminated/Separated" status (or a
                 // separation date) marks the employee INACTIVE — keeping resigned
                 // staff out of payroll — while an explicit active status reactivates.
@@ -266,6 +316,7 @@ class EmployeeImportService
 
                 $this->applyGovernmentIds($employee, $get);
                 $this->applyCompensation($employee, $companyId, $get);
+                $this->applySchedule($employee, $companyId, $get, $warnings, $line);
             } catch (\Throwable $e) {
                 $errors[] = ['row' => $line, 'message' => $e->getMessage()];
             }
@@ -342,6 +393,186 @@ class EmployeeImportService
             'allowance_monthly' => $allowance,
             'effective_from' => $employee->date_hired?->toDateString() ?? now()->toDateString(),
             'is_active' => true,
+        ]);
+    }
+
+    /** Match a supervisor name to an employee id in the company (first-last or last-first). */
+    private function resolveSupervisor(int $companyId, string $name): ?int
+    {
+        if (! isset($this->nameIndex[$companyId])) {
+            $this->nameIndex[$companyId] = [];
+            foreach (Employee::query()->where('company_id', $companyId)->get(['id', 'first_name', 'middle_name', 'last_name']) as $e) {
+                $f = $e->first_name; $m = $e->middle_name; $l = $e->last_name;
+                // Index several name orderings so a supervisor written with or without a
+                // middle name, first-last or last-first, still resolves.
+                $variants = ["$f $l", "$l $f", "$f $m $l", "$l $f $m", "$f $l $m"];
+                foreach ($variants as $variant) {
+                    $k = $this->normName($variant);
+                    if ($k !== '') {
+                        $this->nameIndex[$companyId][$k] ??= $e->id;
+                    }
+                }
+            }
+        }
+
+        return $this->nameIndex[$companyId][$this->normName(str_replace(',', ' ', $name))] ?? null;
+    }
+
+    /** Strip to letters only, lower-cased — tolerant of punctuation/middle names/spacing. */
+    private function normName(string $s): string
+    {
+        return preg_replace('/[^a-z]/', '', strtolower($s));
+    }
+
+    /**
+     * Create/assign a work schedule from Schedule In / Out (+ Rest Days) on the row.
+     * Schedules are shared per company by their in/out/rest-day signature, so many
+     * employees on the same shift reuse one schedule rather than making hundreds.
+     */
+    private function applySchedule(Employee $employee, int $companyId, callable $get, array &$warnings, int $line): void
+    {
+        $inRaw = $get('schedule_in');
+        $outRaw = $get('schedule_out');
+        if ($inRaw === '' || $outRaw === '') {
+            return;
+        }
+        $in = $this->parseTime($inRaw);
+        $out = $this->parseTime($outRaw);
+        if ($in === null || $out === null) {
+            $warnings[] = ['row' => $line, 'message' => "Unreadable schedule time (in \"{$inRaw}\", out \"{$outRaw}\") — schedule left unchanged."];
+
+            return;
+        }
+
+        $rest = $this->parseRestDays($get('rest_days'));
+        $wsId = $this->resolveSchedule($companyId, $in, $out, $rest);
+        $this->assignSchedule($employee, $wsId);
+    }
+
+    /** "08:00" / "8:00 AM" / "0800" / "17:00" -> "H:i:s", or null. */
+    private function parseTime(string $v): ?string
+    {
+        $v = trim($v);
+        if ($v === '') {
+            return null;
+        }
+        if (preg_match('/^\d{3,4}$/', $v)) {
+            $p = str_pad($v, 4, '0', STR_PAD_LEFT);
+            $v = substr($p, 0, 2).':'.substr($p, 2, 2);
+        }
+        try {
+            return Carbon::parse($v)->format('H:i:s');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** Parse a rest-days cell into day-of-week ints (0=Sun..6=Sat). Blank = Sunday. */
+    private function parseRestDays(string $v): array
+    {
+        $v = strtolower(trim($v));
+        if ($v === '') {
+            return [0];
+        }
+        $names = ['sun' => 0, 'mon' => 1, 'tue' => 2, 'wed' => 3, 'thu' => 4, 'fri' => 5, 'sat' => 6];
+        $out = [];
+        foreach (preg_split('/[,;\/&]+|\s+and\s+|\s+/', $v) as $tok) {
+            $tok = trim($tok);
+            if ($tok === '') {
+                continue;
+            }
+            if (is_numeric($tok)) {
+                $n = (int) $tok;
+                if ($n >= 0 && $n <= 6) {
+                    $out[] = $n;
+                }
+            } elseif (isset($names[substr($tok, 0, 3)])) {
+                $out[] = $names[substr($tok, 0, 3)];
+            }
+        }
+
+        return $out !== [] ? array_values(array_unique($out)) : [0];
+    }
+
+    /** Reuse or create a company work schedule for this in/out/rest-day pattern. */
+    private function resolveSchedule(int $companyId, string $in, string $out, array $rest): int
+    {
+        sort($rest);
+        $restSig = implode('', $rest);
+        $sig = $companyId.'|'.$in.'|'.$out.'|'.$restSig;
+        if (isset($this->scheduleCache[$sig])) {
+            return $this->scheduleCache[$sig];
+        }
+
+        $code = 'IMP-'.str_replace(':', '', substr($in, 0, 5)).'-'.str_replace(':', '', substr($out, 0, 5)).'-R'.($restSig === '' ? 'X' : $restSig);
+        $ws = WorkSchedule::query()->where('company_id', $companyId)->where('code', $code)->first();
+
+        if (! $ws) {
+            $startMin = ((int) substr($in, 0, 2)) * 60 + (int) substr($in, 3, 2);
+            $endMin = ((int) substr($out, 0, 2)) * 60 + (int) substr($out, 3, 2);
+            if ($endMin <= $startMin) {
+                $endMin += 1440; // overnight shift
+            }
+            $break = 60;
+            $required = round(max(0, $endMin - $startMin - $break) / 60, 2);
+
+            $ws = WorkSchedule::create([
+                'company_id' => $companyId,
+                'code' => $code,
+                'name' => 'Shift '.substr($in, 0, 5).'-'.substr($out, 0, 5),
+                'is_flexible' => false,
+                'breaks_paid' => false,
+                'weekly_workdays' => 7 - count($rest),
+                'hours_per_day' => $required,
+                'is_active' => true,
+            ]);
+
+            for ($dow = 0; $dow < 7; $dow++) {
+                $isRest = in_array($dow, $rest, true);
+                WorkScheduleDay::create([
+                    'work_schedule_id' => $ws->id,
+                    'day_of_week' => $dow,
+                    'is_rest_day' => $isRest,
+                    'time_in' => $isRest ? null : $in,
+                    'time_out' => $isRest ? null : $out,
+                    'break_minutes' => $isRest ? 0 : $break,
+                    'required_hours' => $isRest ? 0 : $required,
+                ]);
+            }
+        }
+
+        return $this->scheduleCache[$sig] = $ws->id;
+    }
+
+    /** Assign the schedule to the employee, closing any different current assignment. */
+    private function assignSchedule(Employee $employee, int $workScheduleId): void
+    {
+        $latest = EmployeeSchedule::query()
+            ->where('employee_id', $employee->id)
+            ->orderByDesc('effective_from')->orderByDesc('id')
+            ->first();
+
+        // Already on this schedule with an open assignment — nothing to do.
+        if ($latest && (int) $latest->work_schedule_id === $workScheduleId && $latest->effective_to === null) {
+            return;
+        }
+
+        if ($latest) {
+            // Correcting an existing schedule: the new one takes effect today, and the
+            // old open assignment is closed the day before.
+            if ($latest->effective_to === null) {
+                $latest->update(['effective_to' => now()->subDay()->toDateString()]);
+            }
+            $effectiveFrom = now()->toDateString();
+        } else {
+            // Filling a gap: cover history from the hire date (or today if none).
+            $effectiveFrom = $employee->date_hired?->toDateString() ?? now()->toDateString();
+        }
+
+        EmployeeSchedule::create([
+            'employee_id' => $employee->id,
+            'work_schedule_id' => $workScheduleId,
+            'effective_from' => $effectiveFrom,
         ]);
     }
 

@@ -7,6 +7,7 @@ import { getEmployee, updateEmployee, getLookup, type EmployeeCreateInput } from
 import { getMe } from "@/lib/auth";
 import { useBranchTerm } from "@/lib/terminology";
 import { SearchSelect } from "@/components/SearchSelect";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 
 export default function EditEmployeePage() {
   const router = useRouter();
@@ -26,6 +27,7 @@ export default function EditEmployeePage() {
     department_id: 0,
     position_id: 0,
     employment_type_id: 0,
+    manager_employee_id: 0,
     date_hired: "", date_regularized: "",
     is_active: true,
     is_confidential: false,
@@ -66,6 +68,7 @@ export default function EditEmployeePage() {
       department_id: emp.department?.id ?? 0,
       position_id: emp.position?.id ?? 0,
       employment_type_id: emp.employment_type?.id ?? 0,
+      manager_employee_id: emp.manager?.id ?? 0,
       date_hired: emp.date_hired ?? "",
       date_regularized: emp.date_regularized ?? "",
       is_active: emp.is_active,
@@ -99,6 +102,7 @@ export default function EditEmployeePage() {
         department_id: form.department_id ? Number(form.department_id) : undefined,
         position_id: form.position_id ? Number(form.position_id) : undefined,
         employment_type_id: form.employment_type_id ? Number(form.employment_type_id) : undefined,
+        manager_employee_id: form.manager_employee_id ? Number(form.manager_employee_id) : null,
       };
       // Only send the enum fields when actually set — an empty string fails the
       // API's `in:` validation, which blocked saving records with no gender yet.
@@ -286,6 +290,16 @@ export default function EditEmployeePage() {
           </Field>
           <Field label="Date regularized">
             <input type="date" name="date_regularized" value={form.date_regularized} onChange={set} className={inp} />
+          </Field>
+          <Field label="Immediate Supervisor / Manager">
+            <EmployeeSearchSelect
+              value={form.manager_employee_id || ""}
+              onChange={(id) => setForm((p) => ({ ...p, manager_employee_id: id ? Number(id) : 0 }))}
+              placeholder="— None —"
+              companyId={emp?.company?.id}
+              initialLabel={emp?.manager?.full_name ?? ""}
+              className="mt-0.5"
+            />
           </Field>
         </div>
 

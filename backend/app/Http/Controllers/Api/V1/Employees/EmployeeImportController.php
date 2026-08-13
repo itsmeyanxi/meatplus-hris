@@ -115,14 +115,16 @@ class EmployeeImportController extends Controller
             'Branch', 'Department', 'Position', 'Employment Type',
             'Gender', 'Civil Status', 'Date Hired', 'Birth Date', 'Email',
             'Employee Status', 'Separation Date', 'Confidential',
+            'Immediate Supervisor', 'Schedule In', 'Schedule Out', 'Rest Days',
+            'Mobile', 'Address', 'City', 'Province', 'Religion', 'Nationality',
         ];
         // Worked examples mirroring an agency biometric roster (Employee ID may
         // equal the device PIN; leave any unknown cell blank — blanks are ignored).
         $examples = [
-            ['5', '5', 'Suing', 'Jeric', '', 'EAA', '', '', '', 'Male', 'Single', '', '', '', 'Active', '', 'No'],
-            ['6', '6', 'Jatulan', 'Justine', '', 'EAA', '', '', '', 'Female', 'Single', '', '', '', 'Active', '', 'No'],
-            ['9', '9', 'Celedonio', 'Jayson', '', 'ATC', '', '', '', 'Male', 'Married', '', '', '', 'Resigned', '2026-06-30', 'No'],
-            ['EMP-1001', '5', 'Dela Cruz', 'Juan', 'Santos', 'Head Office', 'Operations', 'Warehouse Staff', 'Regular', 'Male', 'Single', '2020-05-01', '1995-03-12', 'juan.delacruz@meatplus.ph', 'Active', '', 'Yes'],
+            ['5', '5', 'Suing', 'Jeric', '', 'EAA', '', '', '', 'Male', 'Single', '', '', '', 'Active', '', 'No', '', '', '', '', '', '', '', '', '', ''],
+            ['6', '6', 'Jatulan', 'Justine', '', 'EAA', '', '', '', 'Female', 'Single', '', '', '', 'Active', '', 'No', '', '', '', '', '', '', '', '', '', ''],
+            ['9', '9', 'Celedonio', 'Jayson', '', 'ATC', '', '', '', 'Male', 'Married', '', '', '', 'Resigned', '2026-06-30', 'No', '', '', '', '', '', '', '', '', '', ''],
+            ['EMP-1001', '5', 'Dela Cruz', 'Juan', 'Santos', 'Head Office', 'Operations', 'Warehouse Staff', 'Regular', 'Male', 'Single', '2020-05-01', '1995-03-12', 'juan.delacruz@meatplus.ph', 'Active', '', 'Yes', 'Maria Santos', '08:00', '17:00', 'Sunday', '09171234567', '123 Rizal St', 'Mexico', 'Pampanga', 'Catholic', 'Filipino'],
         ];
 
         $guide = [
@@ -151,6 +153,14 @@ class EmployeeImportController extends Controller
             ['                       so they drop out of payroll; any other status keeps them active.'],
             ['   • Confidential   — Yes / No. Moves the person into the confidential vs non-confidential payroll'],
             ['                       group. Applied only if your account may edit confidential classification.'],
+            [''],
+            ['SCHEDULE, SUPERVISOR, ADDRESS & CONTACT'],
+            ['   • Schedule In / Schedule Out — the shift start/end, e.g. 08:00 and 17:00 (also accepts 8:00 AM).'],
+            ['                       Filling both assigns a work schedule so attendance/absences are tracked.'],
+            ['   • Rest Days      — day(s) off, e.g. "Sunday" or "Sat, Sun" (blank = Sunday). For a night shift,'],
+            ['                       set Schedule Out earlier than Schedule In (e.g. 18:00 to 06:00 crosses midnight).'],
+            ['   • Immediate Supervisor — the manager\'s name; matched to an existing employee in the company.'],
+            ['   • Mobile, Address, City, Province, Religion, Nationality — plain contact / personal details.'],
             [''],
             ['RULES & TIPS'],
             ['   • Dates: use YYYY-MM-DD (e.g. 2026-07-29).'],
