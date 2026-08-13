@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader, AppButton, TableShell } from "@/components/ui";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
@@ -17,14 +18,32 @@ function fmt(d: string | null) {
 }
 
 export default function BiometricIssuesPage() {
+  // useSearchParams (for the ?focus deep-link) must sit under a Suspense boundary.
+  return (
+    <Suspense fallback={null}>
+      <BiometricIssuesContent />
+    </Suspense>
+  );
+}
+
+function BiometricIssuesContent() {
   const qc = useQueryClient();
   const { confirm, dialog } = useConfirm();
   const [includeResolved, setIncludeResolved] = useState(false);
+
+  // A notification deep-links here with ?focus=<id> — scroll to and highlight that row.
+  const focusId = Number(useSearchParams().get("focus")) || null;
 
   const { data: rows, isLoading, isError } = useQuery({
     queryKey: [...QK, includeResolved],
     queryFn: () => biometricAnomaliesApi.list(includeResolved),
   });
+
+  useEffect(() => {
+    if (!focusId || !rows) return;
+    const el = document.getElementById(`bio-row-${focusId}`);
+    el?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [focusId, rows]);
 
   const rescan = useMutation({
     mutationFn: biometricAnomaliesApi.rescan,
@@ -93,7 +112,13 @@ export default function BiometricIssuesPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {rows.map((a) => (
-                <tr key={a.id} className={`hover:bg-slate-50/60 ${a.resolved_at ? "opacity-50" : ""}`}>
+                <tr
+                  key={a.id}
+                  id={`bio-row-${a.id}`}
+                  className={`hover:bg-slate-50/60 ${a.resolved_at ? "opacity-50" : ""} ${
+                    focusId === a.id ? "bg-amber-50 ring-2 ring-inset ring-amber-300" : ""
+                  }`}
+                >
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-800">{a.employee.name || "—"}</div>
                     <div className="font-mono text-xs text-slate-400">

@@ -186,7 +186,7 @@ class BiometricAnomalyDetector
                 $a['pin'],
                 $a['device_name'],
                 $a['punches'],
-                '/attendance/biometric-issues',
+                '/attendance/biometric-issues?focus='.$row->id, // land on this exact row
                 $a['employee_id'],
             ));
         } catch (\Throwable $e) {
