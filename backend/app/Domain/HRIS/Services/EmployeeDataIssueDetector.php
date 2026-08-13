@@ -140,6 +140,16 @@ class EmployeeDataIssueDetector
         return ['new' => $new, 'ongoing' => $ongoing, 'resolved' => $resolved, 'open' => $open];
     }
 
+    /** Short human label per category, ordered high-severity first (drives the digest breakdown). */
+    private const CATEGORY_LABELS = [
+        'missing_employment_type' => 'no employment type',
+        'missing_compensation' => 'no compensation',
+        'attendance_silent' => 'silent attendance',
+        'missing_position' => 'no position',
+        'missing_department' => 'no department',
+        'missing_biometric_id' => 'no biometric ID',
+    ];
+
     /** Aggregated digest to the HR of ONE company (employee.update holders for it). */
     private function notifyHr(?int $companyId, int $newCount): void
     {
@@ -149,6 +159,17 @@ class EmployeeDataIssueDetector
 
             $openTotal = $scope(EmployeeDataIssue::query())->count();
             $highOpen = $scope(EmployeeDataIssue::query())->where('severity', 'high')->count();
+
+            // Per-category counts so the digest can say exactly WHAT is missing.
+            $counts = $scope(EmployeeDataIssue::query())
+                ->select('category', DB::raw('count(*) as c'))
+                ->groupBy('category')->pluck('c', 'category');
+            $breakdown = [];
+            foreach (self::CATEGORY_LABELS as $cat => $label) {
+                if (($n = (int) ($counts[$cat] ?? 0)) > 0) {
+                    $breakdown[] = ['label' => $label, 'count' => $n];
+                }
+            }
 
             $users = HrRecipients::withPermissionForCompany('employee.update', $companyId);
             if ($users->isEmpty()) {
@@ -160,6 +181,7 @@ class EmployeeDataIssueDetector
                 $highOpen,
                 $openTotal,
                 '/employees/data-issues',
+                $breakdown,
             ));
 
             $scope(EmployeeDataIssue::query())
