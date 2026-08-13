@@ -4,7 +4,7 @@ namespace App\Domain\HRIS\Services;
 
 use App\Domain\HRIS\Models\Employee;
 use App\Domain\HRIS\Models\EmployeeDataIssue;
-use App\Models\User;
+use App\Domain\Identity\Support\HrRecipients;
 use App\Notifications\EmployeeDataIssuesDigest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -86,6 +86,7 @@ class EmployeeDataIssueDetector
         $seen = [];
         $new = 0;
         $ongoing = 0;
+        $newByCompany = []; // company_id => count of newly-opened issues
 
         foreach ($current as $a) {
             $key = $a['employee_id'].'|'.$a['category'];
@@ -109,7 +110,13 @@ class EmployeeDataIssueDetector
                 'resolved_at' => null,
             ])->save();
 
-            $isNew ? $new++ : $ongoing++;
+            if ($isNew) {
+                $new++;
+                $cid = $a['company_id'] ? (int) $a['company_id'] : 0;
+                $newByCompany[$cid] = ($newByCompany[$cid] ?? 0) + 1;
+            } else {
+                $ongoing++;
+            }
         }
 
         // Auto-resolve issues that are no longer detected (and weren't ignored).
@@ -125,29 +132,25 @@ class EmployeeDataIssueDetector
 
         $open = EmployeeDataIssue::whereNull('resolved_at')->where('ignored', false)->count();
 
-        if ($new > 0) {
-            $this->notifyHr($new, $open);
+        // One digest PER COMPANY, to that company's HR only.
+        foreach ($newByCompany as $cid => $newCount) {
+            $this->notifyHr($cid ?: null, $newCount);
         }
 
         return ['new' => $new, 'ongoing' => $ongoing, 'resolved' => $resolved, 'open' => $open];
     }
 
-    /** One aggregated digest to HR (employee.update holders). */
-    private function notifyHr(int $newCount, int $openTotal): void
+    /** Aggregated digest to the HR of ONE company (employee.update holders for it). */
+    private function notifyHr(?int $companyId, int $newCount): void
     {
         try {
-            $highOpen = EmployeeDataIssue::whereNull('resolved_at')->where('ignored', false)->where('severity', 'high')->count();
+            $scope = fn ($q) => $q->whereNull('resolved_at')->where('ignored', false)
+                ->when($companyId, fn ($c) => $c->where('company_id', $companyId));
 
-            $roleIds = DB::table('role_has_permissions as rp')
-                ->join('permissions as p', 'p.id', '=', 'rp.permission_id')
-                ->where('p.name', 'employee.update')
-                ->pluck('rp.role_id');
-            $userIds = DB::table('model_has_roles')
-                ->where('model_type', User::class)
-                ->whereIn('role_id', $roleIds)
-                ->pluck('model_id')->unique();
+            $openTotal = $scope(EmployeeDataIssue::query())->count();
+            $highOpen = $scope(EmployeeDataIssue::query())->where('severity', 'high')->count();
 
-            $users = User::whereIn('id', $userIds)->where('is_active', true)->get();
+            $users = HrRecipients::withPermissionForCompany('employee.update', $companyId);
             if ($users->isEmpty()) {
                 return;
             }
@@ -159,7 +162,7 @@ class EmployeeDataIssueDetector
                 '/employees/data-issues',
             ));
 
-            EmployeeDataIssue::whereNull('resolved_at')->where('ignored', false)
+            $scope(EmployeeDataIssue::query())
                 ->whereNull('first_notified_at')
                 ->update(['first_notified_at' => now()]);
         } catch (\Throwable $e) {

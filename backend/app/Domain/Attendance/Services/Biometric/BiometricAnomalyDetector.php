@@ -4,7 +4,7 @@ namespace App\Domain\Attendance\Services\Biometric;
 
 use App\Domain\Attendance\Models\BiometricAnomaly;
 use App\Domain\HRIS\Models\Employee;
-use App\Models\User;
+use App\Domain\Identity\Support\HrRecipients;
 use App\Notifications\BiometricMappingAlert;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -172,21 +172,11 @@ class BiometricAnomalyDetector
         return ['new' => $new, 'ongoing' => $ongoing, 'resolved' => $resolved];
     }
 
-    /** Send the bell alert to HR — holders of attendance.manage (mirrors approver notifs). */
+    /** Send the bell alert to HR of the affected employee's company (attendance.manage). */
     private function notifyHr(BiometricAnomaly $row, array $a): void
     {
         try {
-            $roleIds = DB::table('role_has_permissions as rp')
-                ->join('permissions as p', 'p.id', '=', 'rp.permission_id')
-                ->where('p.name', 'attendance.manage')
-                ->pluck('rp.role_id');
-            $userIds = DB::table('model_has_roles')
-                ->where('model_type', User::class)
-                ->whereIn('role_id', $roleIds)
-                ->pluck('model_id')
-                ->unique();
-
-            $users = User::whereIn('id', $userIds)->where('is_active', true)->get();
+            $users = HrRecipients::withPermissionForCompany('attendance.manage', $a['company_id'] ? (int) $a['company_id'] : null);
             if ($users->isEmpty()) {
                 return;
             }
