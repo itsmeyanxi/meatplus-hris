@@ -55,6 +55,15 @@ export default function CompensationPage() {
   const patch = (r: CompRow, p: Partial<Edit>) =>
     setEdits((s) => ({ ...s, [r.employee_id]: { ...(s[r.employee_id] ?? base(r)), ...p } }));
 
+  // A row is "dirty" only when a pay VALUE changed (not the always-today effective
+  // date). Saving an unchanged row would append a duplicate salary-history record,
+  // so Save stays disabled until something actually changes.
+  const VALUE_KEYS: (keyof Edit)[] = ["payType", "rate", "allowance", "deMinimis", "commAllowance", "transportAllowance", "mealAllowance", "fleetCard"];
+  const isDirty = (r: CompRow) => {
+    const c = cur(r), b = base(r);
+    return VALUE_KEYS.some((k) => c[k] !== b[k]);
+  };
+
   const save = useMutation({
     mutationFn: (r: CompRow) => {
       const e = cur(r);
@@ -312,9 +321,11 @@ export default function CompensationPage() {
                         />
                         <button
                           onClick={() => save.mutate(r)}
-                          disabled={save.isPending || !e.effectiveFrom}
-                          title={!e.effectiveFrom ? "Set an effective date first" : "Save this rate"}
-                          className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-40"
+                          disabled={save.isPending || !e.effectiveFrom || !isDirty(r)}
+                          title={!e.effectiveFrom ? "Set an effective date first" : !isDirty(r) ? "No changes to save" : "Save this rate"}
+                          className={`rounded-md border px-2.5 py-1 text-xs font-medium transition disabled:opacity-40 ${
+                            isDirty(r) ? "border-brand-300 bg-brand-50 text-brand-700 hover:bg-brand-100" : "border-slate-200 text-slate-600 hover:bg-slate-100"
+                          }`}
                         >
                           Save
                         </button>

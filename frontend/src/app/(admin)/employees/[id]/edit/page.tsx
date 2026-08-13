@@ -8,6 +8,7 @@ import { getMe } from "@/lib/auth";
 import { useBranchTerm } from "@/lib/terminology";
 import { SearchSelect } from "@/components/SearchSelect";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
+import { useUnsavedGuard } from "@/lib/useUnsavedGuard";
 
 export default function EditEmployeePage() {
   const router = useRouter();
@@ -84,13 +85,7 @@ export default function EditEmployeePage() {
   // Whether the form differs from what was loaded — drives the Save button and the
   // "leave without saving?" guard.
   const dirty = initialRef.current !== null && JSON.stringify(form) !== JSON.stringify(initialRef.current);
-
-  // Warn before a browser navigation / tab close swallows unsaved edits.
-  useEffect(() => {
-    const handler = (e: BeforeUnloadEvent) => { if (dirty && !saved) { e.preventDefault(); e.returnValue = ""; } };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty, saved]);
+  useUnsavedGuard(dirty && !saved);
 
   const leave = () => { if (!dirty || window.confirm("Discard unsaved changes?")) router.back(); };
 

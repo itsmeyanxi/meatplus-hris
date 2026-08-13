@@ -9,6 +9,7 @@ import { z } from "zod";
 import { createEmployee, getLookup } from "@/lib/employees";
 import { useBranchTerm } from "@/lib/terminology";
 import { SearchSelect } from "@/components/SearchSelect";
+import { useUnsavedGuard } from "@/lib/useUnsavedGuard";
 
 const schema = z.object({
   employee_no: z.string().min(1, "Required").max(30),
@@ -52,6 +53,9 @@ export default function NewEmployeePage() {
     resolver: zodResolver(schema),
     defaultValues: { nationality: "Filipino", gender: "male", civil_status: "single" },
   });
+  // Don't let a half-filled new-employee form vanish on an accidental refresh/close.
+  useUnsavedGuard(form.formState.isDirty && !form.formState.isSubmitSuccessful);
+  const leave = () => { if (!form.formState.isDirty || window.confirm("Discard this new employee?")) router.back(); };
   const departmentId = form.watch("department_id");
   const { data: positions } = useQuery({
     queryKey: ["positions", departmentId],
@@ -276,7 +280,7 @@ export default function NewEmployeePage() {
         <div className="flex items-center justify-end gap-2">
           <button
             type="button"
-            onClick={() => router.back()}
+            onClick={leave}
             className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100"
           >
             Cancel

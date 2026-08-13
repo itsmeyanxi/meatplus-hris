@@ -19,6 +19,7 @@ import { compensationApi, payrollProfileApi } from "@/lib/payroll";
 import { bankAccountsApi } from "@/lib/employee-relations";
 import { usersApi, ROLE_LABELS, type Role } from "@/lib/users";
 import { SearchSelect } from "@/components/SearchSelect";
+import { useUnsavedGuard } from "@/lib/useUnsavedGuard";
 
 // ── schema ────────────────────────────────────────────────────────────────────
 
@@ -391,6 +392,9 @@ export default function EmployeeRegistrationPage() {
   const departmentId  = form.watch("department_id");
   const createAccount = form.watch("create_account");
   const watched       = form.watch();
+  // A long multi-section form — protect a partly-filled registration from an
+  // accidental refresh/tab-close (cleared once it's successfully registered).
+  useUnsavedGuard(form.formState.isDirty && !result);
 
   // Branch, department and position all belong to the chosen company, so every
   // lookup is keyed by it and refetches when it changes.
