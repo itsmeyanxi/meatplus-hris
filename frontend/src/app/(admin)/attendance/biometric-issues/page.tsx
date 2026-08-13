@@ -9,6 +9,7 @@ import { PageHeader, AppButton, TableShell } from "@/components/ui";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { biometricAnomaliesApi, type BiometricAnomaly } from "@/lib/biometric-anomalies";
+import { useSwitchToCompanyParam } from "@/lib/useSwitchToCompanyParam";
 
 const QK = ["biometric-anomalies"];
 
@@ -31,6 +32,8 @@ function BiometricIssuesContent() {
   const { confirm, dialog } = useConfirm();
   const [includeResolved, setIncludeResolved] = useState(false);
 
+  // Cross-company HR may arrive with ?company=<id> — switch to it first.
+  const { switching } = useSwitchToCompanyParam();
   // A notification deep-links here with ?focus=<id> — scroll to and highlight that row.
   const focusId = Number(useSearchParams().get("focus")) || null;
 
@@ -88,7 +91,7 @@ function BiometricIssuesContent() {
         Show resolved
       </label>
 
-      {isLoading ? (
+      {switching || isLoading ? (
         <TableShell><TableSkeleton rows={3} cols={6} /></TableShell>
       ) : isError ? (
         <EmptyState title="Couldn't load issues" message="Please retry in a moment." />

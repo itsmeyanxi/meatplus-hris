@@ -2,12 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader, AppButton, TableShell } from "@/components/ui";
 import { TableSkeleton, EmptyState } from "@/components/feedback";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { employeeDataIssuesApi, issueLabel, type EmployeeDataIssue, type Severity } from "@/lib/employee-data-issues";
+import { useSwitchToCompanyParam } from "@/lib/useSwitchToCompanyParam";
 
 const QK = ["employee-data-issues"];
 
@@ -23,9 +24,20 @@ const SEV_CLASS: Record<Severity, string> = {
 };
 
 export default function EmployeeDataIssuesPage() {
+  // useSearchParams (via the company-switch hook) must sit under a Suspense boundary.
+  return (
+    <Suspense fallback={null}>
+      <EmployeeDataIssuesContent />
+    </Suspense>
+  );
+}
+
+function EmployeeDataIssuesContent() {
   const qc = useQueryClient();
   const { confirm, dialog } = useConfirm();
   const [category, setCategory] = useState<string | null>(null);
+  // Cross-company HR may arrive with ?company=<id> — switch to it before loading.
+  const { switching } = useSwitchToCompanyParam();
 
   const { data: rows, isLoading, isError } = useQuery({
     queryKey: QK,
@@ -84,7 +96,7 @@ export default function EmployeeDataIssuesPage() {
         }
       />
 
-      {isLoading ? (
+      {switching || isLoading ? (
         <TableShell><TableSkeleton rows={5} cols={5} /></TableShell>
       ) : isError ? (
         <EmptyState title="Couldn't load issues" message="Please retry in a moment." />

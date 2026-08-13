@@ -176,11 +176,14 @@ class EmployeeDataIssueDetector
                 return;
             }
 
+            // Carry the company so a cross-company HR is switched to it on click.
+            $url = '/employees/data-issues'.($companyId ? '?company='.$companyId : '');
+
             Notification::send($users, new EmployeeDataIssuesDigest(
                 $newCount,
                 $highOpen,
                 $openTotal,
-                '/employees/data-issues',
+                $url,
                 $breakdown,
             ));
 
