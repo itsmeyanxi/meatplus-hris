@@ -141,6 +141,7 @@ export default function EmployeeSchedulePage() {
   const current = assignments[0]; // newest effective_from first
   const [wsId, setWsId] = useState("");
   const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [to, setTo] = useState(""); // blank = ongoing (no end date)
   const [adding, setAdding] = useState(false);
   const [schedSearch, setSchedSearch] = useState("");
 
@@ -174,7 +175,7 @@ export default function EmployeeSchedulePage() {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["employee-schedule", employeeId] });
   const assign = useMutation({
-    mutationFn: () => employeeSchedulesApi.create(employeeId, { work_schedule_id: Number(wsId), effective_from: from }),
+    mutationFn: () => employeeSchedulesApi.create(employeeId, { work_schedule_id: Number(wsId), effective_from: from, effective_to: to || null }),
     onSuccess: () => { toast.success("Schedule assigned."); setAdding(false); setWsId(""); invalidate(); },
     onError: () => toast.error("Couldn't assign the schedule."),
   });
@@ -205,7 +206,7 @@ export default function EmployeeSchedulePage() {
       const name = customName.trim() || `${emp?.first_name ?? "Employee"} ${emp?.last_name ?? ""} — custom`.trim();
       const code = `CUSTOM-${employeeId}-${Date.now().toString(36)}`;
       const sched = await workSchedulesApi.create({ code, name, weekly_workdays: workdays, is_active: true, days });
-      await employeeSchedulesApi.create(employeeId, { work_schedule_id: sched.id, effective_from: from });
+      await employeeSchedulesApi.create(employeeId, { work_schedule_id: sched.id, effective_from: from, effective_to: to || null });
     },
     onSuccess: () => {
       toast.success("Custom schedule created and assigned.");
@@ -388,8 +389,13 @@ export default function EmployeeSchedulePage() {
 
             <div className="flex flex-wrap items-end gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-500">2 · Effective from</label>
-                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                <label className="mb-1 block text-xs font-medium text-slate-500">2 · Effective period</label>
+                <div className="flex items-center gap-2">
+                  <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                  <span className="text-xs text-slate-400">to</span>
+                  <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                </div>
+                <p className="mt-1 text-[11px] text-slate-400">Leave “to” blank for an ongoing schedule (ends only when a new one starts).</p>
               </div>
               {mode === "existing" ? (
                 <button
@@ -408,7 +414,7 @@ export default function EmployeeSchedulePage() {
                   {createAssign.isPending ? "Creating…" : "Create & assign"}
                 </button>
               )}
-              <p className="text-xs text-slate-400">The new schedule applies from this date; the previous one is kept in history.</p>
+              <p className="text-xs text-slate-400">The new schedule applies for the period above; the previous one is kept in history.</p>
             </div>
           </div>
         )}
