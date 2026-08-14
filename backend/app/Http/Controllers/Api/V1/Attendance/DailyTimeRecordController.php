@@ -33,10 +33,15 @@ class DailyTimeRecordController extends Controller
                 $q->whereHas('employee', fn ($eq) => $eq->where('department_id', $did));
             }
             // Keep agency workers out of the organic attendance module — they have
-            // their own per-agency board in the Agencies module. An explicit
-            // employee_id still returns anyone (so a single agency worker can be opened).
+            // their own per-agency board in the Agencies module. Also exclude
+            // inactive/separated staff: their historical DTR rows must not keep
+            // showing (and being counted present/absent) on the live matrix. An
+            // explicit employee_id still returns anyone, so a single agency worker or
+            // a separated employee's history can still be opened directly.
             if (! $request->query('employee_id')) {
-                $q->whereHas('employee', fn ($e) => $e->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)->orWhere('is_project_crew', true)));
+                $q->whereHas('employee', fn ($e) => $e
+                    ->where('is_active', true)
+                    ->whereDoesntHave('branch', fn ($b) => $b->where('is_agency', true)->orWhere('is_project_crew', true)));
             }
         } else {
             $employee = $user->employee;
