@@ -29,6 +29,16 @@ const DEFAULT_WEEK: CustomDay[] = [0, 1, 2, 3, 4, 5, 6].map((dow) => ({
   no_break: false,
 }));
 
+/** First calendar date on/after `fromStr` (YYYY-MM-DD) that falls on `dow` (0=Sun). */
+function dateForDow(fromStr: string, dow: number): string {
+  const base = new Date(`${fromStr}T00:00:00`);
+  if (isNaN(base.getTime())) return "—";
+  const delta = (dow - base.getDay() + 7) % 7;
+  const d = new Date(base);
+  d.setDate(base.getDate() + delta);
+  return d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
+}
+
 /** Minutes since midnight for an "HH:MM" string. */
 function toMins(t: string): number {
   const [h, m] = t.split(":").map(Number);
@@ -321,11 +331,13 @@ export default function EmployeeSchedulePage() {
                   placeholder="Schedule name (optional)"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
                 />
+                <p className="text-[11px] text-slate-400">Dates show the first week the schedule takes effect (from the effective date set in step 2).</p>
                 <div className="overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="w-full min-w-[760px] text-sm">
+                  <table className="w-full min-w-[840px] text-sm">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                         <th className="px-3 py-2.5">Day</th>
+                        <th className="px-3 py-2.5">Date</th>
                         <th className="px-3 py-2.5">Shift Start</th>
                         <th className="px-3 py-2.5">Shift End</th>
                         <th className="px-3 py-2.5">Break Start</th>
@@ -344,6 +356,7 @@ export default function EmployeeSchedulePage() {
                         return (
                           <tr key={dow} className={rest ? "bg-slate-50/60" : ""}>
                             <td className="px-3 py-2 font-medium text-slate-700">{DOW[dow]}</td>
+                            <td className="px-3 py-2 whitespace-nowrap tabular-nums text-slate-500">{dateForDow(from, dow)}</td>
                             <td className="px-3 py-2"><input type="time" value={d.time_in} disabled={rest} onChange={(e) => setDay(dow, { time_in: e.target.value })} className={timeCls} /></td>
                             <td className="px-3 py-2"><input type="time" value={d.time_out} disabled={rest} onChange={(e) => setDay(dow, { time_out: e.target.value })} className={timeCls} /></td>
                             <td className="px-3 py-2"><input type="time" value={d.break_start} disabled={noBreak} onChange={(e) => setDay(dow, { break_start: e.target.value })} className={timeCls} /></td>
