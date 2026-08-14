@@ -7,6 +7,8 @@ export type WorkScheduleDay = {
   is_rest_day: boolean;
   time_in: string | null;
   time_out: string | null;
+  break_start: string | null;
+  break_end: string | null;
   break_minutes: number;
   required_hours: number;
 };

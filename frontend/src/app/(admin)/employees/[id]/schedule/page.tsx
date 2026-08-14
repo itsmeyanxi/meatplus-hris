@@ -12,12 +12,40 @@ import { SearchSelect } from "@/components/SearchSelect";
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 // A manually-entered weekly pattern (one entry per day of week, Sun–Sat).
-type CustomDay = { is_rest_day: boolean; time_in: string; time_out: string };
+type CustomDay = {
+  is_rest_day: boolean;
+  time_in: string;
+  time_out: string;
+  break_start: string;
+  break_end: string;
+  no_break: boolean;
+};
 const DEFAULT_WEEK: CustomDay[] = [0, 1, 2, 3, 4, 5, 6].map((dow) => ({
   is_rest_day: dow === 0, // Sunday rest by default; adjust as needed
   time_in: "08:00",
   time_out: "17:00",
+  break_start: "12:00",
+  break_end: "13:00",
+  no_break: false,
 }));
+
+/** Minutes since midnight for an "HH:MM" string. */
+function toMins(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+/** Break length (minutes) for a day, honouring rest day / no break. */
+function breakMins(d: CustomDay): number {
+  if (d.is_rest_day || d.no_break || !d.break_start || !d.break_end) return 0;
+  return Math.max(0, toMins(d.break_end) - toMins(d.break_start));
+}
+/** Paid hours for a day = shift span − break, crossing midnight if needed. */
+function dayHours(d: CustomDay): number {
+  if (d.is_rest_day || !d.time_in || !d.time_out) return 0;
+  let mins = toMins(d.time_out) - toMins(d.time_in);
+  if (mins < 0) mins += 24 * 60;
+  return Math.max(0, Math.round(((mins - breakMins(d)) / 60) * 10) / 10);
+}
 
 const SCHED_TYPES = [
   { value: "regular", label: "Regular", hint: "punches", desc: "Must time in / out on scheduled days. Tracked for lates, undertime and absences." },
@@ -112,6 +140,17 @@ export default function EmployeeSchedulePage() {
   const [customDays, setCustomDays] = useState<CustomDay[]>(() => DEFAULT_WEEK.map((d) => ({ ...d })));
   const setDay = (dow: number, patch: Partial<CustomDay>) =>
     setCustomDays((ds) => ds.map((d, i) => (i === dow ? { ...d, ...patch } : d)));
+  // Copy this day's shift + break onto every other working (non-rest) day.
+  const copyRow = (dow: number) =>
+    setCustomDays((ds) => {
+      const s = ds[dow];
+      return ds.map((d) =>
+        d.is_rest_day ? d : { ...d, time_in: s.time_in, time_out: s.time_out, break_start: s.break_start, break_end: s.break_end, no_break: s.no_break },
+      );
+    });
+  // Reset a row to the default working day (also un-sets rest day).
+  const clearRow = (dow: number) =>
+    setDay(dow, { is_rest_day: false, time_in: "08:00", time_out: "17:00", break_start: "12:00", break_end: "13:00", no_break: false });
 
   const selected: WorkSchedule | undefined = useMemo(
     () => schedules.find((s) => String(s.id) === wsId),
@@ -138,22 +177,18 @@ export default function EmployeeSchedulePage() {
   // Create a work schedule from the manually-entered week, then assign it.
   const createAssign = useMutation({
     mutationFn: async () => {
+      const hhmmss = (t: string) => (t.length === 5 ? `${t}:00` : t); // API wants H:i:s
       const days = customDays.map((d, dow) => {
-        let required = 0;
-        if (!d.is_rest_day && d.time_in && d.time_out) {
-          const [ih, im] = d.time_in.split(":").map(Number);
-          const [oh, om] = d.time_out.split(":").map(Number);
-          let mins = oh * 60 + om - (ih * 60 + im);
-          if (mins < 0) mins += 24 * 60; // shift crosses midnight
-          required = Math.max(0, Math.round(((mins - 60) / 60) * 10) / 10); // minus a 60-min break
-        }
+        const noWindow = d.is_rest_day || d.no_break || !d.break_start || !d.break_end;
         return {
           day_of_week: dow,
           is_rest_day: d.is_rest_day,
-          time_in: d.is_rest_day ? null : d.time_in,
-          time_out: d.is_rest_day ? null : d.time_out,
-          break_minutes: d.is_rest_day ? 0 : 60,
-          required_hours: required,
+          time_in: d.is_rest_day ? null : hhmmss(d.time_in),
+          time_out: d.is_rest_day ? null : hhmmss(d.time_out),
+          break_start: noWindow ? null : hhmmss(d.break_start),
+          break_end: noWindow ? null : hhmmss(d.break_end),
+          break_minutes: breakMins(d),
+          required_hours: dayHours(d),
         };
       });
       const workdays = days.filter((d) => !d.is_rest_day).length;
@@ -286,27 +321,55 @@ export default function EmployeeSchedulePage() {
                   placeholder="Schedule name (optional)"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
                 />
-                <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
-                  {customDays.map((d, dow) => (
-                    <div key={dow} className="flex flex-wrap items-center gap-3 px-3 py-2">
-                      <span className="w-10 text-xs font-bold uppercase tracking-wide text-slate-500">{DOW[dow]}</span>
-                      <label className="inline-flex items-center gap-1.5 text-xs text-slate-600">
-                        <input type="checkbox" checked={d.is_rest_day} onChange={(e) => setDay(dow, { is_rest_day: e.target.checked })} />
-                        Rest day
-                      </label>
-                      {!d.is_rest_day && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <input type="time" value={d.time_in} onChange={(e) => setDay(dow, { time_in: e.target.value })}
-                            className="rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-brand-500" />
-                          <span className="text-slate-400">to</span>
-                          <input type="time" value={d.time_out} onChange={(e) => setDay(dow, { time_out: e.target.value })}
-                            className="rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-brand-500" />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full min-w-[760px] text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        <th className="px-3 py-2.5">Day</th>
+                        <th className="px-3 py-2.5">Shift Start</th>
+                        <th className="px-3 py-2.5">Shift End</th>
+                        <th className="px-3 py-2.5">Break Start</th>
+                        <th className="px-3 py-2.5">Break End</th>
+                        <th className="px-3 py-2.5 text-center">Rest Day</th>
+                        <th className="px-3 py-2.5 text-center">No Break</th>
+                        <th className="px-3 py-2.5 text-right">Hrs</th>
+                        <th className="px-3 py-2.5"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {customDays.map((d, dow) => {
+                        const rest = d.is_rest_day;
+                        const noBreak = rest || d.no_break;
+                        const timeCls = "w-28 rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-brand-500 disabled:bg-slate-100 disabled:text-slate-300";
+                        return (
+                          <tr key={dow} className={rest ? "bg-slate-50/60" : ""}>
+                            <td className="px-3 py-2 font-medium text-slate-700">{DOW[dow]}</td>
+                            <td className="px-3 py-2"><input type="time" value={d.time_in} disabled={rest} onChange={(e) => setDay(dow, { time_in: e.target.value })} className={timeCls} /></td>
+                            <td className="px-3 py-2"><input type="time" value={d.time_out} disabled={rest} onChange={(e) => setDay(dow, { time_out: e.target.value })} className={timeCls} /></td>
+                            <td className="px-3 py-2"><input type="time" value={d.break_start} disabled={noBreak} onChange={(e) => setDay(dow, { break_start: e.target.value })} className={timeCls} /></td>
+                            <td className="px-3 py-2"><input type="time" value={d.break_end} disabled={noBreak} onChange={(e) => setDay(dow, { break_end: e.target.value })} className={timeCls} /></td>
+                            <td className="px-3 py-2 text-center"><input type="checkbox" checked={d.is_rest_day} onChange={(e) => setDay(dow, { is_rest_day: e.target.checked })} /></td>
+                            <td className="px-3 py-2 text-center"><input type="checkbox" checked={d.no_break} disabled={rest} onChange={(e) => setDay(dow, { no_break: e.target.checked })} /></td>
+                            <td className="px-3 py-2 text-right tabular-nums text-slate-500">{rest ? "—" : `${dayHours(d)}h`}</td>
+                            <td className="px-3 py-2">
+                              <div className="flex justify-end gap-1">
+                                <button type="button" title="Copy this day to all working days" onClick={() => copyRow(dow)} disabled={rest}
+                                  className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30">
+                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
+                                </button>
+                                <button type="button" title="Reset this day" onClick={() => clearRow(dow)}
+                                  className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
+                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-                <p className="text-xs text-slate-400">A 60-minute unpaid break is assumed on working days. This creates a schedule for this employee only.</p>
+                <p className="text-xs text-slate-400"><b>No Break</b> keeps the whole shift paid; <b>Rest Day</b> means no work. The copy icon applies a day to the entire week. Creates a schedule for this employee only.</p>
               </div>
             )}
 
