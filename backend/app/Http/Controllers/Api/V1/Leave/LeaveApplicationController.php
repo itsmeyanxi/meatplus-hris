@@ -164,15 +164,20 @@ class LeaveApplicationController extends Controller
         }
 
         // Compute days_count (inclusive). Half-day applies only to a 1-day range.
-        $from = CarbonImmutable::parse($data['date_from']);
-        $to = CarbonImmutable::parse($data['date_to']);
-        $days = $from->diffInDays($to) + 1;
-        if (! empty($data['half_day']) && $days === 1) {
+        // Cast to int: Carbon 3's diffInDays returns a float, so `=== 1` would never
+        // match (float(1) !== int(1)) and every single-day half-day was wrongly rejected.
+        $from = CarbonImmutable::parse($data['date_from'])->startOfDay();
+        $to = CarbonImmutable::parse($data['date_to'])->startOfDay();
+        $spanDays = (int) $from->diffInDays($to) + 1;
+        if (! empty($data['half_day'])) {
+            if ($spanDays !== 1) {
+                throw ValidationException::withMessages([
+                    'half_day' => 'Half-day only applies to single-day leaves.',
+                ]);
+            }
             $days = 0.5;
-        } elseif (! empty($data['half_day'])) {
-            throw ValidationException::withMessages([
-                'half_day' => 'Half-day only applies to single-day leaves.',
-            ]);
+        } else {
+            $days = $spanDays;
         }
         $data['days_count'] = $days;
 
