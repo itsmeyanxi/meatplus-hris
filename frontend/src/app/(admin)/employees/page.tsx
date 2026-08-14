@@ -418,8 +418,8 @@ export default function EmployeesPage() {
               )}
               <Th>Employee #</Th>
               <Th>Company</Th>
-              <Th>Last Name</Th>
               <Th>First Name</Th>
+              <Th>Last Name</Th>
               <Th>Department</Th>
               <Th>Location</Th>
               <Th>Email</Th>
@@ -479,8 +479,8 @@ export default function EmployeesPage() {
                   )}
                   <Td><span className="font-mono text-slate-900 font-medium">{emp.employee_no}</span></Td>
                   <Td>{emp.company?.code ?? emp.company?.name ?? "—"}</Td>
-                  <Td><span className="font-medium text-slate-900">{emp.last_name ?? "—"}</span></Td>
                   <Td><span className="font-medium text-slate-900">{emp.first_name ?? "—"}</span></Td>
+                  <Td><span className="font-medium text-slate-900">{emp.last_name ?? "—"}</span></Td>
                   <Td>{emp.department?.name ?? "—"}</Td>
                   <Td>{emp.branch?.name ?? "—"}</Td>
                   <Td>{emp.email_company ?? emp.email_personal ?? "—"}</Td>

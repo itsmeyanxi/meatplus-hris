@@ -25,7 +25,7 @@ class EmployeeController extends Controller
         abort_unless($request->user()->can('employee.view'), 403);
 
         $employees = $this->filteredQuery($request)
-            ->orderBy('last_name')->orderBy('first_name')
+            ->orderBy('first_name')->orderBy('last_name')
             ->paginate($request->integer('per_page', 25));
 
         return EmployeeListResource::collection($employees);
@@ -64,7 +64,7 @@ class EmployeeController extends Controller
     {
         abort_unless($request->user()->can('employee.view'), 403);
 
-        $rows = $this->filteredQuery($request)->orderBy('last_name')->orderBy('first_name')->get();
+        $rows = $this->filteredQuery($request)->orderBy('first_name')->orderBy('last_name')->get();
 
         $headers = [
             'Employee ID', 'Last Name', 'Middle Name', 'First Name', 'Gender', 'Civil Status',
