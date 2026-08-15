@@ -33,9 +33,11 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\SetPermissionsTeam::class,
         ]);
 
-        // Track "online now" — stamps last_seen_at for the authenticated user
-        // (throttled). Appended so it runs after auth has resolved the user.
+        // Generous per-user rate-limit backstop against abuse/DoS (won't trip a
+        // normal dashboard), plus "online now" tracking (stamps last_seen_at).
+        // Appended so both run after auth has resolved the user.
         $middleware->api(append: [
+            'throttle:api',
             \App\Http\Middleware\TrackUserActivity::class,
         ]);
     })

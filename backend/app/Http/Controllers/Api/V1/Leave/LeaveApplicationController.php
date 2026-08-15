@@ -63,7 +63,7 @@ class LeaveApplicationController extends Controller
     public function import(Request $request, \App\Domain\HRIS\Services\LeaveApplicationImportService $service): JsonResponse
     {
         abort_unless($request->user()->can('leave.approve.any'), 403);
-        $request->validate(['file' => ['required', 'file', 'max:5120']]);
+        $request->validate(['file' => ['required', 'file', 'max:5120', 'mimes:csv,txt,xlsx,xls']]);
         $file = $request->file('file');
         $head = @file_get_contents($file->getRealPath(), false, null, 0, 8) ?: '';
         $format = str_starts_with($head, "PK\x03\x04") ? 'xlsx' : (str_starts_with($head, "\xD0\xCF\x11\xE0") ? null : 'csv');

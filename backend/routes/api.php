@@ -57,13 +57,13 @@ use App\Http\Middleware\SetPermissionsTeam;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
-    Route::post('login', LoginController::class);
-    Route::post('forgot-password', ForgotPasswordController::class);
-    Route::post('reset-password', ResetPasswordController::class);
+    Route::post('login', LoginController::class)->middleware('throttle:login');
+    Route::post('forgot-password', ForgotPasswordController::class)->middleware('throttle:password');
+    Route::post('reset-password', ResetPasswordController::class)->middleware('throttle:password');
 
     // Public invitation endpoints — employee sets up username/password without being logged in
-    Route::get('invite/{token}', [InvitationController::class, 'show']);
-    Route::post('invite/{token}/accept', [InvitationController::class, 'accept']);
+    Route::get('invite/{token}', [InvitationController::class, 'show'])->middleware('throttle:password');
+    Route::post('invite/{token}/accept', [InvitationController::class, 'accept'])->middleware('throttle:password');
 
     Route::middleware(['auth:sanctum', SetPermissionsTeam::class])->group(function () {
         Route::get('me', MeController::class);
