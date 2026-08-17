@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Api\V1\Attendance;
 
 use App\Domain\Attendance\Models\TimeLog;
 use App\Domain\Attendance\Services\AttendanceEventResolver;
+use App\Domain\Attendance\Services\DtrComputer;
+use App\Domain\HRIS\Models\Employee;
 use App\Http\Controllers\Controller;
+use Carbon\CarbonImmutable;
 use App\Http\Requests\Attendance\TimeLogRequest;
 use App\Http\Resources\Attendance\TimeLogResource;
 use Illuminate\Http\JsonResponse;
@@ -240,6 +243,25 @@ class TimeLogController extends Controller
         $data['ip_address'] = $request->ip();
 
         $log = TimeLog::create($data);
+
+        // Flow the punch into the DTR right away. Without this a manually-added
+        // log sat in the raw time-log list but never showed in the DTR/attendance
+        // matrix until the nightly SyncDtr (or someone hit Compute by hand) —
+        // every other entry point (web time-clock, approved upload, biometric
+        // ingestion, reclaimer) already recomputes on write.
+        //
+        // The window is widened by a day on each side because a punch can belong
+        // to the shift that started the previous evening, and an evening punch's
+        // pair can land tomorrow. Never let a compute hiccup fail the punch.
+        try {
+            $employee = Employee::withoutGlobalScopes()->find($log->employee_id);
+            if ($employee) {
+                $day = CarbonImmutable::parse($log->logged_at)->startOfDay();
+                app(DtrComputer::class)->computeForEmployee($employee, $day->subDay(), $day->addDay());
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return (new TimeLogResource($log))->response()->setStatusCode(201);
     }
