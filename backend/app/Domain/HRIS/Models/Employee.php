@@ -103,7 +103,52 @@ class Employee extends Model
         ];
     }
 
+    /**
+     * The canonical way to render an employee's name for PEOPLE to read:
+     * SURNAME first, e.g. "MEMPIN, Adrian Benedict Jr.". Company-wide and
+     * company-agnostic — every list, table, report and export shows names this
+     * way so a roster can be scanned and sorted by surname.
+     *
+     * Call this (never hand-concatenate first + last) wherever only the name
+     * parts are at hand, so the format stays defined in exactly one place.
+     */
+    public static function formatName(
+        ?string $first,
+        ?string $last,
+        ?string $middle = null,
+        ?string $suffix = null,
+    ): string {
+        $given = trim(implode(' ', array_filter([$first, $middle, $suffix])));
+        $last = trim((string) $last);
+
+        // A missing half must not leave a stray comma behind.
+        if ($last === '') {
+            return $given;
+        }
+
+        return $given === '' ? $last : "{$last}, {$given}";
+    }
+
     protected function fullName(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => self::formatName(
+                $this->first_name,
+                $this->last_name,
+                $this->middle_name,
+                $this->suffix,
+            ),
+        );
+    }
+
+    /**
+     * Given-name-first ("Adrian Benedict Mempin") — deliberately NOT the display
+     * format. Reserved for the places where the order is not ours to choose:
+     * bank account names (the bank matches the name on the account) and prose
+     * addressed to a person ("Hi Adrian, …"). Everything a user reads as a
+     * roster entry uses `full_name` instead.
+     */
+    protected function fullNameFirstLast(): Attribute
     {
         return Attribute::make(
             get: fn () => trim(implode(' ', array_filter([

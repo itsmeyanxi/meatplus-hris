@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Attendance;
 
+use App\Domain\HRIS\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,7 +16,9 @@ class DailyTimeRecordResource extends JsonResource
             'employee' => $this->whenLoaded('employee', fn () => [
                 'id' => $this->employee->id,
                 'employee_no' => $this->employee->employee_no,
-                'full_name' => trim("{$this->employee->first_name} {$this->employee->last_name}"),
+                // Surname-first, and without the middle name/suffix — the DTR
+                // matrix column is narrow and truncates.
+                'full_name' => Employee::formatName($this->employee->first_name, $this->employee->last_name),
             ]),
             'work_date' => $this->work_date?->toDateString(),
             'scheduled_in' => $this->scheduled_in,

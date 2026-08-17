@@ -133,7 +133,10 @@ class PayrollRunController extends Controller
                 $acct = $accounts->get($slip->employee_id);
                 fputcsv($out, [
                     $slip->employee?->employee_no ?? '',
-                    $acct?->account_name ?: $slip->employee?->full_name ?? '',
+                    // Account Name goes to the bank, which matches it against the
+                    // name on the account — so it stays given-name-first even
+                    // though rosters render surname-first.
+                    $acct?->account_name ?: $slip->employee?->full_name_first_last ?? '',
                     $acct?->bank_name ?? '',
                     $acct?->account_number ?? '',
                     number_format((float) $slip->net_pay, 2, '.', ''),

@@ -300,7 +300,7 @@ trait HandlesApprovalWorkflow
             if ($users->isNotEmpty()) {
                 Notification::send($users, new AttendanceRequestAwaitingApproval(
                     $kind,
-                    trim(($subject->first_name ?? '').' '.($subject->last_name ?? '')),
+                    Employee::formatName($subject->first_name, $subject->last_name),
                     $dateStr,
                     $url,
                     $model->id,

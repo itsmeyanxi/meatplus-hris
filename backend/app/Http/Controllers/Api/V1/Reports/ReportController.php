@@ -511,7 +511,7 @@ class ReportController extends Controller
 
             return [
                 'employee_no' => $e->employee_no ?? '',
-                'name' => $e ? trim($e->first_name.' '.$e->last_name) : '',
+                'name' => $e ? Employee::formatName($e->first_name, $e->last_name) : '',
                 'date' => $wd->format('Y-m-d'),
                 'day' => $wd->format('D'),
                 'shift_start' => $hm($r->actual_in),
@@ -610,7 +610,7 @@ class ReportController extends Controller
             $ytdTax = (float) ($a->tax ?? 0);
 
             $writer->addRow(Row::fromValues([
-                $e->employee_no, trim($e->first_name.' '.$e->last_name), $e->position?->title ?? '', $e->department?->name ?? '',
+                $e->employee_no, Employee::formatName($e->first_name, $e->last_name), $e->position?->title ?? '', $e->department?->name ?? '',
                 $e->is_active ? 'Active' : 'Inactive', round($rate, 2), $payType,
                 round((float) ($a->basic ?? 0), 2), round((float) ($a->ot ?? 0), 2), round((float) ($a->allow ?? 0), 2), round((float) ($a->demin ?? 0), 2), round($ytdGross, 2),
                 round((float) ($a->sss ?? 0), 2), round((float) ($a->phil ?? 0), 2), round((float) ($a->hdmf ?? 0), 2), round($ytdTax, 2), round((float) ($a->loans ?? 0), 2), round((float) ($a->net ?? 0), 2),
@@ -1058,7 +1058,7 @@ class ReportController extends Controller
 
             return [
                 $e?->employee_no ?? '',
-                trim(($e?->last_name ?? '').', '.trim(($e?->first_name ?? '').' '.($e?->middle_name ?? ''))),
+                Employee::formatName($e?->first_name, $e?->last_name, $e?->middle_name),
                 $e?->position?->title ?? '',
                 $e?->department?->name ?: 'Unassigned',
                 $e?->date_hired?->format('m/d/Y') ?? '',

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { finalPayApi, SEPARATION_TYPES, type FinalPayRecord, type PayrollHistory } from "@/lib/final-pay";
+import { formatEmployeeName } from "@/lib/names";
 
 // ── helpers ───────────────────────────────────────────────────────────────
 
@@ -73,7 +74,7 @@ function printFinalPay(fp: FinalPayRecord, history?: PayrollHistory) {
   const dash = (n: unknown) => (Number(n ?? 0) > 0 ? f2(n) : "&ndash;");
 
   const empName = fp.employee
-    ? `${fp.employee.first_name} ${fp.employee.last_name}`
+    ? formatEmployeeName(fp.employee.first_name, fp.employee.last_name)
     : `Employee #${fp.employee_id}`;
 
   const cutoffMatch = fp.notes?.match(/Payroll cut-off: (.+)/);
@@ -527,7 +528,7 @@ export default function FinalPayDetailPage() {
     </div>
   );
 
-  const empName     = fp.employee ? `${fp.employee.first_name} ${fp.employee.last_name}` : `Employee #${fp.employee_id}`;
+  const empName     = fp.employee ? formatEmployeeName(fp.employee.first_name, fp.employee.last_name) : `Employee #${fp.employee_id}`;
   const isFinalized = fp.status === "finalized";
   const isCancelled = fp.status === "cancelled";
 

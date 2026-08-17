@@ -7,6 +7,7 @@ import axios from "axios";
 import { SearchSelect } from "@/components/SearchSelect";
 import { finalPayApi, SEPARATION_TYPES, type SeparationType } from "@/lib/final-pay";
 import { listEmployees, type EmployeeListItem } from "@/lib/employees";
+import { formatEmployeeName } from "@/lib/names";
 
 // ── predefined row structure ──────────────────────────────────────────────
 
@@ -543,7 +544,7 @@ function RecordsList({ onNew }: { onNew: () => void }) {
           <tbody className="divide-y divide-slate-50">
             {records.map((r) => {
               const name = r.employee
-                ? `${r.employee.first_name} ${r.employee.last_name}`
+                ? formatEmployeeName(r.employee.first_name, r.employee.last_name)
                 : `#${r.employee_id}`;
               const isCancelled = r.status === "cancelled";
               return (

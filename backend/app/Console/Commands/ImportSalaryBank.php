@@ -120,7 +120,9 @@ class ImportSalaryBank extends Command
                                 'employee_id' => $emp->id,
                                 'bank_name' => $bankName,
                                 'account_number' => $acct, // encrypted by the model mutator
-                                'account_name' => $emp->full_name,
+                                // Given-name-first: this is the name ON the bank
+                                // account, not a roster label (see Employee::fullName).
+                                'account_name' => $emp->full_name_first_last,
                                 'is_primary' => ! EmployeeBankAccount::where('employee_id', $emp->id)->exists(),
                                 'purpose' => 'payroll',
                             ]);

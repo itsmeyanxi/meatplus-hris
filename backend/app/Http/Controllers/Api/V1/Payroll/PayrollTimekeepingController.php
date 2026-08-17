@@ -111,7 +111,7 @@ class PayrollTimekeepingController extends Controller
                 'floating' => $fl,
                 'head' => $head ? [
                     'employee_id' => $head->id,
-                    'name' => trim(($head->first_name ?? '').' '.($head->last_name ?? '')),
+                    'name' => Employee::formatName($head->first_name, $head->last_name),
                     'email' => $head->email_company ?: $head->email_personal,
                     'mobile' => $head->mobile,
                 ] : null,
@@ -181,7 +181,7 @@ class PayrollTimekeepingController extends Controller
                     (int) ($d->late_minutes ?? 0), (int) ($d->ot_minutes ?? 0), (int) ($d->undertime_minutes ?? 0), (int) ($d->night_minutes ?? 0),
                     array_sum($fl),
                     $fl['overtime'] ?? 0, $fl['undertime'] ?? 0, $fl['official_business'] ?? 0, $fl['coa'] ?? 0, $fl['correction'] ?? 0,
-                    $head ? trim(($head->first_name ?? '').' '.($head->last_name ?? '')) : '',
+                    $head ? Employee::formatName($head->first_name, $head->last_name) : '',
                     $head ? ($head->email_company ?: $head->email_personal ?: $head->mobile ?: '') : '',
                 ]);
             }
@@ -273,7 +273,7 @@ class PayrollTimekeepingController extends Controller
             'floating' => $floating,
             'head' => $head ? [
                 'employee_id' => $head->id,
-                'name' => trim(($head->first_name ?? '').' '.($head->last_name ?? '')),
+                'name' => Employee::formatName($head->first_name, $head->last_name),
                 'email' => $head->email_company ?: $head->email_personal,
                 'mobile' => $head->mobile,
             ] : null,

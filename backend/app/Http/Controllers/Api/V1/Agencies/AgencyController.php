@@ -165,7 +165,7 @@ class AgencyController extends Controller
             return [
                 'id' => $e->id,
                 'employee_no' => $e->employee_no,
-                'name' => trim($e->first_name.' '.$e->last_name),
+                'name' => Employee::formatName($e->first_name, $e->last_name),
                 'biometric_id' => $e->biometric_user_id,
                 'time_in' => $in?->format('h:i A'),
                 'time_out' => $out?->format('h:i A'),

@@ -201,7 +201,7 @@ class EmployeeDataIssueDetector
         return [
             'company_id' => $e->company_id,
             'employee_id' => (int) $e->id,
-            'employee_name' => trim($e->first_name.' '.$e->last_name),
+            'employee_name' => Employee::formatName($e->first_name, $e->last_name),
             'category' => $category,
             'severity' => $severity,
             'detail' => $detail,

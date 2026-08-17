@@ -35,7 +35,7 @@ class TeamController extends Controller
         $map = fn (Employee $e) => [
             'id' => $e->id,
             'employee_no' => $e->employee_no,
-            'full_name' => trim(($e->first_name ?? '').' '.($e->last_name ?? '')),
+            'full_name' => Employee::formatName($e->first_name, $e->last_name),
             'position' => $e->position?->title,
             'department' => $e->department?->name,
             'company' => $e->company?->code ?? $e->company?->trade_name,

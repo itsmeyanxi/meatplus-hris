@@ -71,7 +71,7 @@ class ApprovalCenterController extends Controller
                     'type' => $t['key'],
                     'type_label' => $t['label'],
                     'id' => $r->id,
-                    'employee_name' => $emp ? trim(($emp->first_name ?? '').' '.($emp->last_name ?? '')) : "#{$r->employee_id}",
+                    'employee_name' => $emp ? Employee::formatName($emp->first_name, $emp->last_name) : "#{$r->employee_id}",
                     'employee_no' => $emp?->employee_no,
                     'company' => $emp?->company?->code ?? $emp?->company?->trade_name,
                     'date' => optional($r->{$t['date']})->format('Y-m-d') ?? (string) $r->{$t['date']},

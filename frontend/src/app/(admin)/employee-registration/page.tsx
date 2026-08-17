@@ -20,6 +20,7 @@ import { bankAccountsApi } from "@/lib/employee-relations";
 import { usersApi, ROLE_LABELS, type Role } from "@/lib/users";
 import { SearchSelect } from "@/components/SearchSelect";
 import { useUnsavedGuard } from "@/lib/useUnsavedGuard";
+import { formatEmployeeName } from "@/lib/names";
 
 // ── schema ────────────────────────────────────────────────────────────────────
 
@@ -819,7 +820,7 @@ export default function EmployeeRegistrationPage() {
 
       return {
         employeeId: emp.id,
-        employeeName: `${emp.first_name} ${emp.last_name}`,
+        employeeName: formatEmployeeName(emp.first_name, emp.last_name),
         employeeNo: emp.employee_no,
         tempPassword,
         roleAssigned: v.role ? (ROLE_LABELS[v.role as Role] ?? v.role) : undefined,
