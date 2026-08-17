@@ -292,26 +292,59 @@ class TimeLogRequestImportService
         $reader = $ext === 'xlsx' ? new XlsxReader() : new CsvReader();
         $reader->open($path);
 
+        $cell = function ($c) {
+            // Keep both date AND time so time-of-day cells aren't flattened away.
+            if ($c instanceof \DateTimeInterface) {
+                return $c->format('Y-m-d H:i:s');
+            }
+            if ($c instanceof \DateInterval) {
+                return sprintf('%02d:%02d:%02d', $c->h, $c->i, $c->s);
+            }
+
+            return is_scalar($c) ? (string) $c : '';
+        };
+
+        // Read the sheet that actually HOLDS THE DATA, not blindly the first one.
+        // Our own downloadable template puts a "How to fill" guide on sheet 1 and
+        // the real "Time Logs" grid on sheet 2, so reading sheet 1 parsed the
+        // instructions, found no recognizable header, and rejected the whole
+        // upload with "Missing required column" — the system's own template could
+        // not be imported by the system. The first sheet whose header row maps to
+        // a usable column set wins; if none does, fall back to the first sheet so
+        // the original error still surfaces for a genuinely malformed file.
+        $first = null;
         $rows = [];
         foreach ($reader->getSheetIterator() as $sheet) {
+            $sheetRows = [];
             foreach ($sheet->getRowIterator() as $row) {
-                $rows[] = array_map(function ($c) {
-                    // Keep both date AND time so time-of-day cells aren't flattened away.
-                    if ($c instanceof \DateTimeInterface) {
-                        return $c->format('Y-m-d H:i:s');
-                    }
-                    if ($c instanceof \DateInterval) {
-                        return sprintf('%02d:%02d:%02d', $c->h, $c->i, $c->s);
-                    }
-
-                    return is_scalar($c) ? (string) $c : '';
-                }, $row->toArray());
+                $sheetRows[] = array_map($cell, $row->toArray());
             }
-            break;
+
+            $first ??= $sheetRows;
+
+            if (count($sheetRows) >= 2 && $this->looksLikeDataSheet($sheetRows[0])) {
+                $rows = $sheetRows;
+                break;
+            }
         }
         $reader->close();
 
-        return $rows;
+        return $rows ?: ($first ?? []);
+    }
+
+    /**
+     * Whether a header row carries the columns an import needs: an employee
+     * identifier plus either a date or a timestamp. Used to pick the data sheet
+     * out of a multi-sheet workbook (guide tab + data tab).
+     *
+     * @param  array<int,string>  $header
+     */
+    private function looksLikeDataSheet(array $header): bool
+    {
+        $map = $this->mapHeader($header);
+
+        return isset($map['employee_no'])
+            && (isset($map['work_date']) || isset($map['log_time']));
     }
 
     /** @return array<string,int> canonical key => column index */

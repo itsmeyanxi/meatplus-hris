@@ -58,7 +58,15 @@ class DailyTimeRecord extends Model
         if ($this->late_minutes > 0) {
             return 'late';
         }
-        if ((float) $this->hours_worked > 0 || $this->actual_in) {
+        // ANY punch on the day means the person was here, so the day must not read
+        // as empty. `actual_out` counts too: a day with only an out-punch — a manually
+        // added out, or a night shift whose in-punch was missed — computes 0 hours and
+        // has no actual_in, so it used to fall through to 'no_record' and render as a
+        // BLANK cell in the attendance matrix. That made a just-added manual log look
+        // like it never saved. Hours stay 0 and payroll is unaffected (it reads
+        // hours_worked / is_absent, never this status); this only stops real
+        // attendance from being displayed as nothing.
+        if ((float) $this->hours_worked > 0 || $this->actual_in || $this->actual_out) {
             return 'present';
         }
 

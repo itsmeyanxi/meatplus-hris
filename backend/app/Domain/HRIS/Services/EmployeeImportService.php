@@ -612,19 +612,33 @@ class EmployeeImportService
         $reader = $ext === 'xlsx' ? new XlsxReader() : new CsvReader();
         $reader->open($path);
 
+        // Read the sheet that actually holds the data. The downloadable template
+        // puts a "How to fill" guide on sheet 1 and the real "Employees" grid on
+        // sheet 2, so taking the first sheet parsed the instructions and failed
+        // with "Missing required column for: Employee ID" — the system's own
+        // template could not be imported. Fall back to sheet 1 when no sheet has a
+        // usable header, so a genuinely malformed file still reports that error.
+        $first = null;
         $rows = [];
         foreach ($reader->getSheetIterator() as $sheet) {
+            $sheetRows = [];
             foreach ($sheet->getRowIterator() as $row) {
-                $rows[] = array_map(
+                $sheetRows[] = array_map(
                     fn ($c) => $c instanceof \DateTimeInterface ? $c->format('Y-m-d') : (is_scalar($c) ? (string) $c : ''),
                     $row->toArray(),
                 );
             }
-            break; // first sheet only
+
+            $first ??= $sheetRows;
+
+            if (count($sheetRows) >= 2 && isset($this->mapHeader($sheetRows[0])['employee_no'])) {
+                $rows = $sheetRows;
+                break;
+            }
         }
         $reader->close();
 
-        return $rows;
+        return $rows ?: ($first ?? []);
     }
 
     /** @return array<string,int> canonical key => column index */
