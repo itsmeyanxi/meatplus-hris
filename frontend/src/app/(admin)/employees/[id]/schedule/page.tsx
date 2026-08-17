@@ -14,6 +14,15 @@ const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // A manually-entered weekly pattern (one entry per day of week, Sun–Sat).
 type CustomDay = {
   is_rest_day: boolean;
+  /**
+   * Only meaningful while `is_rest_day` is true, mirroring Sprout's padlock:
+   *   locked (false)  = a pure rest day — no shift at all, times greyed out
+   *   unlocked (true) = a rest day that still carries a shift, for staff who
+   *                     report for work on it
+   * Not sent to the API — it round-trips as "does this rest day have times?",
+   * so no extra column is needed (see restHasShift on load / the save payload).
+   */
+  rest_shift: boolean;
   time_in: string;
   time_out: string;
   break_start: string;
@@ -22,6 +31,7 @@ type CustomDay = {
 };
 const DEFAULT_WEEK: CustomDay[] = [0, 1, 2, 3, 4, 5, 6].map((dow) => ({
   is_rest_day: dow === 0, // Sunday rest by default; adjust as needed
+  rest_shift: false,      // a rest day is a PURE rest day until explicitly unlocked
   time_in: "08:00",
   time_out: "17:00",
   break_start: "12:00",
@@ -54,6 +64,11 @@ function breakMins(d: CustomDay): number {
   if (d.no_break || !d.break_start || !d.break_end) return 0;
   return Math.max(0, toMins(d.break_end) - toMins(d.break_start));
 }
+/** Does this day actually carry a shift? A locked rest day carries none. */
+function hasShift(d: CustomDay): boolean {
+  return (! d.is_rest_day || d.rest_shift) && !! d.time_in && !! d.time_out;
+}
+
 /**
  * REQUIRED hours for a day = shift span − break. Zero on a rest day even when a
  * shift is set: a rest day is never *required*, and rest-day work is paid via the
@@ -178,7 +193,39 @@ export default function EmployeeSchedulePage() {
     });
   // Reset a row to the default working day (also un-sets rest day).
   const clearRow = (dow: number) =>
-    setDay(dow, { is_rest_day: false, time_in: "08:00", time_out: "17:00", break_start: "12:00", break_end: "13:00", no_break: false });
+    setDay(dow, { is_rest_day: false, rest_shift: false, time_in: "08:00", time_out: "17:00", break_start: "12:00", break_end: "13:00", no_break: false });
+
+  /**
+   * Toggle the padlock on a rest day (Sprout's model):
+   *   locked   → a pure rest day, no shift
+   *   unlocked → a rest day that still carries a shift
+   * Unlocking seeds the times from the first real working day so HR isn't typing
+   * a shift from scratch; falls back to 08:00–17:00 when the week has none.
+   */
+  const toggleRestShift = (dow: number) =>
+    setCustomDays((ds) => {
+      const target = ds[dow];
+      if (! target.is_rest_day) return ds;
+
+      if (target.rest_shift) {
+        return ds.map((d, i) => (i === dow ? { ...d, rest_shift: false } : d));
+      }
+
+      const model = ds.find((d, i) => i !== dow && ! d.is_rest_day && d.time_in && d.time_out);
+      return ds.map((d, i) =>
+        i === dow
+          ? {
+              ...d,
+              rest_shift: true,
+              time_in: model?.time_in ?? d.time_in ?? "08:00",
+              time_out: model?.time_out ?? d.time_out ?? "17:00",
+              break_start: model?.break_start ?? d.break_start ?? "12:00",
+              break_end: model?.break_end ?? d.break_end ?? "13:00",
+              no_break: model?.no_break ?? d.no_break ?? false,
+            }
+          : d,
+      );
+    });
 
   const selected: WorkSchedule | undefined = useMemo(
     () => schedules.find((s) => String(s.id) === wsId),
@@ -207,19 +254,24 @@ export default function EmployeeSchedulePage() {
     mutationFn: async () => {
       const hhmmss = (t: string) => (t.length === 5 ? `${t}:00` : t); // API wants H:i:s
       const days = customDays.map((d, dow) => {
-        const noWindow = d.no_break || !d.break_start || !d.break_end;
+        // A rest day keeps its shift ONLY when unlocked (staff who report on their
+        // rest day). A locked rest day is a pure rest day and stores no times at
+        // all — which is also how the lock state round-trips on reload.
+        // required_hours stays 0 either way (see dayHours), preserving the +30%.
+        const shift = hasShift(d);
+        const noWindow = ! shift || d.no_break || !d.break_start || !d.break_end;
         return {
           day_of_week: dow,
           is_rest_day: d.is_rest_day,
-          // Keep the shift even on a rest day — staff who report on their rest day
-          // need a shift on record. Previously these were nulled on save, so the
-          // times HR typed were silently discarded. required_hours stays 0 for a
-          // rest day (see dayHours), which is what preserves the +30% premium.
-          time_in: d.time_in ? hhmmss(d.time_in) : null,
-          time_out: d.time_out ? hhmmss(d.time_out) : null,
+          time_in: shift ? hhmmss(d.time_in) : null,
+          time_out: shift ? hhmmss(d.time_out) : null,
           break_start: noWindow ? null : hhmmss(d.break_start),
           break_end: noWindow ? null : hhmmss(d.break_end),
-          break_minutes: breakMins(d),
+          // No shift means no break either. The break fields keep their values in
+          // state while greyed out, so without this guard a pure rest day would
+          // still store a 60-minute break — and anyone who punched on that day
+          // would silently lose an hour off the rest-day hours they worked.
+          break_minutes: shift ? breakMins(d) : 0,
           required_hours: dayHours(d),
         };
       });
@@ -373,33 +425,67 @@ export default function EmployeeSchedulePage() {
                     <tbody className="divide-y divide-slate-100">
                       {customDays.map((d, dow) => {
                         const rest = d.is_rest_day;
-                        // A rest day may still carry a shift (for staff who report on
-                        // their rest day), so its time fields stay editable — only
-                        // "No Break" suppresses the break window.
-                        const noBreak = d.no_break;
+                        // A rest day carries a shift only when explicitly opted in, so
+                        // a plain rest day still means "no work at all". Times are
+                        // greyed on a rest day until that opt-in.
+                        const shift = hasShift(d);
+                        const timesOff = rest && ! d.rest_shift;
+                        const noBreak = timesOff || d.no_break;
                         const timeCls = "w-28 rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-brand-500 disabled:bg-slate-100 disabled:text-slate-300";
                         return (
                           <tr key={dow} className={rest ? "bg-slate-50/60" : ""}>
                             <td className="px-3 py-2 font-medium text-slate-700">{DOW[dow]}</td>
                             <td className="px-3 py-2 whitespace-nowrap tabular-nums text-slate-500">{dateForDow(from, dow)}</td>
-                            <td className="px-3 py-2"><input type="time" value={d.time_in} onChange={(e) => setDay(dow, { time_in: e.target.value })} className={timeCls} /></td>
-                            <td className="px-3 py-2"><input type="time" value={d.time_out} onChange={(e) => setDay(dow, { time_out: e.target.value })} className={timeCls} /></td>
+                            <td className="px-3 py-2"><input type="time" value={d.time_in} disabled={timesOff} onChange={(e) => setDay(dow, { time_in: e.target.value })} className={timeCls} /></td>
+                            <td className="px-3 py-2"><input type="time" value={d.time_out} disabled={timesOff} onChange={(e) => setDay(dow, { time_out: e.target.value })} className={timeCls} /></td>
                             <td className="px-3 py-2"><input type="time" value={d.break_start} disabled={noBreak} onChange={(e) => setDay(dow, { break_start: e.target.value })} className={timeCls} /></td>
                             <td className="px-3 py-2"><input type="time" value={d.break_end} disabled={noBreak} onChange={(e) => setDay(dow, { break_end: e.target.value })} className={timeCls} /></td>
-                            <td className="px-3 py-2 text-center"><input type="checkbox" checked={d.is_rest_day} onChange={(e) => setDay(dow, { is_rest_day: e.target.checked })} /></td>
-                            <td className="px-3 py-2 text-center"><input type="checkbox" checked={d.no_break} onChange={(e) => setDay(dow, { no_break: e.target.checked })} /></td>
-                            {/* A rest day has no REQUIRED hours even with a shift set — show
-                                the shift length in muted text so HR can still see it. */}
+                            <td className="px-3 py-2">
+                              <div className="flex flex-col items-center gap-1">
+                                <input
+                                  type="checkbox"
+                                  checked={d.is_rest_day}
+                                  onChange={(e) => setDay(dow, { is_rest_day: e.target.checked, rest_shift: false })}
+                                />
+                                {/* Our own two-option toggle rather than a padlock icon:
+                                    it says outright what each state means. Shown only
+                                    once the day is actually a rest day. */}
+                                {rest && (
+                                  <div className="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white text-[10px] font-semibold">
+                                    <button
+                                      type="button"
+                                      onClick={() => d.rest_shift && toggleRestShift(dow)}
+                                      title="Pure rest day — nobody is scheduled to work"
+                                      className={`px-2 py-0.5 transition ${! d.rest_shift ? "bg-slate-700 text-white" : "text-slate-500 hover:bg-slate-50"}`}
+                                    >
+                                      Rest only
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => ! d.rest_shift && toggleRestShift(dow)}
+                                      title="Rest day that still carries a shift, for staff who report for work on it"
+                                      className={`px-2 py-0.5 transition ${d.rest_shift ? "bg-brand-600 text-white" : "text-slate-500 hover:bg-slate-50"}`}
+                                    >
+                                      + Shift
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-center"><input type="checkbox" checked={d.no_break} disabled={timesOff} onChange={(e) => setDay(dow, { no_break: e.target.checked })} /></td>
+                            {/* A rest day never has REQUIRED hours. When it carries a shift
+                                the length is shown in muted parentheses so HR can still
+                                see it without reading it as hours owed. */}
                             <td className="px-3 py-2 text-right tabular-nums text-slate-500">
                               {rest
-                                ? (d.time_in && d.time_out
-                                    ? <span className="text-slate-400" title="Rest day — shift on record, but no required hours">({shiftHours(d)}h)</span>
+                                ? (shift
+                                    ? <span className="text-slate-400" title="Rest day with a shift — on record, but no required hours">({shiftHours(d)}h)</span>
                                     : "—")
                                 : `${dayHours(d)}h`}
                             </td>
                             <td className="px-3 py-2">
                               <div className="flex justify-end gap-1">
-                                <button type="button" title="Copy this day to all working days" onClick={() => copyRow(dow)} disabled={rest}
+                                <button type="button" title="Copy this day to all working days" onClick={() => copyRow(dow)} disabled={timesOff}
                                   className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30">
                                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
                                 </button>
@@ -415,7 +501,14 @@ export default function EmployeeSchedulePage() {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-xs text-slate-400"><b>No Break</b> keeps the whole shift paid; <b>Rest Day</b> means no work. The copy icon applies a day to the entire week. Creates a schedule for this employee only.</p>
+                <p className="text-xs text-slate-400">
+                  <b>No Break</b> keeps the whole shift paid. Ticking <b>Rest Day</b> gives you two
+                  choices: <b>Rest only</b> — a true day off with no shift; or <b>+ Shift</b> — a rest
+                  day that still carries a shift, for staff who report for work on it. Either way a
+                  rest day owes no hours, and work done on it earns the rest-day premium with no
+                  late or undertime charged. The copy icon applies a day to the entire week.
+                  Creates a schedule for this employee only.
+                </p>
               </div>
             )}
 
