@@ -66,15 +66,30 @@ class EmployeeScheduleController extends Controller
     {
         $data = $request->validated();
         $from = \Illuminate\Support\Carbon::parse($data['effective_from']);
+        $newTo = ! empty($data['effective_to']) ? \Illuminate\Support\Carbon::parse($data['effective_to']) : null;
 
-        // Only ONE schedule may be active at a time. Close (or drop) any currently
-        // open assignment before adding the new one, so schedules never overlap —
-        // otherwise the DTR engine has two "current" schedules to choose from.
-        foreach ($employee->scheduleAssignments()->whereNull('effective_to')->get() as $open) {
-            if ($open->effective_from && \Illuminate\Support\Carbon::parse($open->effective_from)->gte($from)) {
-                $open->delete(); // it started on/after the new one — it never took effect
+        // Resolve overlaps so the new assignment cleanly REPLACES whatever it covers
+        // (schedules must never overlap — otherwise the DTR engine has two schedules
+        // for the same day). Re-assigning the same/overlapping range must not leave a
+        // stale duplicate behind (which would let the old schedule keep applying).
+        foreach ($employee->scheduleAssignments()->get() as $ex) {
+            $exFrom = $ex->effective_from ? \Illuminate\Support\Carbon::parse($ex->effective_from) : null;
+            $exTo = $ex->effective_to ? \Illuminate\Support\Carbon::parse($ex->effective_to) : null;
+
+            // No overlap with the new [from, newTo] window — leave it untouched.
+            if ($exTo && $exTo->lt($from)) {
+                continue;
+            }
+            if ($newTo && $exFrom && $exFrom->gt($newTo)) {
+                continue;
+            }
+
+            if ($exFrom && $exFrom->lt($from)) {
+                $ex->update(['effective_to' => $from->copy()->subDay()->toDateString()]); // trim its tail before the new range
+            } elseif ($newTo && ($exTo === null || $exTo->gt($newTo))) {
+                $ex->update(['effective_from' => $newTo->copy()->addDay()->toDateString()]); // push its start past the new range
             } else {
-                $open->update(['effective_to' => $from->copy()->subDay()->toDateString()]);
+                $ex->delete(); // fully inside the new range — superseded
             }
         }
 

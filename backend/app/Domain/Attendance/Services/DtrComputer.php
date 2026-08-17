@@ -59,6 +59,10 @@ class DtrComputer
         $from = CarbonImmutable::parse($from)->startOfDay();
         $to = CarbonImmutable::parse($to)->endOfDay();
 
+        // Newest assignment first: when more than one covers the same day (e.g. HR
+        // re-assigned a schedule for an overlapping range), the most recently
+        // effective — then most recently created — one wins, so a re-assignment
+        // always takes precedence over the schedule it replaced.
         $assignments = EmployeeSchedule::query()
             ->with('workSchedule.days')
             ->where('employee_id', $employee->id)
@@ -66,6 +70,8 @@ class DtrComputer
             ->where(function ($q) use ($from) {
                 $q->whereNull('effective_to')->orWhere('effective_to', '>=', $from->toDateString());
             })
+            ->orderByDesc('effective_from')
+            ->orderByDesc('id')
             ->get();
 
         $holidays = Holiday::query()
