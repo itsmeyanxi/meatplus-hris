@@ -218,7 +218,7 @@ class ReportController extends Controller
             $hr($SH), $hr($SHnd), $hr($SHot), $hr($SHotNd),               // T,U,V,W
             $remark,                                                      // X REMARKS
             $emp?->employee_no ?? '',                                     // Y Employee ID
-            trim(($emp?->last_name ?? '').', '.($emp?->first_name ?? '')),// Z Employee Name
+            Employee::formatName($emp?->first_name, $emp?->last_name),// Z Employee Name
             $monthly > 0 ? round($monthly, 2) : '',                       // AA Monthly Rate
             $monthly > 0 ? round($daily, 2) : '',                         // AB Daily Rate
             $monthly > 0 ? round($hourly, 2) : '',                        // AC Hourly Rate
@@ -282,7 +282,7 @@ class ReportController extends Controller
             $a = $agg->get($e->id);
             $data[] = [
                 $e->employee_no,
-                $e->last_name.', '.$e->first_name,
+                Employee::formatName($e->first_name, $e->last_name),
                 $e->department?->name ?? '',
                 (int) ($a->scheduled_days ?? 0),
                 (int) ($a->present_days ?? 0),
@@ -353,7 +353,7 @@ class ReportController extends Controller
             ->orderBy('logged_at')
             ->get(['employee_id', 'logged_at', 'direction', 'source', 'device_id']);
 
-        $name = fn ($e) => $e ? trim($e->last_name.', '.$e->first_name) : '';
+        $name = fn ($e) => $e ? Employee::formatName($e->first_name, $e->last_name) : '';
         $hm = fn ($t) => $t ? \Illuminate\Support\Carbon::parse($t)->format('h:i A') : '';
         $status = function ($r) {
             if ($r->is_on_leave) {
@@ -451,7 +451,8 @@ class ReportController extends Controller
 
         $writer->close();
 
-        $slug = \Illuminate\Support\Str::slug($single ? ($single->first_name.' '.$single->last_name) : ($branch->name ?: 'agency'));
+        // Surname first so downloaded files sort by surname alongside the reports.
+        $slug = \Illuminate\Support\Str::slug($single ? ($single->last_name.' '.$single->first_name) : ($branch->name ?: 'agency'));
 
         return response()
             ->download($path, "agency_{$slug}_attendance_{$from}_to_{$to}.xlsx", [
@@ -643,7 +644,7 @@ class ReportController extends Controller
         foreach ($rows->sortBy(fn ($c) => $c->employee?->last_name) as $c) {
             $data[] = [
                 $c->employee?->employee_no ?? '',
-                ($c->employee?->last_name ?? '').', '.($c->employee?->first_name ?? ''),
+                Employee::formatName($c->employee?->first_name, $c->employee?->last_name),
                 $c->employee?->department?->name ?? '',
                 $c->pay_type,
                 (float) $c->basic_monthly, (float) $c->daily_rate, (float) $c->hourly_rate, (float) $c->allowance_monthly,
@@ -686,7 +687,7 @@ class ReportController extends Controller
         foreach ($rows as $r) {
             $data[] = [
                 $r->employee_no,
-                $r->last_name.', '.$r->first_name,
+                Employee::formatName($r->first_name, $r->last_name),
                 $r->dept ?? '',
                 (int) $r->cutoffs,
                 round((float) $r->total_basic, 2),
@@ -748,7 +749,7 @@ class ReportController extends Controller
                 $data[] = [
                     $govs->get($e->id)?->tin ?? '',
                     $e->employee_no,
-                    $e->last_name.', '.$e->first_name,
+                    Employee::formatName($e->first_name, $e->last_name),
                     round((float) ($agg->get($e->id)->ee ?? 0), 2),
                 ];
             }
@@ -774,7 +775,7 @@ class ReportController extends Controller
                 $data[] = [
                     $govs->get($e->id)?->{$govField} ?? '',
                     $e->employee_no,
-                    $e->last_name.', '.$e->first_name,
+                    Employee::formatName($e->first_name, $e->last_name),
                     round($monthly, 2),
                     round($b['msc'], 2),
                     $b['regular_ee'], $b['regular_er'], $b['wisp_ee'], $b['wisp_er'], $b['ec'],
@@ -806,7 +807,7 @@ class ReportController extends Controller
             $data[] = [
                 $govs->get($e->id)?->{$govField} ?? '',
                 $e->employee_no,
-                $e->last_name.', '.$e->first_name,
+                Employee::formatName($e->first_name, $e->last_name),
                 round($monthly, 2),
                 $ee,
                 round((float) $er, 2),
@@ -905,7 +906,7 @@ class ReportController extends Controller
 
             $row = [
                 $r->employee?->employee_no ?? '',
-                trim(($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? '')),
+                Employee::formatName($r->employee?->first_name, $r->employee?->last_name),
                 $r->leaveType?->name ?? '',
                 $asDate($r->submitted_at),
                 $r->date_from?->toDateString() ?? '',
@@ -959,7 +960,7 @@ class ReportController extends Controller
         foreach ($rows as $r) {
             $data[] = [
                 $r->employee?->employee_no ?? '',
-                ($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? ''),
+                Employee::formatName($r->employee?->first_name, $r->employee?->last_name),
                 $r->date?->toDateString() ?? '',
                 $r->start_time,
                 $r->end_time,
@@ -1249,7 +1250,7 @@ class ReportController extends Controller
                 EmployeeCompensation::with('employee:id,employee_no,first_name,last_name')->where('is_active', true)->lazy(500),
                 static fn ($c) => [
                     $c->employee?->employee_no,
-                    trim(($c->employee?->last_name ?? '').', '.($c->employee?->first_name ?? '')),
+                    Employee::formatName($c->employee?->first_name, $c->employee?->last_name),
                     $c->pay_type, $c->basic_monthly, $c->daily_rate, $c->allowance_monthly,
                     $c->effective_from?->toDateString(), $c->is_active ? 'Yes' : 'No',
                 ]);
@@ -1263,7 +1264,7 @@ class ReportController extends Controller
                 static fn ($l) => [
                     $l->logged_at?->format('Y-m-d h:i:s A'),
                     $l->employee?->employee_no,
-                    trim(($l->employee?->last_name ?? '').', '.($l->employee?->first_name ?? '')),
+                    Employee::formatName($l->employee?->first_name, $l->employee?->last_name),
                     $l->direction, $l->source, $l->device?->name ?? $l->device_id, $l->employee?->branch?->name,
                 ]);
 
@@ -1273,7 +1274,7 @@ class ReportController extends Controller
                 DailyTimeRecord::with('employee:id,employee_no,first_name,last_name')->orderByDesc('work_date')->lazy(1000),
                 static fn ($r) => [
                     $r->work_date?->toDateString(), $r->employee?->employee_no,
-                    trim(($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? '')),
+                    Employee::formatName($r->employee?->first_name, $r->employee?->last_name),
                     $r->actual_in?->format('H:i'), $r->actual_out?->format('H:i'), $r->hours_worked,
                     $r->late_minutes, $r->undertime_minutes, $r->overtime_minutes, $r->night_diff_minutes,
                     method_exists($r, 'dayStatus') ? $r->dayStatus() : ($r->status ?? ''),
@@ -1285,7 +1286,7 @@ class ReportController extends Controller
                 LeaveApplication::with('employee:id,employee_no,first_name,last_name', 'leaveType:id,name')->orderByDesc('date_from')->lazy(500),
                 static fn ($r) => [
                     $r->employee?->employee_no,
-                    trim(($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? '')),
+                    Employee::formatName($r->employee?->first_name, $r->employee?->last_name),
                     $r->leaveType?->name, $r->date_from?->toDateString(), $r->date_to?->toDateString(),
                     $r->days_count, $r->status, $r->decision_remarks,
                 ]);
@@ -1296,7 +1297,7 @@ class ReportController extends Controller
                 OvertimeRequest::with('employee:id,employee_no,first_name,last_name')->orderByDesc('date')->lazy(500),
                 static fn ($r) => [
                     $r->employee?->employee_no,
-                    trim(($r->employee?->last_name ?? '').', '.($r->employee?->first_name ?? '')),
+                    Employee::formatName($r->employee?->first_name, $r->employee?->last_name),
                     $r->date?->toDateString(), $r->start_time, $r->end_time, $r->requested_hours,
                     $r->classification, $r->status, $r->reason,
                 ]);
@@ -1318,7 +1319,7 @@ class ReportController extends Controller
                 Payslip::with('employee:id,employee_no,first_name,last_name', 'run:id,name')->orderByDesc('id')->lazy(500),
                 static fn ($p) => [
                     $p->run?->name, $p->employee?->employee_no,
-                    trim(($p->employee?->last_name ?? '').', '.($p->employee?->first_name ?? '')),
+                    Employee::formatName($p->employee?->first_name, $p->employee?->last_name),
                     $p->days_worked, $p->days_absent, $p->late_minutes, $p->overtime_minutes,
                     $p->basic_pay, $p->overtime_pay, $p->night_diff_pay, $p->allowance, $p->gross_pay,
                     $p->sss, $p->philhealth, $p->pagibig, $p->withholding_tax, $p->total_deductions, $p->net_pay,

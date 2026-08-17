@@ -85,7 +85,7 @@ class ArchiveAllCompanies extends Command
      */
     private function categories(int $companyId): array
     {
-        $name = static fn ($e) => trim(($e?->last_name ?? '').', '.($e?->first_name ?? ''));
+        $name = static fn ($e) => Employee::formatName($e?->first_name, $e?->last_name);
 
         return [
             '01_Employees.xlsx' => [

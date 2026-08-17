@@ -175,7 +175,7 @@ class PayrollTimekeepingController extends Controller
                 $head = $e->manager ?? $e->department?->head;
                 fputcsv($out, [
                     $e->employee_no,
-                    $e->last_name.', '.$e->first_name,
+                    Employee::formatName($e->first_name, $e->last_name),
                     $e->department?->name ?? '',
                     (int) ($d->scheduled_days ?? 0), (int) ($d->present_days ?? 0), (int) ($d->absent_days ?? 0), (int) ($d->leave_days ?? 0),
                     (int) ($d->late_minutes ?? 0), (int) ($d->ot_minutes ?? 0), (int) ($d->undertime_minutes ?? 0), (int) ($d->night_minutes ?? 0),

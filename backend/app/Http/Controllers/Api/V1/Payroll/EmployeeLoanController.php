@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Payroll;
 
+use App\Domain\HRIS\Models\Employee;
 use App\Domain\HRIS\Services\LoanImportService;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Payroll\Models\EmployeeLoan;
@@ -207,7 +208,7 @@ class EmployeeLoanController extends Controller
             $writer->addRow(Row::fromValuesWithStyle($cols, $head));
 
             foreach ($group as $l) {
-                $name = trim(($l->employee?->last_name ?? '').', '.($l->employee?->first_name ?? ''));
+                $name = Employee::formatName($l->employee?->first_name, $l->employee?->last_name);
                 $empNo = (string) ($l->employee?->employee_no ?? '');
                 $ref = (string) ($l->reference_no ?? '');
                 $principal = round((float) $l->principal, 2);
