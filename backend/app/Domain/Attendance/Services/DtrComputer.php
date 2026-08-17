@@ -474,8 +474,15 @@ class DtrComputer
         $undertimeMinutes = 0;
         $overtimeMinutes = 0;
 
-        $scheduledIn = $scheduleDay && ! $isRestDay ? $scheduleDay->time_in : null;
-        $scheduledOut = $scheduleDay && ! $isRestDay ? $scheduleDay->time_out : null;
+        // A rest day may carry a shift, for staff who do report on their rest day —
+        // so the scheduled window is surfaced even on a rest day, and the DTR shows
+        // what shift they were expected on. This is DISPLAY only: every late /
+        // undertime branch below is additionally guarded on `! $isRestDay`, so
+        // nobody is charged tardiness for volunteering on their rest day, and
+        // required_hours stays 0 there (which is what keeps the +30% rest-day
+        // premium applying to the hours they work).
+        $scheduledIn = $scheduleDay?->time_in;
+        $scheduledOut = $scheduleDay?->time_out;
         $breakMinutes = (int) ($scheduleDay->break_minutes ?? 0);
         $breaksPaid = (bool) ($scheduleDay?->workSchedule?->breaks_paid ?? false);
         $requiredHours = (float) ($scheduleDay->required_hours ?? 0);

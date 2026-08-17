@@ -44,14 +44,31 @@ function toMins(t: string): number {
   const [h, m] = t.split(":").map(Number);
   return (h || 0) * 60 + (m || 0);
 }
-/** Break length (minutes) for a day, honouring rest day / no break. */
+/**
+ * Break length (minutes) for a day, honouring "no break".
+ * A rest day CAN carry a shift (for staff who report on their rest day), and its
+ * break must still be deducted from the hours they actually work — so being a
+ * rest day no longer forces this to zero.
+ */
 function breakMins(d: CustomDay): number {
-  if (d.is_rest_day || d.no_break || !d.break_start || !d.break_end) return 0;
+  if (d.no_break || !d.break_start || !d.break_end) return 0;
   return Math.max(0, toMins(d.break_end) - toMins(d.break_start));
 }
-/** Paid hours for a day = shift span − break, crossing midnight if needed. */
+/**
+ * REQUIRED hours for a day = shift span − break. Zero on a rest day even when a
+ * shift is set: a rest day is never *required*, and rest-day work is paid via the
+ * rest-day premium (+30%), which the payroll engine applies only while the day
+ * carries no required hours. The shift there describes WHEN they'd work if they
+ * come in, not hours they owe.
+ */
 function dayHours(d: CustomDay): number {
   if (d.is_rest_day || !d.time_in || !d.time_out) return 0;
+  return shiftHours(d);
+}
+
+/** Length of the shift as entered, regardless of rest-day status (display only). */
+function shiftHours(d: CustomDay): number {
+  if (!d.time_in || !d.time_out) return 0;
   let mins = toMins(d.time_out) - toMins(d.time_in);
   if (mins < 0) mins += 24 * 60;
   return Math.max(0, Math.round(((mins - breakMins(d)) / 60) * 10) / 10);
@@ -190,12 +207,16 @@ export default function EmployeeSchedulePage() {
     mutationFn: async () => {
       const hhmmss = (t: string) => (t.length === 5 ? `${t}:00` : t); // API wants H:i:s
       const days = customDays.map((d, dow) => {
-        const noWindow = d.is_rest_day || d.no_break || !d.break_start || !d.break_end;
+        const noWindow = d.no_break || !d.break_start || !d.break_end;
         return {
           day_of_week: dow,
           is_rest_day: d.is_rest_day,
-          time_in: d.is_rest_day ? null : hhmmss(d.time_in),
-          time_out: d.is_rest_day ? null : hhmmss(d.time_out),
+          // Keep the shift even on a rest day — staff who report on their rest day
+          // need a shift on record. Previously these were nulled on save, so the
+          // times HR typed were silently discarded. required_hours stays 0 for a
+          // rest day (see dayHours), which is what preserves the +30% premium.
+          time_in: d.time_in ? hhmmss(d.time_in) : null,
+          time_out: d.time_out ? hhmmss(d.time_out) : null,
           break_start: noWindow ? null : hhmmss(d.break_start),
           break_end: noWindow ? null : hhmmss(d.break_end),
           break_minutes: breakMins(d),
@@ -352,19 +373,30 @@ export default function EmployeeSchedulePage() {
                     <tbody className="divide-y divide-slate-100">
                       {customDays.map((d, dow) => {
                         const rest = d.is_rest_day;
-                        const noBreak = rest || d.no_break;
+                        // A rest day may still carry a shift (for staff who report on
+                        // their rest day), so its time fields stay editable — only
+                        // "No Break" suppresses the break window.
+                        const noBreak = d.no_break;
                         const timeCls = "w-28 rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-brand-500 disabled:bg-slate-100 disabled:text-slate-300";
                         return (
                           <tr key={dow} className={rest ? "bg-slate-50/60" : ""}>
                             <td className="px-3 py-2 font-medium text-slate-700">{DOW[dow]}</td>
                             <td className="px-3 py-2 whitespace-nowrap tabular-nums text-slate-500">{dateForDow(from, dow)}</td>
-                            <td className="px-3 py-2"><input type="time" value={d.time_in} disabled={rest} onChange={(e) => setDay(dow, { time_in: e.target.value })} className={timeCls} /></td>
-                            <td className="px-3 py-2"><input type="time" value={d.time_out} disabled={rest} onChange={(e) => setDay(dow, { time_out: e.target.value })} className={timeCls} /></td>
+                            <td className="px-3 py-2"><input type="time" value={d.time_in} onChange={(e) => setDay(dow, { time_in: e.target.value })} className={timeCls} /></td>
+                            <td className="px-3 py-2"><input type="time" value={d.time_out} onChange={(e) => setDay(dow, { time_out: e.target.value })} className={timeCls} /></td>
                             <td className="px-3 py-2"><input type="time" value={d.break_start} disabled={noBreak} onChange={(e) => setDay(dow, { break_start: e.target.value })} className={timeCls} /></td>
                             <td className="px-3 py-2"><input type="time" value={d.break_end} disabled={noBreak} onChange={(e) => setDay(dow, { break_end: e.target.value })} className={timeCls} /></td>
                             <td className="px-3 py-2 text-center"><input type="checkbox" checked={d.is_rest_day} onChange={(e) => setDay(dow, { is_rest_day: e.target.checked })} /></td>
-                            <td className="px-3 py-2 text-center"><input type="checkbox" checked={d.no_break} disabled={rest} onChange={(e) => setDay(dow, { no_break: e.target.checked })} /></td>
-                            <td className="px-3 py-2 text-right tabular-nums text-slate-500">{rest ? "—" : `${dayHours(d)}h`}</td>
+                            <td className="px-3 py-2 text-center"><input type="checkbox" checked={d.no_break} onChange={(e) => setDay(dow, { no_break: e.target.checked })} /></td>
+                            {/* A rest day has no REQUIRED hours even with a shift set — show
+                                the shift length in muted text so HR can still see it. */}
+                            <td className="px-3 py-2 text-right tabular-nums text-slate-500">
+                              {rest
+                                ? (d.time_in && d.time_out
+                                    ? <span className="text-slate-400" title="Rest day — shift on record, but no required hours">({shiftHours(d)}h)</span>
+                                    : "—")
+                                : `${dayHours(d)}h`}
+                            </td>
                             <td className="px-3 py-2">
                               <div className="flex justify-end gap-1">
                                 <button type="button" title="Copy this day to all working days" onClick={() => copyRow(dow)} disabled={rest}
