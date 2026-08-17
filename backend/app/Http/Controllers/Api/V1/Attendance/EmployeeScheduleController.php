@@ -3,14 +3,43 @@
 namespace App\Http\Controllers\Api\V1\Attendance;
 
 use App\Domain\Attendance\Models\EmployeeSchedule;
+use App\Domain\Attendance\Services\DtrComputer;
 use App\Domain\HRIS\Models\Employee;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendance\EmployeeScheduleAssignmentRequest;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class EmployeeScheduleController extends Controller
 {
+    public function __construct(private readonly DtrComputer $dtr) {}
+
+    /**
+     * Recompute the DTR across an assignment's date range so a schedule change
+     * takes effect immediately. Without this, a retroactive or current change only
+     * shows after the nightly SyncDtr — which covers just the last few days, so
+     * back-dated assignments never take effect at all. The computer never marks
+     * today/future absent, so an open-ended "to" is safe. Failures never break the
+     * assignment itself.
+     */
+    private function recomputeRange(Employee $employee, ?string $from, ?string $to): void
+    {
+        if (! $from) {
+            return;
+        }
+        try {
+            $end = $to ? CarbonImmutable::parse($to) : CarbonImmutable::today();
+            $this->dtr->computeForEmployee(
+                $employee,
+                CarbonImmutable::parse($from)->subDay(),
+                $end->addDay(),
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
     public function index(Request $request, Employee $employee): JsonResponse
     {
         abort_unless($request->user()->can('attendance.view'), 403);
@@ -52,6 +81,9 @@ class EmployeeScheduleController extends Controller
         $assignment = $employee->scheduleAssignments()->create($data);
         $assignment->load('workSchedule:id,code,name');
 
+        // Make the new schedule take effect now, across its whole range.
+        $this->recomputeRange($employee, $assignment->effective_from?->toDateString(), $assignment->effective_to?->toDateString());
+
         return response()->json([
             'data' => [
                 'id' => $assignment->id,
@@ -71,7 +103,12 @@ class EmployeeScheduleController extends Controller
         abort_unless($request->user()->can('attendance.manage'), 403);
         abort_unless($schedule->employee_id === $employee->id, 404);
 
+        $from = $schedule->effective_from?->toDateString();
+        $to = $schedule->effective_to?->toDateString();
         $schedule->delete();
+
+        // Removing a schedule must recompute too, else its old absences/lates linger.
+        $this->recomputeRange($employee, $from, $to);
 
         return response()->json(['message' => 'Schedule assignment removed.']);
     }
