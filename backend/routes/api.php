@@ -210,6 +210,7 @@ Route::prefix('v1')->group(function () {
         Route::post('time-log-requests/{timeLogRequest}/reject', [\App\Http\Controllers\Api\V1\Attendance\TimeLogRequestController::class, 'reject']);
 
         Route::get('daily-time-records', [DailyTimeRecordController::class, 'index']);
+        Route::get('daily-time-records/export', [DailyTimeRecordController::class, 'export']);
         Route::get('my/daily-time-records', [DailyTimeRecordController::class, 'mine']);
         Route::post('daily-time-records/compute', [DailyTimeRecordController::class, 'compute']);
 

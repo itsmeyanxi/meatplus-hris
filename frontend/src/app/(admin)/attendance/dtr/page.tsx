@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { getMe } from "@/lib/auth";
 import { getLookup } from "@/lib/employees";
 import { dtrApi, type DailyTimeRecord, type DayStatus } from "@/lib/attendance";
@@ -193,6 +194,17 @@ export default function DtrMatrixPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: qKey }),
   });
 
+  // Download the on-screen month/department as the day-by-day DTR CSV.
+  const downloadCsv = useMutation({
+    mutationFn: () =>
+      dtrApi.exportCsv({
+        from: range.from,
+        to: range.to,
+        department_id: deptId === "" ? undefined : deptId,
+      }),
+    onError: () => toast.error("Couldn't download the DTR."),
+  });
+
   // Month nav helpers
   const prevMonth = () => {
     if (month === 0) { setYear(y => y - 1); setMonth(11); }
@@ -277,6 +289,19 @@ export default function DtrMatrixPage() {
           {isFetching && (
             <span className="text-xs text-slate-400">Loading…</span>
           )}
+          {/* Download the same month + department that's on screen, as the
+              day-by-day CSV. Available to anyone who can view the matrix. */}
+          <button
+            onClick={() => downloadCsv.mutate()}
+            disabled={downloadCsv.isPending || rows.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+            title="Download this month's DTR as a CSV (Date, Employee No, Name, Department, Time In/Out, Hours, Late, UT, OT, Night Diff, Status)"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+            </svg>
+            {downloadCsv.isPending ? "Preparing…" : "Download CSV"}
+          </button>
           {canManage && (
             <div className="flex gap-2">
               <button

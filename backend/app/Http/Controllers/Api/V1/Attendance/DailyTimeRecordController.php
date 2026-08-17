@@ -13,10 +13,29 @@ use App\Http\Resources\Attendance\DailyTimeRecordResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DailyTimeRecordController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
+    {
+        $records = $this->visibleQuery($request)
+            ->orderBy('work_date', 'desc')
+            // For the matrix view (no specific employee) allow up to one month × all
+            // employees. Per-employee queries keep the tighter cap so the API stays snappy.
+            ->limit($request->query('employee_id') ? 500 : 5000)
+            ->get()
+            ->sortBy('work_date')->values();
+
+        return DailyTimeRecordResource::collection($records);
+    }
+
+    /**
+     * The DTR rows this viewer is allowed to see, with the same filters the matrix
+     * uses. Shared by index() and export() so a download can never show a different
+     * population than the screen it was taken from.
+     */
+    private function visibleQuery(Request $request): \Illuminate\Database\Eloquent\Builder
     {
         $user = $request->user();
         abort_unless($user->can('attendance.view'), 403);
@@ -56,14 +75,93 @@ class DailyTimeRecordController extends Controller
             $q->where('work_date', '<=', $to);
         }
 
-        // For the matrix view (no specific employee) allow up to one month × all employees.
-        // Per-employee queries keep the tighter cap so the API stays snappy.
-        $limit = $request->query('employee_id') ? 500 : 5000;
+        return $q;
+    }
 
-        $records = $q->orderBy('work_date', 'desc')->limit($limit)->get()
-            ->sortBy('work_date')->values();
+    /**
+     * GET /api/v1/daily-time-records/export?from=&to=&employee_id=&department_id=
+     *
+     * The day-by-day DTR as a CSV, one row per employee per day. Deliberately the
+     * plain daily grid (no rates or pay columns) — this is the timekeeping record
+     * HR hands out, not the payroll register (see reports/dtr for that).
+     *
+     * Scoping is shared with the matrix via visibleQuery(), so an employee without
+     * attendance.view.any can only ever export their OWN days.
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $request->validate([
+            'from' => ['required', 'date'],
+            'to' => ['required', 'date', 'after_or_equal:from'],
+            'employee_id' => ['nullable', 'integer'],
+            'department_id' => ['nullable', 'integer'],
+        ]);
 
-        return DailyTimeRecordResource::collection($records);
+        $records = $this->visibleQuery($request)
+            ->with('employee.department:id,name')
+            ->get()
+            // Date first, then surname — the order the printed DTR is read in.
+            ->sortBy([
+                fn ($a, $b) => $a->work_date <=> $b->work_date,
+                fn ($a, $b) => [$a->employee?->last_name, $a->employee?->first_name]
+                    <=> [$b->employee?->last_name, $b->employee?->first_name],
+            ])
+            ->values();
+
+        $from = $request->query('from');
+        $to = $request->query('to');
+
+        return response()->streamDownload(function () use ($records) {
+            $out = fopen('php://output', 'w');
+
+            // Hand-rolled instead of fputcsv(): PHP quotes any field containing a
+            // SPACE, which would emit "Employee No" / "Time In" and change the
+            // format HR already works with. Quote only when the value actually
+            // needs it — a comma, a quote, or a line break (so a surname-first
+            // name like "ABELADO, EDUARDO" is quoted, a department name is not).
+            $line = function (array $cells) use ($out) {
+                $cells = array_map(function ($v) {
+                    $v = (string) $v;
+
+                    return preg_match('/[",\r\n]/', $v)
+                        ? '"'.str_replace('"', '""', $v).'"'
+                        : $v;
+                }, $cells);
+                fwrite($out, implode(',', $cells)."\n");
+            };
+
+            $line([
+                'Date', 'Employee No', 'Name', 'Department', 'Time In', 'Time Out',
+                'Hours Worked', 'Late (min)', 'Undertime (min)', 'OT (min)',
+                'Night Diff (min)', 'Status',
+            ]);
+
+            // Times as bare HH:MM (blank when the punch is missing), hours always to
+            // 2 decimals, minute columns as plain integers.
+            $hm = fn ($v) => $v ? \Carbon\CarbonImmutable::parse($v)->format('H:i') : '';
+
+            foreach ($records as $r) {
+                $e = $r->employee;
+                $line([
+                    $r->work_date?->toDateString(),
+                    $e?->employee_no ?? '',
+                    Employee::formatName($e?->first_name, $e?->last_name),
+                    $e?->department?->name ?? '',
+                    $hm($r->actual_in),
+                    $hm($r->actual_out),
+                    number_format((float) $r->hours_worked, 2, '.', ''),
+                    (int) $r->late_minutes,
+                    (int) $r->undertime_minutes,
+                    (int) $r->overtime_minutes,
+                    (int) $r->night_diff_minutes,
+                    $r->dayStatus(),
+                ]);
+            }
+
+            fclose($out);
+        }, "dtr_{$from}_to_{$to}.csv", [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 
     /**

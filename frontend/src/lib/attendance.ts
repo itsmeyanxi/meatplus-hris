@@ -233,6 +233,26 @@ export const dtrApi = {
     const { data } = await api.post<Listed<DailyTimeRecord>>("/api/v1/daily-time-records/compute", body);
     return data.data;
   },
+  /**
+   * Download the day-by-day DTR as CSV — one row per employee per day, matching
+   * the layout HR already works with (Date, Employee No, Name, Department, Time
+   * In/Out, Hours, Late, UT, OT, Night Diff, Status). The server applies the same
+   * visibility rules as the matrix, so a non-HR user only ever gets their own days.
+   */
+  exportCsv: async (params: { from: string; to: string; department_id?: number; employee_id?: number }) => {
+    const qs = new URLSearchParams(
+      Object.entries(params)
+        .filter(([, v]) => v !== undefined && v !== "")
+        .map(([k, v]) => [k, String(v)]),
+    ).toString();
+    const { data } = await api.get<Blob>(`/api/v1/daily-time-records/export?${qs}`, { responseType: "blob" });
+    const href = URL.createObjectURL(data);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = `dtr_${params.from}_to_${params.to}.csv`;
+    a.click();
+    URL.revokeObjectURL(href);
+  },
 };
 
 export const myAttendanceApi = {
