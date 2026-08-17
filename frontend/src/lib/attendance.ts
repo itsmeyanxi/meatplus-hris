@@ -98,6 +98,9 @@ export type DayStatus =
   | "leave"
   | "holiday"
   | "rest_day"
+  // Only one side of the day was captured (missing punch-in or punch-out) — the
+  // record is incomplete and needs HR to complete it.
+  | "incomplete"
   | "no_record";
 
 export type DailyTimeRecord = {

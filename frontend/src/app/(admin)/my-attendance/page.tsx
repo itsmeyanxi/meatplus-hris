@@ -19,6 +19,7 @@ const STATUS_STYLE: Record<DayStatus, { dot: string; cell: string; label: string
   leave: { dot: "bg-indigo-500", cell: "bg-indigo-50 border-indigo-200", label: "On leave" },
   holiday: { dot: "bg-violet-500", cell: "bg-violet-50 border-violet-200", label: "Holiday" },
   rest_day: { dot: "bg-slate-400", cell: "bg-slate-50 border-slate-200", label: "Rest day" },
+  incomplete: { dot: "bg-red-500", cell: "bg-red-50 border-red-300", label: "Incomplete (missing punch)" },
   no_record: { dot: "bg-slate-200", cell: "bg-white border-slate-200", label: "No record" },
 };
 

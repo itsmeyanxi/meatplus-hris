@@ -55,18 +55,23 @@ class DailyTimeRecord extends Model
         if ($this->is_rest_day && (float) $this->hours_worked === 0.0) {
             return 'rest_day';
         }
+        // Half a shift: exactly ONE side of the day was captured, so the record is
+        // broken and needs HR to complete it (a forgotten punch-out, a manually added
+        // lone out, or a night shift whose in-punch was missed). It used to be
+        // invisible — a lone out-punch has no actual_in and computes 0 hours, so it
+        // fell through to 'no_record' and the matrix drew a BLANK cell, making a
+        // just-saved manual log look like it never saved. Flagged distinctly rather
+        // than shown as a normal present day, since the times are incomplete.
+        //
+        // Both-null is NOT incomplete: that is a no-punch day (absent, or a
+        // punch-exempt employee credited their scheduled hours above).
+        if (((bool) $this->actual_in) !== ((bool) $this->actual_out)) {
+            return 'incomplete';
+        }
         if ($this->late_minutes > 0) {
             return 'late';
         }
-        // ANY punch on the day means the person was here, so the day must not read
-        // as empty. `actual_out` counts too: a day with only an out-punch — a manually
-        // added out, or a night shift whose in-punch was missed — computes 0 hours and
-        // has no actual_in, so it used to fall through to 'no_record' and render as a
-        // BLANK cell in the attendance matrix. That made a just-added manual log look
-        // like it never saved. Hours stay 0 and payroll is unaffected (it reads
-        // hours_worked / is_absent, never this status); this only stops real
-        // attendance from being displayed as nothing.
-        if ((float) $this->hours_worked > 0 || $this->actual_in || $this->actual_out) {
+        if ((float) $this->hours_worked > 0 || $this->actual_in) {
             return 'present';
         }
 

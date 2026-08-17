@@ -33,12 +33,14 @@ const STATUS_COLOR: Record<DayStatus, string> = {
   leave:    "bg-indigo-100 text-indigo-800 ring-indigo-200",
   holiday:  "bg-violet-100 text-violet-800 ring-violet-200",
   rest_day: "bg-slate-100  text-slate-500  ring-slate-200",
+  // Missing a punch — red so a broken record is obvious at a glance.
+  incomplete:"bg-red-100   text-red-700    ring-red-300",
   no_record:"bg-white      text-slate-300  ring-slate-100",
 };
 
 const STATUS_LABEL: Record<DayStatus, string> = {
   present: "P", late: "L", absent: "A", leave: "Lv",
-  holiday: "H", rest_day: "—", no_record: "",
+  holiday: "H", rest_day: "—", incomplete: "!", no_record: "",
 };
 
 const LEGEND: { key: DayStatus; label: string; dot: string }[] = [
@@ -48,6 +50,7 @@ const LEGEND: { key: DayStatus; label: string; dot: string }[] = [
   { key: "leave",    label: "Leave",    dot: "bg-indigo-500" },
   { key: "holiday",  label: "Holiday",  dot: "bg-violet-500" },
   { key: "rest_day", label: "Rest day", dot: "bg-slate-400" },
+  { key: "incomplete", label: "! Missing punch", dot: "bg-red-500" },
 ];
 
 const DAY_ABBR = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -59,7 +62,7 @@ type EmployeeRow = {
   employee_no: string;
   full_name: string;
   days: Map<string, DailyTimeRecord>;
-  totals: { present: number; late: number; absent: number; leave: number; ot: number };
+  totals: { present: number; late: number; absent: number; leave: number; incomplete: number; ot: number };
 };
 
 type DrawerState = { record: DailyTimeRecord; empName: string } | null;
@@ -122,7 +125,7 @@ export default function DtrMatrixPage() {
           employee_no: r.employee?.employee_no ?? String(r.employee_id),
           full_name: r.employee?.full_name ?? `Employee #${r.employee_id}`,
           days: new Map(),
-          totals: { present: 0, late: 0, absent: 0, leave: 0, ot: 0 },
+          totals: { present: 0, late: 0, absent: 0, leave: 0, incomplete: 0, ot: 0 },
         });
       }
       const row = map.get(r.employee_id)!;
@@ -132,6 +135,10 @@ export default function DtrMatrixPage() {
       else if (s === "late") { row.totals.late++; row.totals.present++; }
       else if (s === "absent") row.totals.absent++;
       else if (s === "leave") row.totals.leave++;
+      // Counted on its own, NOT as present: the employee was here but one punch is
+      // missing, so the day's hours aren't known yet. Without its own tally these
+      // days would vanish from P/L/A and the row wouldn't add up.
+      else if (s === "incomplete") row.totals.incomplete++;
       row.totals.ot += r.overtime_minutes ?? 0;
     }
     return Array.from(map.values()).sort((a, b) =>
@@ -394,7 +401,7 @@ export default function DtrMatrixPage() {
                     </th>
                   ))}
                   <th className="sticky right-0 z-10 bg-slate-50 border-l border-slate-200 px-3 py-2.5 text-center text-xs font-semibold text-slate-600 min-w-[110px]">
-                    P / L / A
+                    P / L / A / !
                   </th>
                 </tr>
               </thead>
@@ -440,6 +447,18 @@ export default function DtrMatrixPage() {
                       <span className="text-amber-600">{row.totals.late}</span>
                       <span className="text-slate-300 mx-1">/</span>
                       <span className="text-red-600">{row.totals.absent}</span>
+                      {/* Only shown when there is something to fix, so a clean row stays clean. */}
+                      {row.totals.incomplete > 0 && (
+                        <>
+                          <span className="text-slate-300 mx-1">/</span>
+                          <span
+                            className="text-red-700"
+                            title={`${row.totals.incomplete} day(s) missing a punch`}
+                          >
+                            {row.totals.incomplete}!
+                          </span>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -491,11 +510,13 @@ function DetailDrawer({
 
   const statusLabel: Record<DayStatus, string> = {
     present: "Present", late: "Late", absent: "Absent", leave: "On Leave",
-    holiday: "Holiday", rest_day: "Rest Day", no_record: "No Record",
+    holiday: "Holiday", rest_day: "Rest Day", incomplete: "Incomplete — missing punch",
+    no_record: "No Record",
   };
   const statusBg: Record<DayStatus, string> = {
     present: "bg-emerald-500", late: "bg-amber-500", absent: "bg-red-500",
-    leave: "bg-indigo-500", holiday: "bg-violet-500", rest_day: "bg-slate-400", no_record: "bg-slate-200",
+    leave: "bg-indigo-500", holiday: "bg-violet-500", rest_day: "bg-slate-400",
+    incomplete: "bg-red-500", no_record: "bg-slate-200",
   };
 
   return (

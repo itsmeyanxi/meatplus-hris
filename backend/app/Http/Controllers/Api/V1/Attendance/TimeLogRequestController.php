@@ -119,31 +119,47 @@ class TimeLogRequestController extends Controller
         DB::transaction(function () use ($req, $deciderId) {
             $date = $req->work_date->toDateString();
 
-            $make = function (?string $time, string $direction) use ($req, $date) {
+            $make = function (?string $time, string $direction, ?CarbonImmutable $after = null) use ($req, $date) {
                 if (! $time) {
-                    return;
+                    return null;
                 }
+
+                $at = CarbonImmutable::parse("{$date} {$time}", self::TZ);
+
+                // Overnight shift: the template (and its own guide) puts BOTH times on
+                // the shift's START date — "In 20:00, Out 05:00". Stored literally, the
+                // 05:00 out landed 15 hours BEFORE the in, so the DTR read 05:00 as the
+                // arrival and 20:00 as the departure and credited 14 hours instead of 9.
+                // An out that is not after the in belongs to the next calendar day.
+                if ($after && $at->lessThanOrEqualTo($after)) {
+                    $at = $at->addDay();
+                }
+
                 TimeLog::create([
                     'company_id' => $req->company_id,
                     'employee_id' => $req->employee_id,
-                    'logged_at' => CarbonImmutable::parse("{$date} {$time}", self::TZ),
+                    'logged_at' => $at,
                     'direction' => $direction,
                     'source' => 'manual',
                     'device_id' => 'UPLOAD',
                     'source_event_id' => (string) Str::uuid(),
                     'metadata' => ['time_log_request_id' => $req->id, 'batch_id' => $req->batch_id],
                 ]);
+
+                return $at;
             };
-            $make($req->time_in, 'in');
-            $make($req->time_out, 'out');
+            $in = $make($req->time_in, 'in');
+            $make($req->time_out, 'out', $in);
 
             $req->update(['status' => 'approved', 'decided_by' => $deciderId, 'decided_at' => now()]);
 
-            // Recompute just that employee's day so the punch flows into DTR now.
+            // Recompute so the punches flow into the DTR now. Widened by a day each
+            // side because an overnight shift's out-punch lands on the NEXT date (see
+            // $make above) and the shift may have started the previous evening.
             $employee = Employee::withoutGlobalScopes()->find($req->employee_id);
             if ($employee) {
                 $day = CarbonImmutable::parse($date);
-                app(DtrComputer::class)->computeForEmployee($employee, $day, $day);
+                app(DtrComputer::class)->computeForEmployee($employee, $day->subDay(), $day->addDay());
             }
         });
     }
