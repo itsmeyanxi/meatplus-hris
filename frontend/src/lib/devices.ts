@@ -99,4 +99,60 @@ export const devicesApi = {
     const { data } = await api.get<Listed<DeviceLookup>>(`/api/v1/lookups/branches?company_id=${companyId}`);
     return data.data;
   },
+  /** Connection health for every terminal — is it talking to us, and is what it sends landing on a person. */
+  report: async (): Promise<ConnectionReport> => {
+    const { data } = await api.get<ConnectionReport>(`${base}/report`);
+    return data;
+  },
+  downloadReport: async () => {
+    const { data } = await api.get<Blob>(`${base}/report?format=csv`, { responseType: "blob" });
+    const href = URL.createObjectURL(data);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = `biometric_connection_report_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(href);
+  },
+};
+
+/** live = pushed within the hour · idle = same day · quiet = 1–2 days · offline = 3+ days */
+export type DeviceState = "live" | "idle" | "quiet" | "offline" | "never";
+
+export type DeviceHealth = {
+  id: number;
+  name: string;
+  serial_no: string | null;
+  vendor: string | null;
+  company: string | null;
+  is_active: boolean;
+  last_event_at: string | null;
+  silent_minutes: number | null;
+  state: DeviceState;
+  punches_today: number;
+  punches_7d: number;
+  punches_30d: number;
+  employees_30d: number;
+  /** % of what the device sent in 30 days that actually matched an employee. */
+  match_rate: number | null;
+  staged_pending: number;
+  staged_pins: number;
+  /** One plain sentence when a human is needed, otherwise null. */
+  attention: string | null;
+};
+
+export type ConnectionReport = {
+  devices: DeviceHealth[];
+  summary: {
+    generated_at: string;
+    total: number;
+    live: number;
+    idle: number;
+    quiet: number;
+    offline: number;
+    never: number;
+    pending_devices: number;
+    punches_today: number;
+    staged_pending: number;
+    needs_attention: number;
+  };
 };

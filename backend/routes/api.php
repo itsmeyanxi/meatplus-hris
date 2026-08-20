@@ -185,6 +185,8 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('holidays', HolidayController::class);
 
         // Biometric attendance devices (IT + HR)
+        // Declared before the resource so "report" isn't captured as {attendanceDevice}.
+        Route::get('attendance-devices/report', [AttendanceDeviceController::class, 'report']);
         Route::apiResource('attendance-devices', AttendanceDeviceController::class)
             ->parameters(['attendance-devices' => 'attendanceDevice']);
         Route::post('attendance-devices/{attendanceDevice}/test', [AttendanceDeviceController::class, 'test']);

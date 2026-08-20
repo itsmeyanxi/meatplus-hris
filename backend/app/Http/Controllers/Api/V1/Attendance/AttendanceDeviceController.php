@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Attendance;
 
 use App\Domain\Attendance\Models\AttendanceDevice;
 use App\Domain\Attendance\Services\Biometric\BiometricSyncService;
+use App\Domain\Attendance\Services\Biometric\ConnectionReport;
 use App\Domain\Attendance\Services\Biometric\HikvisionIsapiClient;
 use App\Domain\Identity\Models\Company;
 use App\Models\User;
@@ -13,6 +14,7 @@ use App\Http\Resources\Attendance\AttendanceDeviceResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AttendanceDeviceController extends Controller
 {
@@ -23,6 +25,46 @@ class AttendanceDeviceController extends Controller
         return AttendanceDeviceResource::collection(
             AttendanceDevice::orderBy('name')->get(),
         );
+    }
+
+    /**
+     * GET /api/v1/attendance-devices/report[?format=csv]
+     *
+     * Connection health for every terminal: is it still talking to us, is what it
+     * sends landing on an employee, and which ones need a human today. The device
+     * list answers "what devices exist"; this answers "are they working".
+     */
+    public function report(Request $request, ConnectionReport $report): JsonResponse|StreamedResponse
+    {
+        abort_unless($request->user()->can('device.manage'), 403);
+
+        $data = $report->build();
+
+        if ($request->query('format') !== 'csv') {
+            return response()->json($data);
+        }
+
+        return response()->streamDownload(function () use ($data) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Device', 'Serial', 'Company', 'Vendor', 'Approved', 'State',
+                'Last contact', 'Silent (hours)', 'Punches today', 'Punches 7d', 'Punches 30d',
+                'Employees 30d', 'Match rate %', 'Staged punches', 'Unmapped PINs', 'Needs attention']);
+
+            foreach ($data['devices'] as $d) {
+                fputcsv($out, [
+                    $d['name'], $d['serial_no'], $d['company'], $d['vendor'],
+                    $d['is_active'] ? 'yes' : 'NO',
+                    $d['state'],
+                    $d['last_event_at'] ? substr(str_replace('T', ' ', $d['last_event_at']), 0, 16) : 'never',
+                    $d['silent_minutes'] === null ? '' : round($d['silent_minutes'] / 60, 1),
+                    $d['punches_today'], $d['punches_7d'], $d['punches_30d'], $d['employees_30d'],
+                    $d['match_rate'] ?? '', $d['staged_pending'], $d['staged_pins'],
+                    $d['attention'] ?? '',
+                ]);
+            }
+            fclose($out);
+        }, 'biometric_connection_report_'.now()->format('Y-m-d').'.csv',
+            ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function store(AttendanceDeviceRequest $request): JsonResponse

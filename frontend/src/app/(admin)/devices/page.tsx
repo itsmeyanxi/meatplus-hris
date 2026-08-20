@@ -10,6 +10,7 @@ import { inputCls, labelCls } from "@/lib/form-classes";
 import { SearchSelect } from "@/components/SearchSelect";
 import { devicesApi, type Device, type DeviceInput, type SyncSummary, type EnrolledUser } from "@/lib/devices";
 import { branchTermFor } from "@/lib/terminology";
+import { BiometricConnectionReport } from "@/components/attendance/BiometricConnectionReport";
 
 const QK = ["attendance-devices"];
 
@@ -121,6 +122,9 @@ export default function DevicesPage() {
         description="Register and sync fingerprint/face attendance terminals."
         actions={<AppButton onClick={openCreate}>+ Add device</AppButton>}
       />
+
+      {/* Health first: the list below says what exists, this says what is working. */}
+      <BiometricConnectionReport />
 
       <EnrollmentHelp />
 
