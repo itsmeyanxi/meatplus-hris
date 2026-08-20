@@ -75,6 +75,7 @@ Route::prefix('v1')->group(function () {
         Route::get('my/time-clock', [\App\Http\Controllers\Api\V1\Me\TimeClockController::class, 'show']);
         Route::post('my/time-clock', [\App\Http\Controllers\Api\V1\Me\TimeClockController::class, 'store']);
         Route::get('audit-trail', [\App\Http\Controllers\Api\V1\Admin\AuditTrailController::class, 'index']);
+        Route::get('audit-trail/export', [\App\Http\Controllers\Api\V1\Admin\AuditTrailController::class, 'export']);
         Route::post('my/change-password', ChangePasswordController::class);
         Route::get('my/notifications', [NotificationController::class, 'index']);
         Route::post('my/notifications/read-all', [NotificationController::class, 'markAllRead']);
