@@ -30,6 +30,18 @@ class BiometricAnomalyDetector
     /** Only consider punches this recent — we alert on live, ongoing misattribution. */
     private const WINDOW_DAYS = 45;
 
+    /**
+     * Do not re-alert HR about the same (employee, PIN) inside this many hours.
+     *
+     * Detection runs over a ROLLING window, so a collision can age out of that
+     * window, be marked resolved, then reappear the moment a fresh punch lands —
+     * which reads as "newly opened" and fires the alert again. That flap was
+     * invisible on a daily schedule but re-pings HR every hour on an hourly one.
+     * The alert still fires for a genuinely new collision, and again if one comes
+     * back after a real absence; it just cannot repeat inside a day.
+     */
+    private const RENOTIFY_COOLDOWN_HOURS = 24;
+
     /** Below this name similarity (%), the device name is treated as a different person. */
     private const SIMILARITY_FLOOR = 55.0;
 
@@ -138,7 +150,13 @@ class BiometricAnomalyDetector
                 'kind' => 'pin_reuse_collision',
             ]);
 
-            $isNew = ! $row->exists || $row->resolved_at !== null;
+            // Worth alerting about: a brand-new collision, or one that had been
+            // resolved and is back. Suppressed if HR was already told recently
+            // (see RENOTIFY_COOLDOWN_HOURS) — such a row counts as ongoing, not new.
+            $reopened = $row->exists && $row->resolved_at !== null;
+            $cooling = $row->notified_at !== null
+                && $row->notified_at->greaterThan(now()->subHours(self::RENOTIFY_COOLDOWN_HOURS));
+            $isNew = (! $row->exists || $reopened) && ! $cooling;
             $row->fill([
                 'company_id' => $a['company_id'],
                 'device_key' => $a['device_key'],

@@ -22,16 +22,19 @@ Schedule::command('attendance:reclaim-unmatched')
     ->runInBackground();
 
 // Alert HR to biometric PIN-reuse collisions (someone else's punches landing on an
-// employee via the employee-number fallback). Once a day is plenty; only NEW issues
-// notify, so this never spams the bell.
+// employee via the employee-number fallback). Runs HOURLY so HR hears about a bad
+// mapping the same morning it happens rather than the next day; only NEWLY-opened
+// anomalies notify, so repeating the scan every hour never re-pings the bell.
 Schedule::command('attendance:detect-biometric-anomalies')
-    ->dailyAt('06:30')
+    ->hourly()
     ->withoutOverlapping()
     ->runInBackground();
 
 // Scan employee records for data problems (missing payroll/attendance essentials,
-// silent attendance) and send HR one aggregated digest of new issues.
+// silent attendance) and send HR one aggregated digest. Runs HOURLY: the digest is
+// only sent for issues detected as NEW in that pass, so an hourly cadence surfaces a
+// problem within the hour without turning into an hourly notification.
 Schedule::command('employees:detect-data-issues')
-    ->dailyAt('06:45')
+    ->hourly()
     ->withoutOverlapping()
     ->runInBackground();
