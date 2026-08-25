@@ -71,8 +71,10 @@ employee_list_*.csv
 # Database backups (contain employee PII — never commit)
 backups/
 
-# Downloaded binaries (Caddy, etc.)
-tools/
+# Downloaded binaries (Caddy, etc.) and machine-local operational scripts.
+# Anchored to the repo root on purpose: an unanchored "tools/" also swallowed
+# docs/tools/, which holds the tracked document-generation scripts.
+/tools/
 
 # Ad-hoc HR working exports (contain employee PII)
 missing-positions-to-fill.xlsx

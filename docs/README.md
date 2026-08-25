@@ -64,6 +64,19 @@ HTTPS/443 is not enabled — the site is intentionally HTTP for now. See
 > [screenshots/](screenshots/README.md), which lists exactly what to capture and what must be
 > redacted first.
 
+**Word version.** Document 10 is also maintained as
+`docs/ALL-COMPANY-HRIS-System-Turnover.docx` (31 pages, A4) for circulation to management and
+external parties. **The markdown is the source of truth** — edit `10-system-turnover.md`, then
+regenerate:
+
+```powershell
+.\docs\tools\build-turnover-docx.ps1
+```
+
+The conversion turns the mermaid diagrams into ASCII art (mermaid source is unreadable in
+Word) and each screenshot link into a labelled placeholder box, so images can be pasted
+straight into the document. Requires Node and Microsoft Word; both are on the production PC.
+
 ---
 
 ## Quick start
