@@ -29,7 +29,7 @@ OT/UT/OB/COA requests), leave (types/balances/applications), overtime, payroll
 ## 3. Topology (as deployed)
 
 Everything runs on one Windows PC (Laragon stack) and is published to the internet through
-Caddy. Branch biometric devices push in from wherever they are.
+the Next.js server itself. Branch biometric devices push in from wherever they are.
 
 ```
    BIOMETRIC DEVICES (any branch / any network)
@@ -37,10 +37,11 @@ Caddy. Branch biometric devices push in from wherever they are.
         ▼
  ┌───────────────────────────── office PC ─────────────────────────────┐
  │                                                                      │
- │   Caddy (:80, reverse proxy + round-robin load balancer)            │
- │     ├─ /api/*  /sanctum/*  /up  /iclock/*  ─▶ Laravel pool          │
- │     │                                         :8000 :8001 :8002 :8003│
- │     └─ everything else                     ─▶ Next.js  :3001         │
+ │   Next.js (:80, public entry point; proxies via next.config.mjs)    │
+ │     ├─ /api/*  /sanctum/*  /up             ─▶ Laravel :8000         │
+ │     ├─ /iclock/*                           ─▶ Laravel :8001         │
+ │     │                                         (device traffic only)  │
+ │     └─ everything else                     ─▶ the Next app itself    │
  │                                                   │                  │
  │                            Laravel workers ───────┴──▶ PostgreSQL 17 │
  │                            (php artisan serve)         Laragon :5433 │
@@ -51,8 +52,13 @@ Caddy. Branch biometric devices push in from wherever they are.
    Browsers: HR, payroll, managers, employees — any company, any branch
 ```
 
-- Caddy health-checks each worker on `/up`; only healthy workers get traffic, so one
-  crashed worker simply drops out of rotation.
+- **Device traffic is isolated from user traffic.** `php artisan serve` serves one request
+  at a time, so punches go to `:8001` and the UI to `:8000` — a burst from the terminals
+  cannot block someone loading a page, and vice versa.
+- **No load balancer today.** Caddy used to round-robin the pool and health-check it on
+  `/up`, but Smart App Control blocks the unsigned binary, so Next.js holds port 80 instead.
+  Workers `:8002`/`:8003` still start but receive nothing; if `:8000` dies, the UI is down
+  until the pool is restarted. Restoring Caddy needs a signed build.
 - Devices push **outbound**, so no server is needed at each branch and no inbound access
   into branch LANs is required.
 - HTTPS/443 is **parked** — the site is HTTP by design for now (see
@@ -63,9 +69,9 @@ Caddy. Branch biometric devices push in from wherever they are.
 | Component | Tech | Responsibility |
 |---|---|---|
 | Web frontend | Next.js 16, TypeScript, TanStack Query, Tailwind | All user UIs; talks to the API |
-| API / app server | Laravel 12 (PHP 8.3), DDD layout, run as a 4-worker pool | Business logic, ingestion, auth, REST API |
+| API / app server | Laravel 11 (PHP 8.3), DDD layout, run as a 4-worker pool | Business logic, ingestion, auth, REST API |
 | Database | PostgreSQL 17 (Laragon); code also runs on MySQL | System of record |
-| Reverse proxy | Caddy | TLS-ready proxy + load balancer across the worker pool |
+| Public entry point | Next.js (`:80`) with server-side rewrites | Serves the app and proxies `/api`, `/sanctum`, `/up`, `/iclock` to the Laravel pool |
 | Ingestion | `routes/iclock.php` → `IclockController` → `AdmsIngestionService` | Receive ADMS punches from devices |
 | Auth | Sanctum (cookie/session), Spatie Permission (teams) | User auth; devices authorized by serial allowlist |
 
@@ -122,7 +128,16 @@ Device scan → ADMS POST /iclock/cdata → AdmsIngestionService → TimeLog
 
 **Identity mapping** — each person is enrolled on the device under a numeric **PIN**. The
 server maps it to `employee.biometric_user_id` (fallback: `employee_no`), scoped to the
-device's company. Unmatched PINs are skipped, never lost.
+device's company. A PIN that matches nobody is **staged in `unmatched_punches`**, not
+dropped: `attendance:reclaim-unmatched` runs every 15 minutes and converts staged rows into
+real punches the moment that PIN maps to someone, then recomputes the affected DTRs. So
+attendance that arrives before the person exists in the HRIS is recoverable rather than lost.
+
+**The `employee_no` fallback has a failure mode worth knowing.** If someone is re-enrolled
+under a new PIN and their old employee number is then reused on the device for a *different*
+person, that person's punches land on the original employee's record. `BiometricAnomalyDetector`
+looks for exactly this and opens a reviewable row; see
+[09-alerts-and-notifications.md](09-alerts-and-notifications.md).
 
 **Security** — devices **auto-register by serial** on first contact but land **inactive**;
 their punches are **rejected until an admin activates the serial** and assigns its company.
@@ -158,8 +173,10 @@ Full definitions: [02-database-schema.md](02-database-schema.md).
 
 ## 10. Reliability & scale
 
-- **Worker pool** — Caddy round-robins 4 Laravel workers, so a slow request on one worker
-  doesn't block the others, and a crashed worker drops out via the `/up` health check.
+- **Worker pool** — 4 Laravel workers start, but with Caddy out of the path only `:8000`
+  (users) and `:8001` (devices) receive traffic. The split still buys the important part:
+  a flood of punches can't starve the UI. What it no longer buys is failover — see the
+  topology note above.
 - **Idempotent ingestion** — safe device retries; no double punches.
 - **Bounded recompute** — DTR re-runs only affected employee+date ranges.
 - **Indexes** on hot columns (`employee_id`, `work_date`, `logged_at`, `company_id`).

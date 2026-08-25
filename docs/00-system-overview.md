@@ -3,7 +3,8 @@
 > **Who this is for:** Anyone who needs to understand what this system is and does, without being a programmer. Read this top-to-bottom and you'll be able to explain the system to other people.
 >
 > **Where to find this file:** `docs/00-system-overview.md` inside the project folder
-> (`Documents\meatplus-hris\docs`). It sits next to the two technical docs, `01-architecture.md` and `02-database-schema.md`.
+> (`Documents\meatplus-hris\docs`). It sits alongside the technical docs — see
+> [README.md](README.md) for the full index.
 
 ---
 
