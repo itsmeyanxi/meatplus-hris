@@ -45,8 +45,6 @@ class AttendanceDevice extends Model
             'last_synced_at' => 'datetime',
             'last_event_at' => 'datetime',
             'last_seen_at' => 'datetime',
-            'silence_notified_at' => 'datetime',
-            'silence_emailed_at' => 'datetime',
         ];
     }
 

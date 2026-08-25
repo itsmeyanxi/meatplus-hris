@@ -13,7 +13,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 /**
  * HR review + resolution of detected biometric PIN-reuse collisions
  * (see {@see BiometricAnomalyDetector}). Gated by attendance.manage — the same
- * authority that receives the {@see \App\Notifications\BiometricMappingAlert}.
+ * authority that receives the daily {@see \App\Notifications\BiometricHealthDigest}.
  */
 class BiometricAnomalyController extends Controller
 {
@@ -39,7 +39,7 @@ class BiometricAnomalyController extends Controller
     {
         abort_unless($request->user()->can('attendance.manage'), 403);
 
-        return response()->json($detector->syncAndNotify());
+        return response()->json($detector->sync());
     }
 
     /** HR has handled this one (fixed the mapping, or judged it fine) — close it. */

@@ -4,13 +4,10 @@ namespace App\Domain\Attendance\Services\Biometric;
 
 use App\Domain\Attendance\Models\BiometricAnomaly;
 use App\Domain\HRIS\Models\Employee;
-use App\Domain\Identity\Support\HrRecipients;
-use App\Notifications\BiometricMappingAlert;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Notification;
 
 /**
- * Finds "PIN reuse collisions" and alerts HR.
+ * Finds "PIN reuse collisions" so the daily digest can report them.
  *
  * Symptom (real case: Saludaga/Robby): an employee was re-enrolled on the terminal
  * under a new PIN and their biometric_user_id was updated to it. Their OLD employee
@@ -29,18 +26,6 @@ class BiometricAnomalyDetector
 {
     /** Only consider punches this recent — we alert on live, ongoing misattribution. */
     private const WINDOW_DAYS = 45;
-
-    /**
-     * Do not re-alert HR about the same (employee, PIN) inside this many hours.
-     *
-     * Detection runs over a ROLLING window, so a collision can age out of that
-     * window, be marked resolved, then reappear the moment a fresh punch lands —
-     * which reads as "newly opened" and fires the alert again. That flap was
-     * invisible on a daily schedule but re-pings HR every hour on an hourly one.
-     * The alert still fires for a genuinely new collision, and again if one comes
-     * back after a real absence; it just cannot repeat inside a day.
-     */
-    private const RENOTIFY_COOLDOWN_HOURS = 24;
 
     /** Below this name similarity (%), the device name is treated as a different person. */
     private const SIMILARITY_FLOOR = 55.0;
@@ -128,12 +113,17 @@ class BiometricAnomalyDetector
     }
 
     /**
-     * Detect, persist new/updated rows, notify HR for newly-opened ones, and mark
-     * resolved the ones that no longer appear.
+     * Detect, persist new/updated rows, and mark resolved the ones that no longer
+     * appear. Deliberately does NOT notify: telling HR is the daily digest's job (see
+     * BiometricDigestBuilder), which reads the open rows this leaves behind.
+     *
+     * Alerting from here produced one bell item per collision the moment it was found
+     * — 131 of them at 12% read, while the two real problems stayed unfixed for twelve
+     * days. Detection running hourly is right; announcing hourly was not.
      *
      * @return array{new:int, ongoing:int, resolved:int}
      */
-    public function syncAndNotify(): array
+    public function sync(): array
     {
         $current = $this->detect();
         $currentKeys = [];
@@ -150,31 +140,29 @@ class BiometricAnomalyDetector
                 'kind' => 'pin_reuse_collision',
             ]);
 
-            // Worth alerting about: a brand-new collision, or one that had been
-            // resolved and is back. Suppressed if HR was already told recently
-            // (see RENOTIFY_COOLDOWN_HOURS) — such a row counts as ongoing, not new.
-            $reopened = $row->exists && $row->resolved_at !== null;
-            $cooling = $row->notified_at !== null
-                && $row->notified_at->greaterThan(now()->subHours(self::RENOTIFY_COOLDOWN_HOURS));
-            $isNew = (! $row->exists || $reopened) && ! $cooling;
+            // A brand-new collision, or one that had been resolved and is back. Purely
+            // a count for the command's output now — the digest decides what gets said.
+            $isNew = ! $row->exists || $row->resolved_at !== null;
             $row->fill([
                 'company_id' => $a['company_id'],
                 'device_key' => $a['device_key'],
                 'device_name' => $a['device_name'],
                 'punches' => $a['punches'],
                 'detail' => "PIN {$a['pin']} is enrolled on the device as \"{$a['device_name']}\" but matches {$a['employee_name']} by employee number.",
-                'detected_at' => now(),
                 'resolved_at' => null,
             ]);
+
+            // Stamp detected_at ONLY when the collision first appears (or comes back
+            // after being resolved). Refreshing it every hourly scan reset the clock,
+            // so a problem open since 13 Aug kept reporting itself as found today —
+            // which is exactly how two of these went twelve days without anyone
+            // realising they were stale rather than new.
+            if ($isNew || $row->detected_at === null) {
+                $row->detected_at = now();
+            }
             $row->save();
 
-            if ($isNew) {
-                $this->notifyHr($row, $a);
-                $row->forceFill(['notified_at' => now()])->save();
-                $new++;
-            } else {
-                $ongoing++;
-            }
+            $isNew ? $new++ : $ongoing++;
         }
 
         // Anything previously open but no longer detected is resolved.
@@ -188,29 +176,6 @@ class BiometricAnomalyDetector
         }
 
         return ['new' => $new, 'ongoing' => $ongoing, 'resolved' => $resolved];
-    }
-
-    /** Send the bell alert to HR of the affected employee's company (attendance.manage). */
-    private function notifyHr(BiometricAnomaly $row, array $a): void
-    {
-        try {
-            $users = HrRecipients::withPermissionForCompany('attendance.manage', $a['company_id'] ? (int) $a['company_id'] : null);
-            if ($users->isEmpty()) {
-                return;
-            }
-
-            Notification::send($users, new BiometricMappingAlert(
-                $a['employee_name'],
-                $a['pin'],
-                $a['device_name'],
-                $a['punches'],
-                // Land on this exact row, switching to its company first if needed.
-                '/attendance/biometric-issues?focus='.$row->id.($a['company_id'] ? '&company='.$a['company_id'] : ''),
-                $a['employee_id'],
-            ));
-        } catch (\Throwable $e) {
-            report($e);
-        }
     }
 
     /**

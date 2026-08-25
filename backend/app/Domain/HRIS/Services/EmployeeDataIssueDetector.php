@@ -76,17 +76,26 @@ class EmployeeDataIssueDetector
     }
 
     /**
-     * Sync detected issues into the table and digest-notify HR of new ones.
+     * Sync detected issues into the table, and OPTIONALLY digest-notify HR.
      *
-     * @return array{new:int, ongoing:int, resolved:int, open:int}
+     * Detection and announcement were deliberately split. Detection wants to run often
+     * so the review page is current; announcing that often meant a fresh bell item at
+     * any hour of the day, which is how 51 of these accumulated at 18% read. The
+     * scheduler now detects hourly and notifies once each morning.
+     *
+     * Nothing is lost in between: a newly-opened issue is remembered by its null
+     * `first_notified_at`, so the daily pass reports everything that appeared since
+     * the last one rather than only what this exact run happened to find.
+     *
+     * @param  bool  $notify  send the digest (daily pass) or stay silent (hourly pass)
+     * @return array{new:int, ongoing:int, resolved:int, open:int, notified:int}
      */
-    public function syncAndNotify(): array
+    public function sync(bool $notify = false): array
     {
         $current = $this->detect();
         $seen = [];
         $new = 0;
         $ongoing = 0;
-        $newByCompany = []; // company_id => count of newly-opened issues
 
         foreach ($current as $a) {
             $key = $a['employee_id'].'|'.$a['category'];
@@ -106,17 +115,19 @@ class EmployeeDataIssueDetector
                 'company_id' => $a['company_id'],
                 'severity' => $a['severity'],
                 'detail' => $a['detail'],
-                'detected_at' => now(),
                 'resolved_at' => null,
-            ])->save();
+            ]);
 
-            if ($isNew) {
-                $new++;
-                $cid = $a['company_id'] ? (int) $a['company_id'] : 0;
-                $newByCompany[$cid] = ($newByCompany[$cid] ?? 0) + 1;
-            } else {
-                $ongoing++;
+            // Only stamp detected_at when the issue first appears (or returns after
+            // being resolved). Refreshing it on every scan reset the clock, so a gap
+            // open for weeks kept presenting itself as found just now — and "how long
+            // has this been outstanding" became unanswerable.
+            if ($isNew || $row->detected_at === null) {
+                $row->detected_at = now();
             }
+            $row->save();
+
+            $isNew ? $new++ : $ongoing++;
         }
 
         // Auto-resolve issues that are no longer detected (and weren't ignored).
@@ -132,12 +143,37 @@ class EmployeeDataIssueDetector
 
         $open = EmployeeDataIssue::whereNull('resolved_at')->where('ignored', false)->count();
 
-        // One digest PER COMPANY, to that company's HR only.
-        foreach ($newByCompany as $cid => $newCount) {
-            $this->notifyHr($cid ?: null, $newCount);
+        $notified = $notify ? $this->notifyPending() : 0;
+
+        return ['new' => $new, 'ongoing' => $ongoing, 'resolved' => $resolved, 'open' => $open, 'notified' => $notified];
+    }
+
+    /**
+     * Digest every company that has open issues HR has not been told about yet.
+     *
+     * Driven by `first_notified_at` rather than by what this run happened to detect,
+     * so an issue found by an hourly pass at 2pm is still reported in the next
+     * morning's digest instead of being silently skipped.
+     *
+     * @return int  companies notified
+     */
+    private function notifyPending(): int
+    {
+        $pending = EmployeeDataIssue::query()
+            ->whereNull('resolved_at')
+            ->where('ignored', false)
+            ->whereNull('first_notified_at')
+            ->selectRaw('company_id, count(*) as c')
+            ->groupBy('company_id')
+            ->pluck('c', 'company_id');
+
+        $sent = 0;
+        foreach ($pending as $companyId => $newCount) {
+            $this->notifyHr($companyId ? (int) $companyId : null, (int) $newCount);
+            $sent++;
         }
 
-        return ['new' => $new, 'ongoing' => $ongoing, 'resolved' => $resolved, 'open' => $open];
+        return $sent;
     }
 
     /** Short human label per category, ordered high-severity first (drives the digest breakdown). */

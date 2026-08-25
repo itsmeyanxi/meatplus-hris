@@ -18,7 +18,7 @@ class DetectBiometricAnomalies extends Command
 
     public function handle(BiometricAnomalyDetector $detector): int
     {
-        $result = $detector->syncAndNotify();
+        $result = $detector->sync();
 
         $this->info("Biometric anomalies — new: {$result['new']}, ongoing: {$result['ongoing']}, resolved: {$result['resolved']}.");
 

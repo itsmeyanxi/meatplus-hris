@@ -21,30 +21,37 @@ Schedule::command('attendance:reclaim-unmatched')
     ->withoutOverlapping()
     ->runInBackground();
 
-// Alert HR to biometric PIN-reuse collisions (someone else's punches landing on an
-// employee via the employee-number fallback). Runs HOURLY so HR hears about a bad
-// mapping the same morning it happens rather than the next day; only NEWLY-opened
-// anomalies notify, so repeating the scan every hour never re-pings the bell.
+// Detect biometric PIN-reuse collisions (someone else's punches landing on an
+// employee via the employee-number fallback). Runs HOURLY, but only to keep the
+// review page current — it no longer notifies anyone. Announcing each collision the
+// moment it was found produced 131 alerts at 12% read, while the two real problems
+// sat unfixed for twelve days; the daily digest below now does the telling.
 Schedule::command('attendance:detect-biometric-anomalies')
     ->hourly()
     ->withoutOverlapping()
     ->runInBackground();
 
-// Alert IT/HR when a terminal stops contacting the server. Judged on the ~30-second
-// iclock heartbeat, NOT on punch activity, so a quiet site is never mistaken for a
-// dead one. Hourly: a silent terminal marks its people absent every day it stays
-// down, so it must be chased the same morning. The in-app bell fires as soon as an
-// outage is detected; email is limited to Mondays and Fridays (see the detector).
-Schedule::command('attendance:detect-device-silence')
-    ->hourly()
+// THE daily biometric notice: offline terminals, PIN collisions and unmapped punches
+// merged into one bell item per person, at the start of the working day. Sends
+// nothing when nothing is wrong. Email rides along on Mondays and Fridays only.
+Schedule::command('attendance:biometric-digest')
+    ->dailyAt('07:00')
     ->withoutOverlapping()
     ->runInBackground();
 
 // Scan employee records for data problems (missing payroll/attendance essentials,
-// silent attendance) and send HR one aggregated digest. Runs HOURLY: the digest is
-// only sent for issues detected as NEW in that pass, so an hourly cadence surfaces a
-// problem within the hour without turning into an hourly notification.
+// silent attendance). Detection stays frequent so the review page is current, but the
+// DIGEST is sent once a day alongside the biometric one — running it hourly meant a
+// fresh bell item at any hour, which is how 51 of these piled up at 18% read.
 Schedule::command('employees:detect-data-issues')
     ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// …and the one daily digest for them, just after the biometric one so HR opens the
+// bell to two notices rather than a day's worth. Anything an hourly pass found since
+// yesterday is included — nothing detected between digests is skipped.
+Schedule::command('employees:detect-data-issues --notify')
+    ->dailyAt('07:05')
     ->withoutOverlapping()
     ->runInBackground();
