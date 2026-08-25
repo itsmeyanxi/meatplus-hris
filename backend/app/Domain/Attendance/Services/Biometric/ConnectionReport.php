@@ -20,7 +20,7 @@ class ConnectionReport
     /** A device that pushed within this many minutes is considered live. */
     private const LIVE_MINUTES = 60;
 
-    /** Beyond this many days of silence a device is treated as offline, not idle. */
+    /** Days of no contact after which the outage message escalates its wording. */
     private const OFFLINE_DAYS = 3;
 
     /** Window used for throughput and the ingestion match rate. */
@@ -71,7 +71,15 @@ class ConnectionReport
             $s30 = $staged30->get($key);
 
             $lastEvent = $d->last_event_at ? Carbon::parse($d->last_event_at) : null;
-            $minutes = $lastEvent ? $lastEvent->diffInMinutes($now) : null;
+            // Connectivity is judged on the ~30-second iclock heartbeat, NOT on punch
+            // activity. `last_event_at` only advances when ATTLOG data arrives, which
+            // made a healthy terminal at a quiet site (MTC, the NBC pantry) read as
+            // "offline for 5 days" while it was polling us every half minute. The
+            // punch timestamp is still surfaced separately as `last_punch_at`.
+            $lastSeen = $d->last_seen_at ? Carbon::parse($d->last_seen_at) : $lastEvent;
+            // Carbon 3 returns a float here; round to whole minutes so the value can be
+            // fed to intdiv() and rendered without a fractional tail.
+            $minutes = $lastSeen ? (int) round($lastSeen->diffInMinutes($now)) : null;
 
             $matched30 = (int) ($t->total ?? 0);
             $unmatched30 = (int) ($s30->c ?? 0);
@@ -85,9 +93,10 @@ class ConnectionReport
                 'company' => $d->company?->code,
                 'is_active' => (bool) $d->is_active,
                 'last_event_at' => $lastEvent?->toIso8601String(),
+                'last_seen_at' => $lastSeen?->toIso8601String(),
                 'last_synced_at' => $d->last_synced_at?->toIso8601String(),
                 'silent_minutes' => $minutes,
-                'state' => $this->state($d, $minutes),
+                'state' => $this->state($minutes, $t->last_punch ?? null),
                 'punches_today' => (int) ($t->today ?? 0),
                 'punches_7d' => (int) ($t->last7 ?? 0),
                 'punches_30d' => $matched30,
@@ -98,7 +107,7 @@ class ConnectionReport
                 'staged_pins' => (int) ($s->pins ?? 0),
                 // What share of what it sent in the window actually landed on a person.
                 'match_rate' => $seen30 > 0 ? round($matched30 / $seen30 * 100, 1) : null,
-                'attention' => $this->attention($d, $minutes, $matched30, (int) ($s->pending ?? 0), $seen30),
+                'attention' => $this->attention($d, $minutes, $matched30, (int) ($s->pending ?? 0), $seen30, $t->last_punch ?? null),
             ];
         }
 
@@ -120,23 +129,42 @@ class ConnectionReport
         ];
     }
 
-    /** live · idle · quiet · offline · never — from how long since the device last pushed. */
-    private function state(AttendanceDevice $d, ?int $minutes): string
+    /**
+     * live · idle · quiet · offline · never — from the CONNECTION heartbeat, plus one
+     * distinction the punch timestamp alone could never make.
+     *
+     * The terminals poll us every ~30 seconds day and night, so silence is measured in
+     * hours, not days: past DeviceSilenceDetector::SILENT_HOURS the unit is genuinely
+     * off and the alert has fired. `idle` now means the opposite of what it used to —
+     * the terminal is connected and healthy but nobody is punching on it, which is
+     * worth knowing (is this door still in use?) and is emphatically not an outage.
+     */
+    private function state(?int $minutes, ?string $lastPunchAt): string
     {
         if ($minutes === null) {
             return 'never';
         }
-        if ($minutes <= self::LIVE_MINUTES) {
-            return 'live';
+        if ($minutes > DeviceSilenceDetector::SILENT_HOURS * 60) {
+            return 'offline';
         }
-        if ($minutes < 60 * 24) {
-            return 'idle';           // same day — normal outside punch hours
+        if ($minutes > self::LIVE_MINUTES) {
+            return 'quiet';          // briefly out of touch — not yet alerting
         }
-        if ($minutes < 60 * 24 * self::OFFLINE_DAYS) {
-            return 'quiet';          // a day or two — suspicious, not yet damning
+        if ($this->punchlessDays($lastPunchAt) >= 7) {
+            return 'idle';           // connected, but taking no punches
         }
 
-        return 'offline';
+        return 'live';
+    }
+
+    /** Days since this terminal last produced a punch (PHP_INT_MAX when never). */
+    private function punchlessDays(?string $lastPunchAt): int
+    {
+        if (! $lastPunchAt) {
+            return PHP_INT_MAX;
+        }
+
+        return (int) Carbon::parse($lastPunchAt)->diffInDays(now());
     }
 
     /**
@@ -144,7 +172,7 @@ class ConnectionReport
      * most consequential problem wins — a dead terminal matters more than a low
      * match rate, because silence is what silently marks people absent.
      */
-    private function attention(AttendanceDevice $d, ?int $minutes, int $matched30, int $pending, int $seen30): ?string
+    private function attention(AttendanceDevice $d, ?int $minutes, int $matched30, int $pending, int $seen30, ?string $lastPunchAt): ?string
     {
         if (! $d->is_active) {
             return 'Not approved — its punches are being REJECTED. Set the company and activate it.';
@@ -154,12 +182,23 @@ class ConnectionReport
         }
 
         $days = intdiv($minutes, 60 * 24);
+        $hours = intdiv($minutes, 60);
 
         if ($days >= self::OFFLINE_DAYS) {
-            return "Silent for {$days} days. Anyone who normally punches here is being marked ABSENT — check the terminal.";
+            return "No contact for {$days} days. Anyone who normally punches here is being marked ABSENT — check the terminal.";
         }
-        if ($days >= 1 && $matched30 > 0) {
-            return "No contact for {$days} day(s) after being active — worth checking before it costs someone a day's pay.";
+        if ($hours >= DeviceSilenceDetector::SILENT_HOURS) {
+            $span = $days >= 1 ? "{$days} day(s)" : "{$hours} hours";
+
+            return "No contact for {$span}. It checks in every 30 seconds when healthy, so this is a real outage — check power and network.";
+        }
+        // Connected and healthy, but nothing is coming through it. Not an outage, and
+        // deliberately ranked below every fault above: it usually means the door or
+        // shift moved, and it should never be mistaken for a dead terminal.
+        if ($matched30 > 0 && $this->punchlessDays($lastPunchAt) >= 7) {
+            $quiet = $this->punchlessDays($lastPunchAt);
+
+            return "Connected, but no punches in {$quiet} days. Confirm the terminal is still in use.";
         }
         if ($pending > 0 && $seen30 > 0 && $matched30 === 0) {
             return "Reachable, but NONE of its punches match an employee — {$pending} staged. The PINs on this terminal are not mapped in the HRIS.";

@@ -115,7 +115,12 @@ export const devicesApi = {
   },
 };
 
-/** live = pushed within the hour · idle = same day · quiet = 1–2 days · offline = 3+ days */
+/**
+ * Connection state, from the ~30-second iclock heartbeat (NOT from punch activity):
+ * live = in touch within the hour · quiet = out of touch under 2h · offline = past
+ * that, and alerting · never = has never contacted us. `idle` is the odd one out:
+ * connected and healthy, but no punches for 7+ days — a door nobody is using.
+ */
 export type DeviceState = "live" | "idle" | "quiet" | "offline" | "never";
 
 export type DeviceHealth = {
@@ -125,7 +130,12 @@ export type DeviceHealth = {
   vendor: string | null;
   company: string | null;
   is_active: boolean;
+  /** Last time a PUNCH came through — attendance activity, not connectivity. */
   last_event_at: string | null;
+  /** Last time the terminal contacted us at all — the ~30s connection heartbeat. */
+  last_seen_at: string | null;
+  last_punch_at: string | null;
+  /** Minutes since last contact (from last_seen_at, NOT from punch activity). */
   silent_minutes: number | null;
   state: DeviceState;
   punches_today: number;

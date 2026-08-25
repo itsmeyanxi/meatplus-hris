@@ -30,7 +30,7 @@ class AttendanceDevice extends Model
     protected $fillable = [
         'company_id', 'branch_id', 'name', 'vendor', 'serial_no',
         'ip_address', 'port', 'timezone', 'use_server_time', 'username', 'password', 'is_active',
-        'last_synced_at', 'last_event_at',
+        'last_synced_at', 'last_event_at', 'last_seen_at',
     ];
 
     protected $hidden = ['password'];
@@ -44,7 +44,22 @@ class AttendanceDevice extends Model
             'is_active' => 'boolean',
             'last_synced_at' => 'datetime',
             'last_event_at' => 'datetime',
+            'last_seen_at' => 'datetime',
+            'silence_notified_at' => 'datetime',
+            'silence_emailed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Minutes since the terminal last CONTACTED us at all (not since it last sent a
+     * punch). Null when it has never made contact. This is the connectivity signal —
+     * `last_event_at` answers a different question: when did someone last punch here.
+     */
+    public function silentMinutes(): ?int
+    {
+        $seen = $this->last_seen_at ?? $this->last_event_at;
+
+        return $seen ? (int) $seen->diffInMinutes(now()) : null;
     }
 
     public function branch(): BelongsTo

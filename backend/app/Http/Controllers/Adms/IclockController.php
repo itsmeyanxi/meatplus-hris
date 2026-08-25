@@ -20,7 +20,7 @@ class IclockController extends Controller
     /** GET = handshake (device asks for options); POST = data push (ATTLOG, …). */
     public function cdata(Request $request): Response
     {
-        $this->logRequest($request);
+        $this->recordRequest($request);
 
         $sn = (string) $request->query('SN', '');
 
@@ -41,7 +41,7 @@ class IclockController extends Controller
      */
     public function getrequest(Request $request): Response
     {
-        $this->logRequest($request);
+        $this->recordRequest($request);
 
         $sn = (string) $request->query('SN', '');
         if ($sn !== '') {
@@ -66,7 +66,7 @@ class IclockController extends Controller
     /** Device reports command execution results. */
     public function devicecmd(Request $request): Response
     {
-        $this->logRequest($request);
+        $this->recordRequest($request);
 
         return $this->text('OK');
     }
@@ -74,7 +74,7 @@ class IclockController extends Controller
     /** Any other iclock path (fdata, edata, ping, …). */
     public function fallback(Request $request): Response
     {
-        $this->logRequest($request);
+        $this->recordRequest($request);
 
         return $this->text('OK');
     }
@@ -84,8 +84,19 @@ class IclockController extends Controller
         return response($body, 200)->header('Content-Type', 'text/plain');
     }
 
-    private function logRequest(Request $request): void
+    /**
+     * Log the raw request AND stamp the device's heartbeat.
+     *
+     * Every iclock call counts: the terminals poll getrequest every ~30 seconds
+     * around the clock, so `last_seen_at` is what tells us a unit is still connected.
+     * `last_event_at` only moves when punches arrive, which makes a quiet site look
+     * identical to an unplugged terminal — the down alert reads last_seen_at exactly
+     * so it never pages anyone over an idle Sunday.
+     */
+    private function recordRequest(Request $request): void
     {
+        $this->stampHeartbeat((string) $request->query('SN', ''));
+
         $entry = sprintf(
             "[%s] %s %s\nBODY: %s\n%s\n",
             now()->toDateTimeString(),
@@ -98,6 +109,26 @@ class IclockController extends Controller
         $written = file_put_contents(storage_path('logs/iclock.log'), $entry, FILE_APPEND | LOCK_EX);
         if ($written === false) {
             \Illuminate\Support\Facades\Log::channel('single')->info('iclock request (file write failed): ' . $entry);
+        }
+    }
+
+    /**
+     * Record that this serial just contacted us. A bare query-builder update on
+     * purpose: it runs on every poll from every terminal (~18 a minute), so it must
+     * not fire model events or the company scope — and must never break ingestion.
+     */
+    private function stampHeartbeat(string $sn): void
+    {
+        if ($sn === '') {
+            return;
+        }
+
+        try {
+            \Illuminate\Support\Facades\DB::table('attendance_devices')
+                ->where('serial_no', $sn)
+                ->update(['last_seen_at' => now()]);
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 }

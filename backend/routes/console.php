@@ -30,6 +30,16 @@ Schedule::command('attendance:detect-biometric-anomalies')
     ->withoutOverlapping()
     ->runInBackground();
 
+// Alert IT/HR when a terminal stops contacting the server. Judged on the ~30-second
+// iclock heartbeat, NOT on punch activity, so a quiet site is never mistaken for a
+// dead one. Hourly: a silent terminal marks its people absent every day it stays
+// down, so it must be chased the same morning. The in-app bell fires as soon as an
+// outage is detected; email is limited to Mondays and Fridays (see the detector).
+Schedule::command('attendance:detect-device-silence')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // Scan employee records for data problems (missing payroll/attendance essentials,
 // silent attendance) and send HR one aggregated digest. Runs HOURLY: the digest is
 // only sent for issues detected as NEW in that pass, so an hourly cadence surfaces a

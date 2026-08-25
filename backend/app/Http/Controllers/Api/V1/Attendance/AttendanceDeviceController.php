@@ -46,16 +46,22 @@ class AttendanceDeviceController extends Controller
 
         return response()->streamDownload(function () use ($data) {
             $out = fopen('php://output', 'w');
+            // "Last contact" is the connection heartbeat and "Last punch" is attendance
+            // activity — two separate columns on purpose. Exporting the punch timestamp
+            // as contact time is what made healthy low-traffic terminals read as dead.
             fputcsv($out, ['Device', 'Serial', 'Company', 'Vendor', 'Approved', 'State',
-                'Last contact', 'Silent (hours)', 'Punches today', 'Punches 7d', 'Punches 30d',
+                'Last contact', 'Last punch', 'Silent (hours)', 'Punches today', 'Punches 7d', 'Punches 30d',
                 'Employees 30d', 'Match rate %', 'Staged punches', 'Unmapped PINs', 'Needs attention']);
+
+            $stamp = fn (?string $iso) => $iso ? substr(str_replace('T', ' ', $iso), 0, 16) : 'never';
 
             foreach ($data['devices'] as $d) {
                 fputcsv($out, [
                     $d['name'], $d['serial_no'], $d['company'], $d['vendor'],
                     $d['is_active'] ? 'yes' : 'NO',
                     $d['state'],
-                    $d['last_event_at'] ? substr(str_replace('T', ' ', $d['last_event_at']), 0, 16) : 'never',
+                    $stamp($d['last_seen_at']),
+                    $stamp($d['last_punch_at'] ? str_replace(' ', 'T', $d['last_punch_at']) : null),
                     $d['silent_minutes'] === null ? '' : round($d['silent_minutes'] / 60, 1),
                     $d['punches_today'], $d['punches_7d'], $d['punches_30d'], $d['employees_30d'],
                     $d['match_rate'] ?? '', $d['staged_pending'], $d['staged_pins'],

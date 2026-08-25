@@ -14,12 +14,18 @@ import { devicesApi, type DeviceHealth, type DeviceState } from "@/lib/devices";
  * company — while having sent nothing for weeks. That matters because absence is
  * judged from missing punches, so a silent device quietly marks its people ABSENT
  * every day until somebody notices.
+ *
+ * Two different questions live in this table, and conflating them was the old bug:
+ * "Last seen" is the ~30-second connection heartbeat (is the unit plugged in and
+ * reachable), while "Last punch" is attendance activity. A quiet door with nobody
+ * punching used to read as OFFLINE for days — hence "Connected · no punches", which
+ * is a healthy terminal, not an outage.
  */
 
 const STATE_STYLE: Record<DeviceState, { dot: string; chip: string; label: string }> = {
   live:    { dot: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-700",  label: "Live" },
-  idle:    { dot: "bg-slate-400",   chip: "bg-slate-100 text-slate-600",     label: "Idle today" },
-  quiet:   { dot: "bg-amber-500",   chip: "bg-amber-50 text-amber-700",      label: "Quiet" },
+  idle:    { dot: "bg-sky-500",     chip: "bg-sky-50 text-sky-700",          label: "Connected · no punches" },
+  quiet:   { dot: "bg-amber-500",   chip: "bg-amber-50 text-amber-700",      label: "Out of touch" },
   offline: { dot: "bg-red-500",     chip: "bg-red-50 text-red-700",          label: "Offline" },
   never:   { dot: "bg-red-500",     chip: "bg-red-50 text-red-700",          label: "Never seen" },
 };
@@ -31,6 +37,14 @@ function silence(mins: number | null): string {
   const h = mins / 60;
   if (h < 24) return `${Math.round(h)} h ago`;
   return `${Math.floor(h / 24)} d ago`;
+}
+
+/** Relative age of a timestamp, for the "Last punch" column. */
+function ago(iso: string | null): string {
+  if (!iso) return "never";
+  const mins = (Date.now() - new Date(iso).getTime()) / 60000;
+  if (!isFinite(mins) || mins < 0) return "—";
+  return silence(mins);
 }
 
 /** Below ~90% a meaningful share of what the device sends is landing on nobody. */
@@ -124,16 +138,16 @@ export function BiometricConnectionReport() {
           <table className="w-full min-w-[900px] text-sm">
             <thead className="bg-slate-50">
               <tr>
-                {["Device", "Company", "State", "Last contact", "Today", "7 days", "30 days", "People", "Match rate", "Staged"].map((h) => (
+                {["Device", "Company", "State", "Last contact", "Last punch", "Today", "7 days", "30 days", "People", "Match rate", "Staged"].map((h) => (
                   <th key={h} className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
               {isLoading ? (
-                <tr><td colSpan={10} className="px-3 py-8 text-center text-xs text-slate-400">Checking terminals…</td></tr>
+                <tr><td colSpan={11} className="px-3 py-8 text-center text-xs text-slate-400">Checking terminals…</td></tr>
               ) : devices.length === 0 ? (
-                <tr><td colSpan={10} className="px-3 py-8 text-center text-xs text-slate-400">No devices registered for this company.</td></tr>
+                <tr><td colSpan={11} className="px-3 py-8 text-center text-xs text-slate-400">No devices registered for this company.</td></tr>
               ) : (
                 devices.map((d: DeviceHealth) => {
                   const st = STATE_STYLE[d.state];
@@ -152,6 +166,11 @@ export function BiometricConnectionReport() {
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${st.chip}`}>{st.label}</span>
                       </td>
                       <td className="px-3 py-2.5 whitespace-nowrap text-slate-600">{silence(d.silent_minutes)}</td>
+                      {/* Deliberately its own column: a terminal can be reachable
+                          (Last contact seconds ago) while nobody has punched on it
+                          for a week. Reading one as the other is what made healthy
+                          low-traffic doors look dead. */}
+                      <td className="px-3 py-2.5 whitespace-nowrap text-slate-500">{ago(d.last_punch_at)}</td>
                       <td className="px-3 py-2.5 tabular-nums text-slate-700">{d.punches_today}</td>
                       <td className="px-3 py-2.5 tabular-nums text-slate-600">{d.punches_7d}</td>
                       <td className="px-3 py-2.5 tabular-nums text-slate-600">{d.punches_30d.toLocaleString()}</td>
