@@ -56,6 +56,13 @@ HTTPS/443 is not enabled — the site is intentionally HTTP for now. See
 | 07 | [Employee accounts](07-employee-accounts.md) | Give employees a login — bulk invite, single invite, direct provision |
 | 08 | [Backend walkthrough](08-backend-walkthrough.md) | Read the code: request lifecycle, domain layout, the two invariants, the three engines |
 | 09 | [Alerts & notifications](09-alerts-and-notifications.md) | What the system tells people, when, and through which channel |
+| 10 | [**System turnover**](10-system-turnover.md) | **The complete handover document** — overview, architecture, DB, modules, workflows, roles, API, deployment, environment, backup/recovery, known issues, code structure, scheduled jobs, security, maintenance, ownership |
+
+> Documents 01–09 go deep on one topic each. **Document 10 is the single self-contained
+> reference** for maintenance, onboarding, or handing the system to another team — start there
+> if you are new or taking ownership. Screenshots live in
+> [screenshots/](screenshots/README.md), which lists exactly what to capture and what must be
+> redacted first.
 
 ---
 
