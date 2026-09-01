@@ -49,10 +49,21 @@ class EmployeeController extends Controller
         ]);
 
         $companyId = $request->user()->active_company_id;
+
+        // Marking confidential also puts staff on the "exempted" schedule (always
+        // present, no punch). A mass query-builder update bypasses model events, so
+        // set it here to mirror the Employee saving hook. One-directional: unmarking
+        // confidential leaves the schedule as-is.
+        $attrs = ['is_confidential' => $data['is_confidential']];
+        if ($data['is_confidential']) {
+            $attrs['schedule_type'] = 'exempted';
+            $attrs['time_in_out_required'] = false;
+        }
+
         $updated = Employee::query()
             ->whereIn('id', $data['employee_ids'])
             ->where('company_id', $companyId)
-            ->update(['is_confidential' => $data['is_confidential']]);
+            ->update($attrs);
 
         return response()->json(['updated' => $updated, 'is_confidential' => $data['is_confidential']]);
     }

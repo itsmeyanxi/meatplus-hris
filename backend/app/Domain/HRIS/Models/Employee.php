@@ -65,6 +65,15 @@ class Employee extends Model
         // Keep the time_in_out_required flag in sync with the schedule type, so the
         // DTR (which reads the flag) and any type change stay consistent.
         static::saving(function (self $e) {
+            // Confidential staff (execs / senior) are exempt from time tracking:
+            // when an employee is MARKED confidential, put them on the "exempted"
+            // schedule (always present, no punch). One-directional — clearing the
+            // confidential flag does not change the schedule back. Runs before the
+            // sync below so time_in_out_required follows to false.
+            if ($e->is_confidential && $e->isDirty('is_confidential')) {
+                $e->schedule_type = 'exempted';
+            }
+
             if ($e->isDirty('schedule_type') && $e->schedule_type !== null) {
                 $e->time_in_out_required = ! in_array($e->schedule_type, self::NO_PUNCH_TYPES, true);
             }
