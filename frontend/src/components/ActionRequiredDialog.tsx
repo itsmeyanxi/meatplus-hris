@@ -25,6 +25,8 @@ import { getNotifications, markNotificationRead, type AppNotification } from "@/
 
 /** Notification types that represent work, ordered by how much it costs to ignore them. */
 const ACTIONABLE: Record<string, { label: string; tone: string; rank: number }> = {
+  // Assigned by a person, so it outranks anything the system found on its own.
+  "action.assignment": { label: "Assigned to you", tone: "red", rank: -1 },
   "biometric.device_offline": { label: "Terminal offline", tone: "red", rank: 0 },
   "biometric.digest": { label: "Biometric", tone: "red", rank: 1 },
   "biometric.mapping": { label: "Wrong person", tone: "red", rank: 2 },
