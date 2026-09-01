@@ -57,6 +57,7 @@ HTTPS/443 is not enabled — the site is intentionally HTTP for now. See
 | 08 | [Backend walkthrough](08-backend-walkthrough.md) | Read the code: request lifecycle, domain layout, the two invariants, the three engines |
 | 09 | [Alerts & notifications](09-alerts-and-notifications.md) | What the system tells people, when, and through which channel |
 | 10 | [**System turnover**](10-system-turnover.md) | **The complete handover document** — overview, architecture, DB, modules, workflows, roles, API, deployment, environment, backup/recovery, known issues, code structure, scheduled jobs, security, maintenance, ownership |
+| 11 | [System check — 2026-09-01](11-system-check-2026-09-01.md) | Point-in-time health review: what was fixed (DTR fabricated time-ins, test suite aimed at production, log rotation) and what remains open |
 
 > Documents 01–09 go deep on one topic each. **Document 10 is the single self-contained
 > reference** for maintenance, onboarding, or handing the system to another team — start there
