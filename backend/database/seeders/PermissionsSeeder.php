@@ -171,7 +171,13 @@ class PermissionsSeeder extends Seeder
                 'leave.view', 'leave.file',
             ],
             'hr_coordinator' => [
-                'employee.view',
+                // employee.update is what lets a coordinator actually WORK the employee
+                // data-issues queue (rescan / dismiss), and it is also what puts them on
+                // the daily data-issues digest — viewing the list without being able to
+                // clear anything left the queue to pile up on the HR admins.
+                // Note it carries broader employee editing with it (bank accounts,
+                // government IDs, contracts, benefits), which is accepted for this role.
+                'employee.view', 'employee.update',
                 'attendance.view', 'attendance.view.any',
                 'leave.view', 'leave.file',
                 'access_request.view', 'access_request.approve.hr',
