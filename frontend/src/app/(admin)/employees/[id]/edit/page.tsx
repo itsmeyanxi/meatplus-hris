@@ -39,13 +39,24 @@ export default function EditEmployeePage() {
     queryKey: ["employee", employeeId],
     queryFn: () => getEmployee(employeeId),
     enabled: !!employeeId,
+    // Without a staleTime this query is stale immediately, so React Query refetched it
+    // on every window focus — including the focus change a native date picker causes.
+    // Each refetch re-ran the hydration effect below and wiped whatever was typed.
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
   });
 
   // Snapshot of the loaded values — used for dirty detection (below) and to
   // hydrate the form once the record arrives (no setState during render).
   const initialRef = useRef<typeof form | null>(null);
+  // Which employee the form has already been filled from. Hydration must happen ONCE
+  // per record: re-running it on a later fetch of the same employee overwrote the
+  // user's unsaved edits and reset `dirty`, which silently disabled Save — the form
+  // looked untouched even though HR had just typed into it.
+  const hydratedFor = useRef<number | null>(null);
   useEffect(() => {
     if (!emp) return;
+    if (hydratedFor.current === employeeId) return;
     const snapshot = {
       first_name: emp.first_name ?? "",
       middle_name: emp.middle_name ?? "",
@@ -80,7 +91,8 @@ export default function EditEmployeePage() {
     };
     setForm(snapshot);
     initialRef.current = snapshot;
-  }, [emp]);
+    hydratedFor.current = employeeId;
+  }, [emp, employeeId]);
 
   // Whether the form differs from what was loaded — drives the Save button and the
   // "leave without saving?" guard.

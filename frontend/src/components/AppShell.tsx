@@ -13,6 +13,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { IdleTimeout } from "@/components/IdleTimeout";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ForcePasswordChange } from "@/components/ForcePasswordChange";
+import { ActionRequiredDialog } from "@/components/ActionRequiredDialog";
 
 export type NavItem = {
   href: string;
@@ -240,6 +241,9 @@ export function AppShell({
       <IdleTimeout />
       {/* Ctrl/⌘+K quick search */}
       <CommandPalette />
+      {/* Once a day on entry: what is outstanding, in the middle of the screen.
+          The bell badge was being walked past — see the component for the numbers. */}
+      <ActionRequiredDialog userId={data?.user.id} />
 
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden border-r border-slate-200/80 bg-white/90 px-3.5 py-6 backdrop-blur lg:flex lg:min-h-screen lg:flex-col justify-between transition-all duration-300">
