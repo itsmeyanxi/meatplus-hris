@@ -365,7 +365,10 @@ class DtrComputer
      */
     private function scheduleOvernightDay(TimeLog $l, Collection $assignments): ?string
     {
-        $prevDay = $l->logged_at->subDay()->startOfDay();
+        // copy() again: without it, subDay()->startOfDay() rewrote the punch's OWN
+        // logged_at to the previous midnight, and the corrupted TimeLog stayed in the
+        // grouped collection that computeDay() later reads.
+        $prevDay = $l->logged_at->copy()->subDay()->startOfDay();
         $prev = $this->resolveScheduleDay($assignments, $prevDay);
         if ($prev && ! $prev->is_rest_day && $prev->time_in && $prev->time_out) {
             [$si, $so] = $this->scheduledWindow($prevDay->toDateString(), $prev->time_in, $prev->time_out);
@@ -410,7 +413,14 @@ class DtrComputer
         // qualifies, leave the day without a time-out (incomplete) rather than
         // fabricating a 20-24 hour shift.
         if ($actualIn && $actualOut && $actualIn->diffInMinutes($actualOut) > self::MAX_SHIFT_MINUTES) {
-            $cutoff = $actualIn->addMinutes(self::MAX_SHIFT_MINUTES);
+            // copy() is load-bearing. `logged_at` is a MUTABLE Carbon (the model's
+            // datetime cast), so addMinutes() without it moved $actualIn itself 16
+            // hours into the future and made $cutoff the same instant. The filter below
+            // then read "> X and <= X", matched nothing, and the day was written with a
+            // fabricated time-in and no time-out — 4,049 rows across 250 employees,
+            // every one of them losing night differential and any rest-day/holiday
+            // premium. Covered by DtrComputerTest.
+            $cutoff = $actualIn->copy()->addMinutes(self::MAX_SHIFT_MINUTES);
             // Latest punch still within the cap window becomes the out-punch (logs are
             // ascending, so scan from the end); if none qualifies, no time-out.
             $withinLast = $sortedLogs->reverse()->first(

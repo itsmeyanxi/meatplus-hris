@@ -106,9 +106,58 @@ class IclockController extends Controller
             str_repeat('-', 60),
         );
 
-        $written = file_put_contents(storage_path('logs/iclock.log'), $entry, FILE_APPEND | LOCK_EX);
+        $path = storage_path('logs/iclock.log');
+        $this->rotateIfLarge($path);
+
+        $written = file_put_contents($path, $entry, FILE_APPEND | LOCK_EX);
         if ($written === false) {
             \Illuminate\Support\Facades\Log::channel('single')->info('iclock request (file write failed): ' . $entry);
+        }
+    }
+
+    /** Roll the log over once it passes this size. */
+    private const MAX_LOG_BYTES = 64 * 1024 * 1024;
+
+    /** How many rotated archives to keep. */
+    private const KEEP_ARCHIVES = 4;
+
+    /**
+     * Size-rotate the ADMS log.
+     *
+     * Nine terminals poll every ~30 seconds and every request is logged in full, so
+     * this file grew about 4.5 MB a day and had reached 137 MB unbounded — big enough
+     * to be impractical to open, and eventually a disk problem.
+     *
+     * Rotation is by SIZE and keeps the active file at the same path on purpose: the
+     * anomaly detector reads `iclock.log` for device USER records, and a dated
+     * filename would have silently broken that fallback (it now reads the archives
+     * too). Failures here must never interfere with accepting a punch.
+     */
+    private function rotateIfLarge(string $path): void
+    {
+        try {
+            // filesize() reads PHP's stat cache, which still holds the pre-rotation size
+            // right after a roll-over and would immediately rotate the fresh, empty file.
+            clearstatcache(true, $path);
+
+            if (! is_file($path) || filesize($path) < self::MAX_LOG_BYTES) {
+                return;
+            }
+
+            $archive = storage_path('logs/iclock-'.now()->format('Ymd-His').'.log');
+            if (! @rename($path, $archive)) {
+                return; // locked by another worker - it will roll over on a later request
+            }
+
+            $existing = glob(storage_path('logs/iclock-*.log')) ?: [];
+            if (count($existing) > self::KEEP_ARCHIVES) {
+                sort($existing); // filenames are timestamped, so this is oldest-first
+                foreach (array_slice($existing, 0, count($existing) - self::KEEP_ARCHIVES) as $old) {
+                    @unlink($old);
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 

@@ -202,8 +202,17 @@ class BiometricAnomalyDetector
         }
 
         // Fallback: parse USER records from the ADMS log (best-effort; may be locked).
-        $log = storage_path('logs/iclock.log');
-        if (is_file($log) && ($fh = @fopen($log, 'r'))) {
+        // The log is size-rotated (see IclockController), so read the archives too —
+        // a terminal announces its enrolled users only occasionally, and reading just
+        // the active file would lose every name pushed before the last rotation.
+        $logs = array_merge(
+            glob(storage_path('logs/iclock-*.log')) ?: [],
+            [storage_path('logs/iclock.log')],
+        );
+        foreach ($logs as $log) {
+            if (! is_file($log) || ! ($fh = @fopen($log, 'r'))) {
+                continue;
+            }
             while (($line = @fgets($fh)) !== false) {
                 if (strpos($line, 'USER PIN=') !== false
                     && preg_match('/USER PIN=([^\t]+)\tName=([^\t]*)\t/', $line, $m)) {
